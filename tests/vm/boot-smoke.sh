@@ -38,6 +38,7 @@ rm -f "$log"
 
 qemu=(qemu-system-x86_64
   -machine q35,accel=kvm -cpu host -m 4096 -smp 2
+  -snapshot
   -drive if=pflash,format=raw,readonly=on,file="$ovmf_code"
   -drive if=pflash,format=raw,file="$vars"
   -drive file="$disk",if=virtio,format=qcow2

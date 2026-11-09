@@ -1,2 +1,3 @@
-# bootc-image-builder output and VM logs
+# bootc-image-builder output, VM logs, and a user-owned copy of the disk
 /output/
+/.vm/

@@ -26,4 +26,5 @@ podman run --rm --privileged --pull=newer \
   -v "$out:/output" \
   -v /var/lib/containers/storage:/var/lib/containers/storage \
   quay.io/centos-bootc/bootc-image-builder:latest \
-  build "$image" --type qcow2 --rootfs btrfs --use-librepo=True --output /output
+  build "$image" --type qcow2 --rootfs btrfs --use-librepo=True --output /output \
+  --chown "${SUDO_UID:-0}:${SUDO_GID:-0}"
