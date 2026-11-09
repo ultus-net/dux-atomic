@@ -1,0 +1,3 @@
+# Plymouth holds the boot at plymouth-quit-wait when no usable display is
+# present, and that unit has no timeout. This image ships no custom splash.
+kargs = ["plymouth.enable=0"]

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Give the greeter compositor access to the video, render, and input device groups: copy the missing groups from `/usr/lib/group` into `/etc/group`, add `greeter` to them, and fail the build if the membership did not take effect.
+- Disable Plymouth with `plymouth.enable=0`; with no usable display the boot waited forever in `plymouth-quit-wait`.
+- Assert the greeter session in `tests/vm/boot-smoke.sh`: wait for `greetd` and a `Session c1 of User greeter` scope instead of a serial login prompt, then check the scope is still running after a settle period.
+- Mask the portal service in the greeter user's real home, `/var/lib/greeter`, own that home in the tmpfiles rule, and check the rule in a scratch root at build time.
 - Build the image from the Universal Blue image-template layout: a `ctx` stage, `build/common.sh`, `overlay/`, and `bootc container lint`.
 - Install the first desktop set on `base-main:45`: niri, DMS 2.1.2, dux-greeter, Ghostty, and the Xfce X11 session; enable greetd.
 - Add `tests/vm/make-disk.sh` and `tests/vm/boot-smoke.sh` for a headless qcow2 boot test, with a serial-console kernel argument in the overlay.

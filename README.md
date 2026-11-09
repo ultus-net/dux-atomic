@@ -2,7 +2,7 @@
 
 A planned Fedora bootc developer and gaming workstation for two machines.
 
-The build definition is scaffolded from the Universal Blue image-template: the base tag is set in `Containerfile`. No image has been built or published yet.
+The build definition is scaffolded from the Universal Blue image-template: the base tag is set in `Containerfile`. The generic image builds and boots to the greeter in a VM; no image has been published yet.
 
 - Base: Universal Blue `base-main`, Fedora 45, on a floating tag while we prototype, with generic and NVIDIA variants.
 - Desktop: niri, Dux Modular Shell, Dux Greeter, and Ghostty.
@@ -29,4 +29,8 @@ sudo tests/vm/make-disk.sh
 tests/vm/boot-smoke.sh
 ```
 
-`make-disk.sh` runs bootc-image-builder as root. `boot-smoke.sh` boots the qcow2 headless and waits for a login prompt on the serial console.
+`make-disk.sh` runs bootc-image-builder as root. `boot-smoke.sh` boots the qcow2 headless and asserts that `graphical.target`, `greetd`, and a live greeter session scope appear on the serial console.
+
+QEMU's display-only `virtio-vga` has no render node, so the greeter compositor cannot paint under it. Check the rendered greeter on a GL-capable display (`virtio-vga-gl`) or real hardware; the smoke test asserts the session, not the pixels.
+
+The image disables Plymouth (`plymouth.enable=0`), so both the VM and real hardware show the text boot instead of a splash.
