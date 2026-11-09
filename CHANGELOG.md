@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Build the image from the Universal Blue image-template layout: a `ctx` stage, `build/common.sh`, `overlay/`, and `bootc container lint`.
+- Install the first desktop set on `base-main:45`: niri, DMS 2.1.2, dux-greeter, Ghostty, and the Xfce X11 session; enable greetd.
+- Add `tests/vm/make-disk.sh` and `tests/vm/boot-smoke.sh` for a headless qcow2 boot test, with a serial-console kernel argument in the overlay.
 - Approve the dux-atomic design and scaffold the image definition from the Universal Blue image-template, based on `ghcr.io/ublue-os/base-main:45` on a floating tag for prototyping.
 - Add `tests/test-static.sh`, a cheap check that the `Containerfile` builds from `BASE_IMAGE` and that the package manifest is one name per line.
 - Document the proposed dux-atomic workstation design for generic Intel and NVIDIA hardware.

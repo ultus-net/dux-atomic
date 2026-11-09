@@ -1,3 +1,22 @@
 # packages-common.txt — one package per line, installed as root in the image.
-# Comments group entries. Keep every entry explicit so the image does not pull
-# weak dependencies. Filled in Task 2 of the candidate images plan.
+# Comments group entries.
+
+# Wayland session
+niri
+
+# Dux shell and greeter (COPR duxlabs/dms, duxlabs/dux-repo)
+dms
+dms-greeter
+
+# Terminal
+ghostty
+
+# Xfce X11 fallback
+xfce4-session
+xfwm4
+xfce4-panel
+xfce4-screensaver
+xfce4-power-manager
+xfce4-notifyd
+xorg-x11-server-Xorg
+xinit
