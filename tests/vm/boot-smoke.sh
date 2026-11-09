@@ -8,8 +8,9 @@
 
 set -euo pipefail
 
-disk=${1:-output/qcow2/disk.qcow2}
-log=${2:-output/boot.log}
+repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+disk=${1:-$repo_root/output/qcow2/disk.qcow2}
+log=${2:-$repo_root/output/boot.log}
 timeout_s=${BOOT_TIMEOUT:-240}
 
 find_ovmf() {
