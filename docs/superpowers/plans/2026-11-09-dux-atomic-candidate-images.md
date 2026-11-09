@@ -180,6 +180,7 @@ Each phase gets its own plan and work items.
 - **Theme adapter.** Build an Omarchy palette to DMS custom-theme JSON importer. Verify Zed and Ghostty template output. Excluded: porting the Omarchy manager, shipping Aether, and redistributing wallpapers without licence checks.
 - **Snapshots, Flatpaks, and applications.** Add btrbk with LUKS and btrfs layout validation. Create a Flatpak manifest with verified IDs. Excluded: enabling snapshots before layout validation.
 - **Migration.** Require an external backup and explicit operator confirmation. The desktop needs a tested atomic install path from Arch to bootc. NVIDIA UAT uses a spare disk. Never wipe the running Omarchy installation.
+- **Hyprland session (deferred).** Add a third session with its greeter selector and one boot test per mode, on both variants. Trigger: each variant has its own hardware acceptance record. Excluded from the candidate phase; rationale and revisit triggers are in `docs/research/2026-11-10-hyprland-session-assessment.md`.
 
 ## Reviewer findings carried forward
 
