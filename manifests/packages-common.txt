@@ -1,0 +1,3 @@
+# packages-common.txt — one package per line, installed as root in the image.
+# Comments group entries. Keep every entry explicit so the image does not pull
+# weak dependencies. Filled in Task 2 of the candidate images plan.
