@@ -16,7 +16,7 @@ The build definition follows the Universal Blue image-template. Every green push
 | Base image | Universal Blue `base-main`, Fedora 45, floating tag while we prototype |
 | Generic x86_64 image | Builds, boots to the greeter in a VM, and provisions the desktop on first login |
 | Desktop | niri, Dux Modular Shell, Dux Greeter, Ghostty, and an Xfce X11 fallback |
-| Applications | First desktop set only. Zed, OpenCode, Steam, Discord, Spotify, Bitwarden, Obsidian, Zen Browser, and Lutris are planned and not installed |
+| Applications | Steam ships in the image. Lutris follows after the gaming dogfood. Zed, Bitwarden, Obsidian, Zen Browser, Discord, and Spotify arrive from Flathub at first login; OpenCode stays a dotfiles-owned CLI |
 | NVIDIA variant | Planned, not built |
 | Configuration | The existing [dotfiles repository](https://github.com/ultus-net/dotfiles) remains authoritative |
 | Publishing | CI signs every published digest with cosign keyless OIDC and attests the SBOM. `:latest` moves only on a manual promotion |
@@ -39,6 +39,7 @@ just ci-local
 | Dux Greeter | Login greeter, with the niri session preselected |
 | Ghostty | Terminal |
 | Xfce | X11 fallback session |
+| Steam | Gaming client, with gamescope and MangoHud |
 
 The image ships no interactive user. A real install creates the operator account itself.
 
@@ -46,6 +47,7 @@ The image ships no interactive user. A real install creates the operator account
 
 - [Build](docs/build.md)
 - [First login](docs/first-login.md)
+- [Applications](docs/applications.md)
 - [Testing](docs/testing.md)
 - [CI and publishing](docs/ci.md)
 - [Known gaps before promotion](docs/known-gaps.md)

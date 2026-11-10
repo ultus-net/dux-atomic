@@ -4,7 +4,7 @@
 podman build -t dux-atomic:dev .
 ```
 
-The `ctx` stage hands `build/`, `manifests/`, and `overlay/` to one build step, so none of them land in the final image. Packages come from `manifests/packages-common.txt`, one name per line.
+The `ctx` stage hands `build/`, `manifests/`, and `overlay/` to one build step, so none of them land in the final image. Packages come from `manifests/packages-common.txt`, one name per line. The gaming group pulls in the multilib graphics stack that Steam needs.
 
 `tests/verify-image.sh` runs `bootc container lint` and `systemd-analyze verify` against a built image. `just build` and `just lint-image` wrap both steps.
 
