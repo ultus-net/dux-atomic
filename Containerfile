@@ -3,12 +3,6 @@
 # Layout follows the Universal Blue image-template
 # (https://github.com/ublue-os/image-template): a ctx stage exposes the build
 # scripts to one RUN, and a build script performs the installs.
-#
-# BASE_IMAGE is a global build arg. It must precede the first FROM so the final
-# stage can use it, and a caller can override the base:
-#   podman build --build-arg BASE_IMAGE=<ref> .
-
-ARG BASE_IMAGE=ghcr.io/ublue-os/base-main:45
 
 # Allow build scripts to be referenced without being copied into the final image.
 FROM scratch AS ctx
@@ -16,9 +10,11 @@ COPY build /build
 COPY manifests /manifests
 COPY overlay /overlay
 
-# BASE_IMAGE is a build arg with an explicit tag; hadolint cannot resolve it.
-# hadolint ignore=DL3006
-FROM ${BASE_IMAGE}
+# The base is pinned to a digest, and the tag stays for readers. The pin is a
+# literal rather than an ARG: Dependabot reads a file whose name matches
+# containerfile|dockerfile, and never expands an ARG into FROM.
+# tests/test-static.sh asserts the tag+digest form.
+FROM ghcr.io/ublue-os/base-main:45@sha256:444e9e37ea581e76829772ae2a42edfdbacdd0cbc7a27085a4ed0f3d6e1336c7
 
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache \

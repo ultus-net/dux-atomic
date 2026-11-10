@@ -15,6 +15,10 @@ build:
 lint-image:
     tests/verify-image.sh {{image}}
 
+# Regenerate the third-party package lock from a built image.
+lock:
+    build/package-lock.sh {{image}} > manifests/packages-common.lock
+
 disk:
     sudo tests/vm/make-disk.sh {{image}}
 

@@ -7,6 +7,7 @@ set -euo pipefail
 
 image=${1:-localhost/dux-atomic:dev}
 runtime=${CONTAINER_RUNTIME:-podman}
+repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 
 "$runtime" run --rm "$image" bootc container lint
 "$runtime" run --rm "$image" systemd-analyze verify \
@@ -24,3 +25,15 @@ for package in gamescope mangohud steam-devices; do
   "$runtime" run --rm "$image" rpm -q "$package" \
     || { echo "FAIL $package is not installed" >&2; exit 1; }
 done
+# The lock records the third-party packages this image resolves. Fedora packages
+# move with the updates repository on every build, so only other vendors are
+# compared; a drift there is a third-party rebuild and needs a lock update.
+lock=$repo_root/manifests/packages-common.lock
+expected=$(grep -vE '^(#|$)' "$lock" | grep -vE $'\tFedora Project$')
+measured=$(CONTAINER_RUNTIME=$runtime "$repo_root/build/package-lock.sh" "$image" |
+  grep -vE '^(#|$)' | grep -vE $'\tFedora Project$')
+if [[ $measured != "$expected" ]]; then
+  echo "FAIL the third-party package lock drifted; run 'just lock'" >&2
+  diff -u <(printf '%s\n' "$expected") <(printf '%s\n' "$measured") >&2 || true
+  exit 1
+fi

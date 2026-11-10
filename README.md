@@ -13,7 +13,7 @@ The build definition follows the Universal Blue image-template. Every green push
 
 | Area | State |
 | --- | --- |
-| Base image | Universal Blue `base-main`, Fedora 45, floating tag while we prototype |
+| Base image | Universal Blue `base-main`, Fedora 45, pinned by digest and updated by Dependabot |
 | Generic x86_64 image | Builds, boots to the greeter in a VM, and provisions the desktop on first login |
 | Desktop | niri, Dux Modular Shell, Dux Greeter, Ghostty, and an Xfce X11 fallback |
 | Applications | Steam ships in the image. Lutris follows after the gaming dogfood. Zed, Bitwarden, Obsidian, Zen Browser, Discord, and Spotify arrive from Flathub at first login; OpenCode stays a dotfiles-owned CLI |
