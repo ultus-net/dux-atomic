@@ -102,6 +102,24 @@ else
   echo "ok   the greeter defaults to the niri session"
 fi
 
+# A regression here is silent: waiting on the echoed command instead of the
+# printf output lets the probe pass before it runs.
+boot_smoke=$repo_root/tests/vm/boot-smoke.sh
+common=$repo_root/build/common.sh
+if ! grep -qF 'wait_for "DUX_USER:${test_user}"' "$boot_smoke" ||
+   ! grep -qF "wait_for 'DUX_PROBE_END:ok'" "$boot_smoke" ||
+   grep -qF "wait_for 'DUX_PROBE_END'" "$boot_smoke"; then
+  echo "FAIL boot-smoke waits on an echoed marker instead of printf output" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'readlink "$portal_mask"' "$common" ||
+     ! grep -qF '= /dev/null' "$common" ||
+     ! grep -qF "trap 'rm -rf \"\$check_root\"' EXIT" "$common"; then
+  echo "FAIL build/common.sh does not assert the portal mask target or trap the scratch root" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the vm login probes and greeter mask fail closed"
+fi
+
 if ((failures > 0)); then
   exit 1
 fi

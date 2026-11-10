@@ -207,7 +207,7 @@ Use DMS built-ins first, avoiding duplicate launchers, notification services, cl
 | Suspend and resume reliability | NVIDIA suspend, resume, and hibernate hooks plus a tested power transition | Repeated suspend/resume cycles work with both monitors and a running game |
 | Per-device power and display profiles | niri output includes and udev rules keyed to dock and monitor identity | Dock and undock restore scale, refresh rate, lid policy, and Ethernet |
 | Audio state | WirePlumber per-device defaults, microphone noise suppression, and Bluetooth codec preference | Dock audio and call microphone switch correctly |
-| Notification and clipboard discipline | Do-not-disturb, history, secret exclusion, clear on lock, and one notification daemon | Clipboard excludes password-manager entries and no duplicate daemons run |
+| Notification and clipboard discipline | Do-not-disturb, history, secret exclusion, clear on lock, and one notification daemon per session | Clipboard excludes password-manager entries and no duplicate notification daemons run in a session |
 | Offline recovery and diagnostics | Local recovery page, `bootc status`, rollback with confirmation, and a redacted diagnostics bundle | Recovery works from a TTY with no network |
 
 Observed sources: ~/.config/omarchy/shell.json defines the current controls and a 300-second lock.
@@ -225,7 +225,7 @@ Do not install the same tool in both layers.
 | Operations toolbelt | Rootless Podman, Distrobox, networking, and no host package layering | A pinned operations container with kubectl, Helm, OpenTofu, cloud CLIs, k9s, stern, and kubectx | Tools run from the container and the host image stays unchanged |
 | Project runtimes | Base libraries only | The existing mise or devcontainer setup, project pin files, and direnv | A project pins its toolchain without a global install |
 | Secrets and signing | No private keys or credentials in the image | Bitwarden SSH agent, age or sops, and a gitleaks pre-commit hook | No plaintext secret enters git and commits are signed |
-| CI parity | The image workflow runs hadolint, shellcheck, trivy, and syft | Matching local pre-commit and `just` recipes | Local and CI checks agree |
+| CI parity | Own the image repo's CI workflow, the pinned tool versions, and the image scan (hadolint, shellcheck, trivy, syft) | Mirror the same tool pins in local pre-commit and `just` recipes | Local and CI run the same pinned versions |
 | Junior onboarding | A TTY recovery path and a system diagnostics entry | A first-day checklist, project template, PR template, and break-glass runbook | A new user completes setup in one session |
 | Learning aids | The offline recovery page | `tldr`, `cheat`, `/explain`, and labeled cheatsheets | Lookup works without network |
 | Local cluster | Podman and the required kernel support | An optional kind or k3d helper with tested rootless limits | Cluster create and delete leave host state clean |

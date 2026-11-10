@@ -156,7 +156,7 @@ These were approved after the first plan draft. They are downstream work and mus
 - NVIDIA suspend, resume, and hibernate hooks with a tested power transition.
 - Per-device power and display profiles keyed to dock and monitor identity.
 - Per-device audio defaults, microphone noise suppression, and Bluetooth codec preference.
-- Notification and clipboard discipline, including secret exclusion and one notification daemon.
+- Notification and clipboard discipline, including secret exclusion and one notification daemon per session.
 - Offline recovery and diagnostics, including a redacted bundle.
 
 Each item gets a work item, an owner, and an acceptance test. Ownership splits between image and dotfiles so nothing is installed twice.

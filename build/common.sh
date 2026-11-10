@@ -84,21 +84,27 @@ done
 # runtime /var content. The passwd and group copies let tmpfiles resolve owner
 # names against the scratch root.
 check_root=$(mktemp -d)
+# Remove the scratch root on any exit, including a failed assertion.
+trap 'rm -rf "$check_root"' EXIT
 mkdir -p "$check_root/etc"
 cp /etc/passwd /etc/group "$check_root/etc/"
 systemd-tmpfiles --create --root="$check_root" /usr/lib/tmpfiles.d/dux-atomic-greetd.conf || {
   echo "greeter tmpfiles rule failed" >&2
   exit 1
 }
-test -L "$check_root/var/lib/greeter/.config/systemd/user/xdg-desktop-portal.service" || {
+portal_mask=$check_root/var/lib/greeter/.config/systemd/user/xdg-desktop-portal.service
+test -L "$portal_mask" || {
   echo "greeter portal mask was not created" >&2
+  exit 1
+}
+test "$(readlink "$portal_mask")" = /dev/null || {
+  echo "greeter portal mask does not point at /dev/null" >&2
   exit 1
 }
 test "$(stat -c %U:%G "$check_root/var/lib/greeter")" = "greeter:greeter" || {
   echo "greeter home is not owned by greeter" >&2
   exit 1
 }
-rm -rf "$check_root"
 
 # Leave no third-party repo enabled in the final image.
 dnf5 -y copr disable duxlabs/dms

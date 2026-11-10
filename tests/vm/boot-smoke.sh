@@ -185,7 +185,7 @@ if [[ $login == 1 ]]; then
   # Wait for the login shell's prompt instead of a fixed sleep.
   wait_for "${test_user}@" 20 || true
 
-  serial_write 'echo "DUX_USER:$(id -un)"'
+  serial_write 'printf "DUX_USER:%s\n" "$(id -un)"'
   serial_write 'loginctl list-sessions --no-legend | grep -q "$(id -un)" && printf "DUX_SESSION:%s\n" ok || printf "DUX_SESSION:%s\n" missing'
   serial_write 'test -e /dev/dri/renderD128 && printf "DUX_RENDER:%s\n" ok || printf "DUX_RENDER:%s\n" none'
   serial_write 'echo "DUX_GREETER_GROUPS:$(id -nG greeter | tr " " ",")"'
@@ -204,19 +204,14 @@ if [[ $login == 1 ]]; then
   # The greeter cache is 0750 greeter:greeter, so the test user cannot read
   # memory.json. Assert the seed unit's state over the system bus instead.
   serial_write 'probe=$(systemctl show -p ConditionResult -p Result dux-atomic-greeter-defaults.service); printf "DUX_GREETER_SEED:%s\n" "$(echo "$probe" | grep -q "ConditionResult=yes" && echo "$probe" | grep -q "Result=success" && echo ok || echo missing)"'
-  serial_write 'echo DUX_PROBE_END'
+  serial_write 'printf "DUX_PROBE_END:%s\n" ok'
 
-  if ! wait_for 'DUX_USER:' 20; then
+  if ! wait_for "DUX_USER:${test_user}" 20; then
     echo "login failed: ${test_user} did not reach a shell" >&2
     tail -20 "$log" >&2 || true
     exit 1
   fi
-  if ! grep -q "DUX_USER:${test_user}" "$log"; then
-    echo "login failed: the shell is not running as ${test_user}" >&2
-    grep -a 'DUX_USER:' "$log" >&2 || true
-    exit 1
-  fi
-  if ! wait_for 'DUX_PROBE_END' 90; then
+  if ! wait_for 'DUX_PROBE_END:ok' 90; then
     echo "login failed: the session probe did not finish" >&2
     exit 1
   fi
