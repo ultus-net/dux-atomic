@@ -261,6 +261,22 @@ else
   echo "ok   the publish step caps each attempt and each command's retry budget"
 fi
 
+# A descendant that outlives `timeout` keeps the step's stdout pipe open, so
+# every command must write to a file of its own; a pipe-based wrapper would
+# reintroduce the stall it is meant to prevent.
+if ! grep -qF 'with_log() {' "$workflow" ||
+   ! grep -qF '"$@" >>"$file" 2>&1 || status=$?' "$workflow" ||
+   ! grep -qF 'cat "$file"' "$workflow" ||
+   ! grep -qF 'with_log "$RUNNER_TEMP/sign.log" retry cosign sign' "$workflow" ||
+   ! grep -qF 'with_log "$RUNNER_TEMP/attest.log" retry cosign attest' "$workflow" ||
+   ! grep -qF 'with_log "$RUNNER_TEMP/verify.log" timeout --kill-after=10 180 cosign verify' "$workflow" ||
+   ! grep -qF 'with_log "$RUNNER_TEMP/verify-attestation.log" timeout --kill-after=10 180 cosign verify-attestation' "$workflow"; then
+  echo "FAIL ci.yml does not run every signing and verification command with its output in a file" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   every signing and verification command writes to its own log file"
+fi
+
 # The failure path must report failure, and the digest notice must come before
 # anything that can stall.
 if ! awk '/failed after .* attempts in /{found=1} found && /return 1/{ok=1} END{exit !ok}' "$workflow"; then
