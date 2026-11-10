@@ -156,7 +156,7 @@ jobs:
     needs: image
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish || inputs.promote)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     environment: ghcr
     permissions:
       contents: read
@@ -203,8 +203,32 @@ jobs:
       - name: Sign the digest and attest the SBOM
         run: |
           digest=$(cat "$RUNNER_TEMP/digest")
-          cosign sign --yes "$IMAGE@$digest"
-          cosign attest --yes --predicate sbom/dux-atomic.spdx.json --type spdxjson "$IMAGE@$digest"
+          # Rekor intermittently answers 5xx and cosign gives up after its own
+          # four attempts. A transient outage must not leave the only publish
+          # path red and waiting for a manual re-run. Each command retries on
+          # its own, so a failed attestation does not sign the digest twice.
+          # Rekor failed for at least nine minutes across two runs
+          # (42799652955 at 11:03:10Z and 11:12:31Z), so the backoff runs to
+          # about fifteen minutes per command, wider than the measured outage.
+          retry() {
+            if (($# == 0)); then
+              echo "retry: no command given" >&2
+              return 2
+            fi
+            local attempt=1 pause=30 max=6
+            until "$@"; do
+              if ((attempt >= max)); then
+                echo "failed after ${attempt} attempts: $*" >&2
+                return 1
+              fi
+              echo "::warning::attempt ${attempt} failed; retrying in ${pause}s: $*"
+              attempt=$((attempt + 1))
+              sleep "$pause"
+              pause=$((pause * 2))
+            done
+          }
+          retry cosign sign --yes "$IMAGE@$digest"
+          retry cosign attest --yes --predicate sbom/dux-atomic.spdx.json --type spdxjson "$IMAGE@$digest"
           cosign verify \
             --certificate-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
@@ -218,7 +242,7 @@ jobs:
       - name: Promote latest
         if: inputs.promote
         # Copy the signed manifest to the tag, so the tag moves only to that
-        # digest. A failed copy leaves the previous tag and alerts.
+        # digest. A failed copy leaves the previous tag and fails the run.
         run: |
           digest=$(cat "$RUNNER_TEMP/digest")
           skopeo copy --preserve-digests "docker://$IMAGE@$digest" "docker://$IMAGE:latest"
