@@ -188,13 +188,14 @@ workflow=$repo_root/.github/workflows/ci.yml
 if ! grep -qF 'retry cosign sign --yes "$IMAGE@$digest"' "$workflow" ||
    ! grep -qF 'retry cosign attest --yes' "$workflow" ||
    ! grep -qF 'attempt >= max' "$workflow" ||
-   ! grep -qF 'max=6' "$workflow" ||
-   ! grep -qF 'timeout "$cap" "$@"' "$workflow" ||
-   ! grep -qF 'cap=$((remaining < 300 ? remaining : 300))' "$workflow" ||
-   ! grep -qF 'budget=600' "$workflow" ||
-   ! grep -qF 'remaining=$((deadline - SECONDS))' "$workflow" ||
-   ! grep -qF 'timeout 180 cosign verify \' "$workflow" ||
-   ! grep -qF 'timeout 180 cosign verify-attestation' "$workflow" ||
+   ! grep -qE 'max=5 budget=600([^0-9]|$)' "$workflow" ||
+   ! grep -qF 'timeout --kill-after=10 "$cap" "$@" && return 0' "$workflow" ||
+   ! grep -qE 'cap=\$\(\(remaining < 300 \? remaining : 300\)\)' "$workflow" ||
+   ! grep -qF '((remaining > 0)) || break' "$workflow" ||
+   ! grep -qF '((remaining > pause)) || break' "$workflow" ||
+   ! grep -qF 'attempt=$((attempt + 1))' "$workflow" ||
+   ! grep -qF -- '--kill-after=10 180 cosign verify \' "$workflow" ||
+   ! grep -qF -- '--kill-after=10 180 cosign verify-attestation' "$workflow" ||
    ! grep -qF '::notice::pushed $IMAGE@$digest' "$workflow" ||
    grep -qF 'until cosign sign' "$workflow"; then
   echo "FAIL ci.yml does not retry sign and attest separately with a capped attempt, a per-command budget, capped verification, and the pushed digest" >&2
@@ -203,10 +204,53 @@ else
   echo "ok   the publish step caps each attempt and each command's retry budget"
 fi
 
+# The failure path must report failure, and the digest notice must come before
+# anything that can stall.
+if ! awk '/failed after .* attempts in /{found=1} found && /return 1/{ok=1} END{exit !ok}' "$workflow"; then
+  echo "FAIL the retry helper does not return 1 after its failure message" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the retry helper returns failure after reporting it"
+fi
+notice_line=$(grep -nF '::notice::pushed $IMAGE@$digest' "$workflow" | head -1 | cut -d: -f1)
+sign_line=$(grep -nF 'retry cosign sign' "$workflow" | head -1 | cut -d: -f1)
+if [[ -z $notice_line || -z $sign_line || $notice_line -ge $sign_line ]]; then
+  echo "FAIL ci.yml records the pushed digest after the first command that can stall" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the pushed digest is recorded before the first command that can stall"
+fi
+
+# Run the helper itself with scaled constants: greps cannot show that a hang is
+# cut, and the helper is the only thing that stops a stall eating the job.
+retry_root=$(mktemp -d)
+trap 'rm -rf "$cond_root" "$sbom_root" "$retry_root"' EXIT
+sed -n '/^          retry() {/,/^          }$/p' "$workflow" | sed 's/^          //' |
+  sed 's/max=5 budget=600/max=5 budget=5/; s/remaining < 300 ? remaining : 300/remaining < 2 ? remaining : 2/; s/pause=30/pause=1/' \
+    >"$retry_root/retry.sh"
+started_at=$SECONDS
+if ! bash -c 'source "$1"; retry sleep 60' _ "$retry_root/retry.sh" 2>/dev/null; then
+  if ((SECONDS - started_at > 8)); then
+    echo "FAIL the retry helper let a hanging command run past its budget" >&2
+    failures=$((failures + 1))
+  else
+    echo "ok   the retry helper cuts a hanging command inside its budget"
+  fi
+else
+  echo "FAIL the retry helper reported success for a hanging command" >&2
+  failures=$((failures + 1))
+fi
+if bash -c 'source "$1"; retry true' _ "$retry_root/retry.sh" 2>/dev/null; then
+  echo "ok   the retry helper returns success without retrying"
+else
+  echo "FAIL the retry helper reported failure for a command that succeeded" >&2
+  failures=$((failures + 1))
+fi
+
 # Rekor's public instance rejects the full file inventory, so the filter must
 # keep dropping files and the relationships that point at them.
 sbom_root=$(mktemp -d)
-trap 'rm -rf "$cond_root" "$sbom_root"' EXIT
+trap 'rm -rf "$cond_root" "$sbom_root" "$retry_root"' EXIT
 cat >"$sbom_root/in.json" <<'JSON'
 {
   "SPDXID": "SPDXRef-DOCUMENT",
