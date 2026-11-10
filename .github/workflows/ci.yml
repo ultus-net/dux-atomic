@@ -54,8 +54,9 @@ jobs:
           android: true
           dotnet: true
           haskell: true
-          # v2 defaults this off; pinning it keeps the v1 behaviour so the
-          # bump does not shrink the space the image and qcow2 builds rely on.
+          # v2 leaves swap in place because removing it can kill a job under
+          # memory pressure. The image and qcow2 builds need the disk, so this
+          # pins the v1 behaviour deliberately.
           swap-storage: true
 
       - name: Install podman and qemu
