@@ -89,7 +89,7 @@ jobs:
             -o spdx-json > "$RUNNER_TEMP/syft-full.spdx.json"
           # Rekor's public instance answered 502 for the 86 MB attestation body
           # in run 42810574149, so the attested document keeps packages only.
-          # The same run's SBOM was 64181348 bytes and is 6657784 after this.
+          # The same run's SBOM was 64181348 bytes and is 6508304 after this.
           jq -c -f build/sbom-packages-only.jq \
             "$RUNNER_TEMP/syft-full.spdx.json" > dux-atomic.spdx.json
 
@@ -208,13 +208,13 @@ jobs:
       - name: Sign the digest and attest the SBOM
         run: |
           digest=$(cat "$RUNNER_TEMP/digest")
-          # Rekor intermittently answers 5xx and cosign gives up after its own
-          # four attempts. A transient outage must not leave the only publish
-          # path red and waiting for a manual re-run. Each command retries on
-          # its own, so a failed attestation does not sign the digest twice.
-          # Rekor failed for at least nine minutes across two runs
-          # (42799652955 at 11:03:10Z and 11:12:31Z), so the backoff runs to
-          # about fifteen minutes per command, wider than the measured outage.
+          # Rekor's public instance answered 502 for this image's attestation
+          # body at about 86 MB, which the SBOM step now prevents by stripping
+          # the file inventory. The retry stays for genuine 5xx and network
+          # failures, and cosign gives up after its own four attempts. Each
+          # command retries on its own, so a failed attestation does not sign
+          # the digest twice. Six attempts back off to about fifteen minutes
+          # per command, and the job timeout holds that budget.
           retry() {
             if (($# == 0)); then
               echo "retry: no command given" >&2

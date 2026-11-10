@@ -207,7 +207,15 @@ cat >"$sbom_root/in.json" <<'JSON'
     {"fileName": "etc/motd", "SPDXID": "SPDXRef-File-etc-motd"},
     {"fileName": "usr/bin/sh", "SPDXID": "SPDXRef-File-usr-bin-sh"}
   ],
-  "packages": [{"SPDXID": "SPDXRef-Package-coreutils", "name": "coreutils"}],
+  "packages": [
+    {"SPDXID": "SPDXRef-Package-coreutils", "name": "coreutils"},
+    {
+      "SPDXID": "SPDXRef-Package-bash",
+      "name": "bash",
+      "filesAnalyzed": true,
+      "packageVerificationCode": {"packageVerificationCodeValue": "d6a770ba38583ed4bb4525bd96e50461655d2758"}
+    }
+  ],
   "relationships": [
     {"spdxElementId": "SPDXRef-Package-coreutils", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-File-etc-motd"},
     {"spdxElementId": "SPDXRef-Package-coreutils", "relationshipType": "DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-Package-bash"},
@@ -224,12 +232,15 @@ elif ! jq -c -f "$repo_root/build/sbom-packages-only.jq" \
   failures=$((failures + 1))
 elif [[ $(jq '.files | length' "$sbom_root/out.json") != 0 ]] ||
      [[ $(jq '.relationships | length' "$sbom_root/out.json") != 2 ]] ||
+     [[ $(jq '[.packages[] | select(.filesAnalyzed == true or .packageVerificationCode != null)] | length' \
+          "$sbom_root/out.json") != 0 ]] ||
      jq -e '.relationships[] | select(.relatedSpdxElement == "SPDXRef-File-etc-motd")' \
        "$sbom_root/out.json" >/dev/null; then
-  echo "FAIL the SBOM filter keeps files or the relationships that point at them" >&2
+  echo "FAIL the SBOM filter keeps files, their relationships, or their verification codes" >&2
   failures=$((failures + 1))
 elif ! grep -qF 'jq -c -f build/sbom-packages-only.jq' "$workflow" ||
-     ! grep -qF '> dux-atomic.spdx.json' "$workflow"; then
+     ! grep -qF '> dux-atomic.spdx.json' "$workflow" ||
+     ! grep -qF 'path: dux-atomic.spdx.json' "$workflow"; then
   echo "FAIL ci.yml does not filter the SBOM into the uploaded file" >&2
   failures=$((failures + 1))
 else
