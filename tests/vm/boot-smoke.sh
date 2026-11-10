@@ -91,9 +91,9 @@ fi
 cpu=${QEMU_CPU:-host}
 smp=2
 if [[ $accel == tcg ]]; then
-  # A hosted TCG boot stalled one vCPU (the watchdog read timed out) and never
-  # started the greeter's user manager. One vCPU keeps the boot deterministic;
-  # the smoke test asserts startup, not desktop performance.
+  # A hosted TCG boot logged the second vCPU as unresponsive (the watchdog
+  # read timed out). One vCPU removes the cross-CPU timeout; the smoke test
+  # asserts startup, not desktop performance.
   cpu=${QEMU_CPU:-max}
   smp=1
 fi
@@ -150,7 +150,7 @@ serial_write() {
 }
 
 serial_login() {
-  if ! wait_for 'login: *$' "$grace_s"; then
+  if ! wait_for 'login: *$' "$timeout_s"; then
     echo "login failed: no getty prompt on the serial console" >&2
     return 1
   fi
@@ -169,22 +169,14 @@ serial_login() {
   return 0
 }
 
-# A greeter that never starts leaves nothing on the serial console: the unit's
-# output goes to the journal, which the unprivileged test account cannot read.
-# Process state, wait channels, and unit state are readable, and they say
-# whether greetd never spawned the greeter or the greeter hung.
+# A hosted TCG boot can stop printing to the serial console while the system
+# keeps working. The log line is the fast signal; the live session is the
+# primary signal and logind reports it after login. These probes run once a
+# shell exists, and the journal stays unreadable to the test account.
 dump_greeter_diagnostics() {
   echo "collecting greeter diagnostics on the serial console" >&2
-  if [[ $login != 1 ]]; then
-    echo "diagnostics need the test account; rerun with BOOT_LOGIN=1" >&2
-    return 0
-  fi
-  if ! serial_login; then
-    echo "diagnostics skipped: no shell for ${test_user}" >&2
-    return 0
-  fi
   serial_write 'echo DUX_DIAG_BEGIN'
-  serial_write "ps -eo user,pid,stat,wchan:20,comm | grep -E 'greetd|dms-greeter|niri|systemd' | head -30"
+  serial_write "ps -eo user,pid,stat,wchan:20,comm | grep -E 'greetd|dms-greeter|niri' | head -20"
   serial_write 'systemctl --no-pager status greetd | head -15'
   serial_write 'loginctl list-sessions --no-legend'
   serial_write 'ls -l /dev/dri'
@@ -201,17 +193,27 @@ if ! wait_for 'Started .*greetd\.service' "$grace_s"; then
   exit 1
 fi
 
-if ! wait_for 'Session c[0-9]+ of User greeter' "$timeout_s"; then
-  echo "boot failed: no greeter session started in ${timeout_s}s" >&2
-  dump_greeter_diagnostics
+greeter_logged=0
+greeter_wait=$timeout_s
+if [[ $login == 1 ]]; then
+  greeter_wait=${BOOT_GREETER_GRACE:-60}
+fi
+if wait_for 'Session c[0-9]+ of User greeter' "$greeter_wait"; then
+  greeter_logged=1
+elif [[ $login != 1 ]]; then
+  echo "boot failed: no greeter session started" >&2
   exit 1
+else
+  echo "warning: the greeter session line did not reach the console; checking logind after login" >&2
 fi
 
 target_seen=0
 if wait_for 'Reached target .*graphical\.target' 60; then
   target_seen=1
-else
+elif [[ $greeter_logged == 1 ]]; then
   echo "warning: graphical.target not reported; the greeter session is live" >&2
+else
+  echo "warning: graphical.target not reported; the greeter session is checked after login" >&2
 fi
 
 sleep "$settle_s"
@@ -220,7 +222,7 @@ if ! kill -0 "$pid" 2>/dev/null; then
   tail -40 "$log" >&2 || true
   exit 1
 fi
-if grep -qE 'Stopped .*session-c[0-9]+\.scope' "$log"; then
+if [[ $greeter_logged == 1 ]] && grep -qE 'Stopped .*session-c[0-9]+\.scope' "$log"; then
   echo "boot failed: the greeter session stopped within ${settle_s}s" >&2
   tail -40 "$log" >&2 || true
   exit 1
@@ -234,6 +236,7 @@ if [[ $login == 1 ]]; then
 
   serial_write 'printf "DUX_USER:%s\n" "$(id -un)"'
   serial_write 'loginctl list-sessions --no-legend | grep -q "$(id -un)" && printf "DUX_SESSION:%s\n" ok || printf "DUX_SESSION:%s\n" missing'
+  serial_write 'loginctl list-sessions --no-legend | grep -qE "^ *c[0-9]+ +[^ ]+ +greeter " && printf "DUX_GREETER_SESSION:%s\n" ok || printf "DUX_GREETER_SESSION:%s\n" missing'
   serial_write 'test -e /dev/dri/renderD128 && printf "DUX_RENDER:%s\n" ok || printf "DUX_RENDER:%s\n" none'
   serial_write 'echo "DUX_GREETER_GROUPS:$(id -nG greeter | tr " " ",")"'
   serial_write 'echo "DUX_KARGS:$(ls /usr/lib/bootc/kargs.d/ | tr "\n" ",")"'
@@ -267,6 +270,12 @@ if [[ $login == 1 ]]; then
   # literal marker.
   if ! grep -q 'DUX_SESSION:ok' "$log"; then
     echo "login failed: loginctl does not list ${test_user}" >&2
+    exit 1
+  fi
+  if ! grep -q 'DUX_GREETER_SESSION:ok' "$log"; then
+    echo "boot failed: loginctl does not list a greeter session" >&2
+    grep -a 'DUX_GREETER_SESSION:' "$log" >&2 || true
+    dump_greeter_diagnostics
     exit 1
   fi
   if ! grep -q 'DUX_UNITS:0' "$log"; then
