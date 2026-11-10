@@ -113,7 +113,7 @@ No manual `dms setup` ran at any point. The first graphical login provisioned
 the desktop by itself.
 
 Unit behaviour, not exercised by this run: the setup unit records success with
-`${XDG_STATE_HOME:-~/.local/state}/dux-atomic/desktop-setup.done`.
+`${XDG_STATE_HOME:-$HOME/.local/state}/dux-atomic/desktop-setup.done`.
 `ExecCondition` runs the setup for a fresh home or for a dms-generated config
 that has no marker, and skips a user-authored config. `ExecStartPost` writes the
 marker only after `dms setup` exits 0, so a failed or timed-out run retries on

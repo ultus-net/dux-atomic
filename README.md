@@ -46,7 +46,7 @@ A real install creates the operator account itself, either in the installer or w
 
 The image never runs the Dux setup for root. On the first graphical session, `dux-atomic-desktop.service` runs `dms setup headless --compositor niri --terminal ghostty --skip-existing` as that user. It writes only under the user's home: the niri config, the DMS binds, the Ghostty config, and the `niri.service` binding for `dms.service`. A user who already has a niri config without the DMS includes, such as a dotfiles-managed account, skips the setup.
 
-The unit records success with `${XDG_STATE_HOME:-~/.local/state}/dux-atomic/desktop-setup.done`, matching the unit's `%S`. `ExecCondition` runs the setup for a fresh home or a dms-generated config without that marker, so a failed or timed-out run retries on the next login instead of leaving a half-written home skipped forever. The marker is written only after `dms setup` exits 0.
+The unit records success with `${XDG_STATE_HOME:-$HOME/.local/state}/dux-atomic/desktop-setup.done`, matching the unit's `%S`. `ExecCondition` runs the setup for a fresh home or a dms-generated config without that marker, so a failed or timed-out run retries on the next login instead of leaving a half-written home skipped forever. The marker is written only after `dms setup` exits 0.
 
 The desktop retry's failure contract is retry on the next login until it succeeds. Each attempt is capped at 120 seconds, and there is no attempt limit, so a permanently failing setup costs up to 120 seconds on every login. A cap is a pre-promotion follow-up. The greeter seed's contract is retry on the next boot, described below.
 
@@ -84,4 +84,4 @@ The image disables Plymouth (`plymouth.enable=0`), so both the VM and real hardw
 - The image has no CI workflow, license, NVIDIA variant, application set, agent sandbox, or snapshot automation yet. The README marks these as planned.
 - The VM test covers the greeter and a serial login. It does not log in through the greeter, start a second session, or exercise the Xfce fallback.
 - `bootc-image-builder` is pinned in `tests/vm/make-disk.sh`, but the base image tag floats and the COPR packages are unpinned.
-- The first-login retry has unit fixtures but no VM coverage yet. Rebuild and re-run the graphical dogfood after the retry change.
+- The first-login retry has unit fixtures and a VM marker assertion, but no partial-home VM coverage yet. Rebuild and re-run the graphical dogfood after the retry change.
