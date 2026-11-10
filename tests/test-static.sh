@@ -184,6 +184,17 @@ else
   echo "ok   the vm login probes and greeter mask fail closed"
 fi
 
+workflow=$repo_root/.github/workflows/ci.yml
+if ! grep -qF 'retry cosign sign --yes "$IMAGE@$digest"' "$workflow" ||
+   ! grep -qF 'retry cosign attest --yes' "$workflow" ||
+   ! grep -qF 'attempt >= 3' "$workflow" ||
+   grep -qF 'until cosign sign' "$workflow"; then
+  echo "FAIL ci.yml does not retry sign and attest separately, or retries forever" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the publish step retries sign and attest with a bounded loop"
+fi
+
 if ((failures > 0)); then
   exit 1
 fi

@@ -205,18 +205,22 @@ jobs:
           digest=$(cat "$RUNNER_TEMP/digest")
           # Rekor intermittently answers 5xx and cosign gives up after its own
           # four attempts. A transient outage must not leave the only publish
-          # path red and waiting for a manual re-run.
-          attempt=1
-          until cosign sign --yes "$IMAGE@$digest" &&
-                cosign attest --yes --predicate sbom/dux-atomic.spdx.json --type spdxjson "$IMAGE@$digest"; do
-            if ((attempt >= 3)); then
-              echo "signing failed after ${attempt} attempts" >&2
-              exit 1
-            fi
-            echo "::warning::signing attempt ${attempt} failed; retrying in 30s"
-            attempt=$((attempt + 1))
-            sleep 30
-          done
+          # path red and waiting for a manual re-run. Each command retries on
+          # its own, so a failed attestation does not sign the digest twice.
+          retry() {
+            local attempt=1
+            until "$@"; do
+              if ((attempt >= 3)); then
+                echo "failed after ${attempt} attempts: $*" >&2
+                return 1
+              fi
+              echo "::warning::attempt ${attempt} failed; retrying in 30s: $*"
+              attempt=$((attempt + 1))
+              sleep 30
+            done
+          }
+          retry cosign sign --yes "$IMAGE@$digest"
+          retry cosign attest --yes --predicate sbom/dux-atomic.spdx.json --type spdxjson "$IMAGE@$digest"
           cosign verify \
             --certificate-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
