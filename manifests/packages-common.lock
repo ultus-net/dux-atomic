@@ -2,8 +2,9 @@
 # One line per resolved NEVRA: <nevra> TAB <vendor>.
 # tests/verify-image.sh compares the non-Fedora lines, because Fedora
 # packages move with the updates repository on every build.
+# A +git build tracks an upstream branch, so it cannot be pinned and is
+# left out of this file and the comparison; the VM boot test covers it.
 dms-2.1.2-1.fc45.x86_64	Fedora Copr - user duxlabs
-dux-greeter-git-2:2.1.3+git132.7bdf4546-2.fc45.x86_64	Fedora Copr - user duxlabs
 gamescope-3.16.29-1.fc45.x86_64	Fedora Project
 ghostty-1.4.0-3.fc45.x86_64	Fedora Copr - user duxlabs
 mangohud-0.8.3~rc1-4.fc45.i686	Fedora Project

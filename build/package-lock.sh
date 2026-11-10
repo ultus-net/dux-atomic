@@ -10,7 +10,8 @@
 # with `just lock`.
 #
 # Scope: manifest names only. Packages those names pull in transitively from a
-# third-party repo are not locked; docs/known-gaps.md records that gap.
+# third-party repo are not locked; docs/known-gaps.md records that gap. A +git
+# build is excluded because it tracks an upstream branch and cannot be pinned.
 
 set -euo pipefail
 
@@ -42,6 +43,8 @@ cat <<'HEADER'
 # One line per resolved NEVRA: <nevra> TAB <vendor>.
 # tests/verify-image.sh compares the non-Fedora lines, because Fedora
 # packages move with the updates repository on every build.
+# A +git build tracks an upstream branch, so it cannot be pinned and is
+# left out of this file and the comparison; the VM boot test covers it.
 HEADER
 
 "$runtime" run --rm "$image" bash -c '
@@ -58,4 +61,4 @@ HEADER
       exit 1
     fi
   done
-' _ "${names[@]}" | LC_ALL=C sort -u
+' _ "${names[@]}" | LC_ALL=C sort -u | awk '!index($0, "+git")'

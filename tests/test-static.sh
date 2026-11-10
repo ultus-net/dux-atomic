@@ -82,8 +82,12 @@ elif ! grep -qF 'the lock measurement failed' "$repo_root/tests/verify-image.sh"
    ! grep -qF 'the package lock has no third-party lines' "$repo_root/tests/verify-image.sh"; then
   echo "FAIL tests/verify-image.sh does not separate a failed measurement from drift" >&2
   failures=$((failures + 1))
+elif [[ $(grep -cF "grep -vF '+git'" "$repo_root/tests/verify-image.sh" || true) -lt 2 ]] ||
+   ! grep -qF "sort -u | awk '!index(\$0, \"+git\")'" "$repo_root/build/package-lock.sh"; then
+  echo "FAIL the lock generator or the gate does not drop +git builds, or the gate drops them on one side only" >&2
+  failures=$((failures + 1))
 else
-  echo "ok   the lock is written atomically and a failed measurement is not drift"
+  echo "ok   the lock is written atomically, drift is separated from a failed measurement, and +git builds are dropped on both sides"
 fi
 
 desktop_unit=$repo_root/overlay/usr/lib/systemd/user/dux-atomic-desktop.service
