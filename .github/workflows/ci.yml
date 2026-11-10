@@ -88,8 +88,8 @@ jobs:
           sudo tests/vm/make-disk.sh localhost/dux-atomic:ci "$GITHUB_WORKSPACE/output"
 
       - name: Boot smoke test
-        # Hosted runners have no /dev/kvm and no DRM render node, so this is TCG
-        # and headless. It asserts the greeter session and the first-login units,
+        # Hosted runners have no /dev/kvm and no host GPU, so this is TCG and
+        # headless. It asserts the greeter session and the first-login units,
         # not rendered pixels. The graphical dogfood stays a local step.
         env:
           BOOT_TIMEOUT: '900'
@@ -102,16 +102,13 @@ jobs:
 
       - name: Vulnerability scan
         # Report only until the Fedora base findings are triaged (#3).
+        # A pinned container avoids the action's unpinned setup-trivy dependency.
         if: hashFiles('.cache/image.tar') != ''
-        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
-        with:
-          input: .cache/image.tar
-          scan-type: image
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: '0'
-          format: table
-          output: trivy-report.txt
+        run: |
+          podman run --rm -v "$PWD:/src:ro" -w /src \
+            docker.io/aquasec/trivy:0.76.2@sha256:6fa071ef8daa2e58b90cbf1710bedca91adbb3bf98693533226f442035b836a6 \
+            image --input .cache/image.tar --severity CRITICAL,HIGH \
+            --ignore-unfixed --cache-dir /tmp/trivy --format table > trivy-report.txt
 
       - name: Upload scan report
         if: hashFiles('trivy-report.txt') != ''

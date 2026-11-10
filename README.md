@@ -27,7 +27,7 @@ The `ctx` stage hands `build/`, `manifests/`, and `overlay/` to one build step, 
 `.github/workflows/ci.yml` runs on every pull request, every push to `main`, and manual dispatch. Every action is pinned to a commit SHA, and the job that runs PR code holds only `contents: read`.
 
 - `static` runs `tests/lint.sh`: shell syntax, shellcheck, `tests/test-static.sh`, hadolint, and actionlint. `tests/lint.sh` pins the linter images by digest, and `just check` runs the same script.
-- `image` builds the image, runs `tests/verify-image.sh` (`bootc container lint` and `systemd-analyze verify`), generates an SPDX SBOM with syft, builds the qcow2 with bootc-image-builder, and runs `boot-smoke.sh`. It then scans with trivy and uploads the report. The scan is report-only until the Fedora base findings are triaged (#3).
+- `image` builds the image, runs `tests/verify-image.sh` (`bootc container lint` and `systemd-analyze verify`), generates an SPDX SBOM with syft, builds the qcow2 with bootc-image-builder, and runs `boot-smoke.sh`. It then scans with a digest-pinned trivy container and uploads the report. The scan is report-only until the Fedora base findings are triaged (#3).
 - `publish` runs only on `main`, holds the write token and OIDC identity, and runs no repository code. It loads the built artifact, pushes `:sha-<commit>`, signs the digest with cosign keyless OIDC, attests the SBOM, and verifies both the signature and the attestation.
 - A `workflow_dispatch` on `main` with `promote` set copies the signed manifest to `:latest` and asserts the registry digest. A failed copy leaves the previous tag, alerts, and needs a human retry. A push never moves `:latest`.
 - `static` and `image` are required checks on `main`; a red hosted `image` run blocks merge.
