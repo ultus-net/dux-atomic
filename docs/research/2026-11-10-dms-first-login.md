@@ -112,11 +112,13 @@ Observed, in order:
 No manual `dms setup` ran at any point. The first graphical login provisioned
 the desktop by itself.
 
-The setup unit records success with `~/.local/state/dux-atomic/desktop-setup.done`.
+Unit behaviour, not exercised by this run: the setup unit records success with
+`${XDG_STATE_HOME:-~/.local/state}/dux-atomic/desktop-setup.done`.
 `ExecCondition` runs the setup for a fresh home or for a dms-generated config
 that has no marker, and skips a user-authored config. `ExecStartPost` writes the
 marker only after `dms setup` exits 0, so a failed or timed-out run retries on
-the next login. `tests/test-static.sh` runs the five condition fixtures.
+the next login. `tests/test-static.sh` runs the six condition fixtures, including
+a home that sets `XDG_STATE_HOME`.
 
 The probe driver is `.vm/dogfood_login.py` with `DOGFOOD_PROBE=7`. It lives in
 the ignored `.vm/` tree as run evidence and is not part of the image. The

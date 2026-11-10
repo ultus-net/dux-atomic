@@ -110,23 +110,45 @@ fi
 # The first-login condition decides retry vs skip. Run the real script against
 # one fixture per case so a change in its logic is visible without a VM.
 condition=$repo_root/overlay/usr/libexec/dux-atomic/needs-setup.sh
+if ! grep -qF '${XDG_STATE_HOME:-$HOME/.local/state}' "$condition"; then
+  echo "FAIL needs-setup.sh does not match the unit's %S marker path" >&2
+  failures=$((failures + 1))
+fi
 cond_root=$(mktemp -d)
 trap 'rm -rf "$cond_root"' EXIT
 mkdir -p "$cond_root/fresh" \
   "$cond_root/partial/.config/niri" \
   "$cond_root/user/.config/niri" \
   "$cond_root/done/.config/niri" "$cond_root/done/.local/state/dux-atomic" \
-  "$cond_root/reset/.local/state/dux-atomic"
-printf 'include optional=true "dms/binds.kdl"\n' >"$cond_root/partial/.config/niri/config.kdl"
+  "$cond_root/reset/.local/state/dux-atomic" \
+  "$cond_root/xdgstate/.config/niri" "$cond_root/xdgstate-state/dux-atomic"
+# Copied from ~/.config/niri/config.kdl after `dms setup headless` in image
+# 3e886bc33a30; see docs/research/2026-11-10-dms-first-login.md.
+printf 'include optional=true "dms/colors.kdl"\n' >"$cond_root/partial/.config/niri/config.kdl"
 printf '// user config\n' >"$cond_root/user/.config/niri/config.kdl"
-printf 'include optional=true "dms/binds.kdl"\n' >"$cond_root/done/.config/niri/config.kdl"
+printf 'include optional=true "dms/colors.kdl"\n' >"$cond_root/done/.config/niri/config.kdl"
+printf 'include optional=true "dms/colors.kdl"\n' >"$cond_root/xdgstate/.config/niri/config.kdl"
 : >"$cond_root/done/.local/state/dux-atomic/desktop-setup.done"
 : >"$cond_root/reset/.local/state/dux-atomic/desktop-setup.done"
+: >"$cond_root/xdgstate-state/dux-atomic/desktop-setup.done"
 condition_failed=0
-for spec in fresh:run partial:run user:skip done:skip reset:run; do
+for spec in fresh:run partial:run user:skip done:skip reset:run xdgstate:skip; do
   name=${spec%%:*}
   expected=${spec##*:}
-  if HOME=$cond_root/$name "$condition"; then got=run; else got=skip; fi
+  env_args=(HOME=$cond_root/$name)
+  if [[ $name == xdgstate ]]; then
+    env_args+=(XDG_STATE_HOME=$cond_root/xdgstate-state)
+  else
+    # Empty means unset for the ${XDG_STATE_HOME:-...} default.
+    env_args+=(XDG_STATE_HOME=)
+  fi
+  # Exit 0 means run, 1 means skip. A crash is neither and must fail the test.
+  if env "${env_args[@]}" "$condition"; then status=0; else status=$?; fi
+  case $status in
+    0) got=run ;;
+    1) got=skip ;;
+    *) got="exit-${status}" ;;
+  esac
   if [[ $got != "$expected" ]]; then
     echo "FAIL setup condition ${name}: expected ${expected}, got ${got}" >&2
     failures=$((failures + 1))
@@ -144,14 +166,17 @@ common=$repo_root/build/common.sh
 if ! grep -qF 'wait_for "DUX_USER:${test_user}"' "$boot_smoke" ||
    ! grep -qF "wait_for 'DUX_PROBE_END:ok'" "$boot_smoke" ||
    ! grep -qF 'if ! wait_for "${test_user}@" 20' "$boot_smoke" ||
+   ! grep -qF 'DUX_SETUP_MARKER' "$boot_smoke" ||
    grep -qF 'wait_for "${test_user}@" 20 || true' "$boot_smoke" ||
    grep -qF "wait_for 'DUX_PROBE_END'" "$boot_smoke"; then
   echo "FAIL boot-smoke waits on an echoed marker instead of printf output" >&2
   failures=$((failures + 1))
 elif ! grep -qF 'readlink "$portal_mask"' "$common" ||
      ! grep -qF '= /dev/null' "$common" ||
-     ! grep -qF "trap 'rm -rf \"\$check_root\"' EXIT" "$common"; then
-  echo "FAIL build/common.sh does not assert the portal mask target or trap the scratch root" >&2
+     ! grep -qF "trap 'rm -rf \"\$check_root\"' EXIT" "$common" ||
+     ! grep -qF 'cannot read ${manifest}' "$common" ||
+     grep -qF 'packages-common.txt || true' "$common"; then
+  echo "FAIL build/common.sh does not assert the portal mask target, trap the scratch root, or read the manifest fail-closed" >&2
   failures=$((failures + 1))
 else
   echo "ok   the vm login probes and greeter mask fail closed"

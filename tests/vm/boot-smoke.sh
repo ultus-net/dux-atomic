@@ -202,6 +202,7 @@ if [[ $login == 1 ]]; then
   serial_write 'printf "DUX_NIRI_CONFIG:%s\n" "$(test -f "$HOME/.config/niri/config.kdl" && echo ok || echo missing)"'
   serial_write 'printf "DUX_DMS_BINDS:%s\n" "$(test -f "$HOME/.config/niri/dms/binds.kdl" && echo ok || echo missing)"'
   serial_write 'printf "DUX_SESSION_SEED:%s\n" "$(grep -q 101418 "$HOME/.local/state/dms/session.json" 2>/dev/null && echo ok || echo missing)"'
+  serial_write 'printf "DUX_SETUP_MARKER:%s\n" "$(test -f "${XDG_STATE_HOME:-$HOME/.local/state}/dux-atomic/desktop-setup.done" && echo ok || echo missing)"'
   serial_write 'printf "DUX_USER_DMS_LINK:%s\n" "$(test -L "$HOME/.config/systemd/user/niri.service.wants/dms.service" && echo ok || echo missing)"'
   serial_write 'printf "DUX_DMS_WANTED:%s\n" "$(systemctl --user show -p Wants niri.service | grep -q dms.service && echo ok || echo missing)"'
   serial_write 'printf "DUX_PRE_WANTED:%s\n" "$(systemctl --user show -p Wants niri.service | grep -q graphical-session-pre.target && echo ok || echo missing)"'
@@ -231,7 +232,7 @@ if [[ $login == 1 ]]; then
     grep -a 'DUX_UNITS:' "$log" >&2 || true
     exit 1
   fi
-  for marker in DUX_NIRI_CONFIG DUX_DMS_BINDS DUX_SESSION_SEED DUX_USER_DMS_LINK DUX_DMS_WANTED DUX_PRE_WANTED DUX_DESKTOP_ENABLED DUX_GREETER_SEED; do
+  for marker in DUX_NIRI_CONFIG DUX_DMS_BINDS DUX_SESSION_SEED DUX_SETUP_MARKER DUX_USER_DMS_LINK DUX_DMS_WANTED DUX_PRE_WANTED DUX_DESKTOP_ENABLED DUX_GREETER_SEED; do
     if ! grep -q "${marker}:ok" "$log"; then
       echo "first login failed: ${marker} is not ok" >&2
       grep -a "${marker}:" "$log" >&2 || true
@@ -256,6 +257,6 @@ fi
 if [[ $target_seen == 1 ]]; then
   echo "boot ok: graphical target, greetd, and a live greeter session are up"
 else
-  echo "boot ok: greetd and a live greeter session are up; the console lost the graphical.target line"
+  echo "boot ok with graphical.target unverified: greetd and a live greeter session are up, but the console lost the target line"
 fi
 echo "log: $log"

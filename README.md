@@ -46,7 +46,9 @@ A real install creates the operator account itself, either in the installer or w
 
 The image never runs the Dux setup for root. On the first graphical session, `dux-atomic-desktop.service` runs `dms setup headless --compositor niri --terminal ghostty --skip-existing` as that user. It writes only under the user's home: the niri config, the DMS binds, the Ghostty config, and the `niri.service` binding for `dms.service`. A user who already has a niri config without the DMS includes, such as a dotfiles-managed account, skips the setup.
 
-The unit records success with `~/.local/state/dux-atomic/desktop-setup.done`. `ExecCondition` runs the setup for a fresh home or a dms-generated config without that marker, so a failed or timed-out run retries on the next login instead of leaving a half-written home skipped forever. The marker is written only after `dms setup` exits 0.
+The unit records success with `${XDG_STATE_HOME:-~/.local/state}/dux-atomic/desktop-setup.done`, matching the unit's `%S`. `ExecCondition` runs the setup for a fresh home or a dms-generated config without that marker, so a failed or timed-out run retries on the next login instead of leaving a half-written home skipped forever. The marker is written only after `dms setup` exits 0.
+
+The desktop retry's failure contract is retry on the next login until it succeeds. Each attempt is capped at 120 seconds, and there is no attempt limit, so a permanently failing setup costs up to 120 seconds on every login. A cap is a pre-promotion follow-up. The greeter seed's contract is retry on the next boot, described below.
 
 `dux-atomic-dms-defaults.service` seeds `~/.local/state/dms/session.json` with a dark DMS background, so the first session is not a blank compositor surface. Replace it with a wallpaper from the Dux library when you want the full documented look.
 

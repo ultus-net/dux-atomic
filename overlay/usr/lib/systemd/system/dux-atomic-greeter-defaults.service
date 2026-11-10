@@ -9,10 +9,9 @@ Before=greetd.service
 
 [Service]
 Type=oneshot
-# The package tmpfiles rule owns /var/cache/dms-greeter. Create the state
-# directory if absent; install -d also makes the cache root, so the rule still
-# sets its final mode and owner on the next boot.
-ExecStartPre=/usr/bin/install -d -m 0755 -o greeter -g greeter /var/cache/dms-greeter/.local/state
+# The package tmpfiles rule owns /var/cache/dms-greeter with mode 0750. Create
+# the state directory if absent, without widening an existing tree.
+ExecStartPre=/usr/bin/install -d -m 0750 -o greeter -g greeter /var/cache/dms-greeter/.local/state
 ExecStart=/usr/bin/install -m 0644 -o greeter -g greeter /usr/share/dux-atomic/greeter/memory.json /var/cache/dms-greeter/.local/state/memory.json
 
 [Install]

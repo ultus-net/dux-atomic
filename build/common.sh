@@ -11,7 +11,23 @@ cp -avf /ctx/overlay/. /
 dnf5 -y copr enable duxlabs/dms
 dnf5 -y copr enable duxlabs/dux-repo
 
-packages=$(grep -Ev '^[[:space:]]*(#.*)?$' /ctx/manifests/packages-common.txt || true)
+manifest=/ctx/manifests/packages-common.txt
+if [[ ! -r $manifest ]]; then
+  echo "cannot read ${manifest}" >&2
+  exit 1
+fi
+# grep exits 1 for an all-comment manifest, which is not an error. Any other
+# non-zero exit is a read failure and must fail the build.
+if packages=$(grep -Ev '^[[:space:]]*(#.*)?$' "$manifest"); then
+  :
+else
+  status=$?
+  if ((status != 1)); then
+    echo "cannot read ${manifest} (grep exit ${status})" >&2
+    exit 1
+  fi
+  packages=
+fi
 if [[ -n $packages ]]; then
   # Word splitting is intended: the manifest is one package per line.
   dnf5 install -y $packages

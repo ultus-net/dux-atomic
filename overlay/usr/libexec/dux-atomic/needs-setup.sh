@@ -7,7 +7,9 @@
 set -eu
 
 config=$HOME/.config/niri/config.kdl
-marker=$HOME/.local/state/dux-atomic/desktop-setup.done
+# Match the unit's %S specifier, which honours XDG_STATE_HOME. A fixed
+# $HOME/.local/state path would diverge for a home that sets it.
+marker=${XDG_STATE_HOME:-$HOME/.local/state}/dux-atomic/desktop-setup.done
 
 if [ -f "$config" ]; then
   if [ -f "$marker" ] || ! grep -q 'include optional=true "dms/' "$config"; then
