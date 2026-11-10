@@ -232,11 +232,11 @@ elif ! jq -c -f "$repo_root/build/sbom-packages-only.jq" \
   failures=$((failures + 1))
 elif [[ $(jq '.files | length' "$sbom_root/out.json") != 0 ]] ||
      [[ $(jq '.relationships | length' "$sbom_root/out.json") != 2 ]] ||
-     [[ $(jq '[.packages[] | select(.filesAnalyzed == true or .packageVerificationCode != null)] | length' \
+     [[ $(jq '[.packages[] | select(.filesAnalyzed != false or .packageVerificationCode != null)] | length' \
           "$sbom_root/out.json") != 0 ]] ||
      jq -e '.relationships[] | select(.relatedSpdxElement == "SPDXRef-File-etc-motd")' \
        "$sbom_root/out.json" >/dev/null; then
-  echo "FAIL the SBOM filter keeps files, their relationships, or their verification codes" >&2
+  echo "FAIL the SBOM filter keeps files, their relationships, or a package that still claims analysis" >&2
   failures=$((failures + 1))
 elif ! grep -qF 'jq -c -f build/sbom-packages-only.jq' "$workflow" ||
      ! grep -qF '> dux-atomic.spdx.json' "$workflow" ||
