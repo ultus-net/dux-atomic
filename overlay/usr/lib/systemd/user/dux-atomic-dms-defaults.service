@@ -1,0 +1,10 @@
+[Unit]
+Description=Seed the default DMS session state for a new account
+ConditionPathExists=!%S/dms/session.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/install -Dm0644 /usr/share/dux-atomic/dms/session.json %S/dms/session.json
+
+[Install]
+WantedBy=graphical-session-pre.target

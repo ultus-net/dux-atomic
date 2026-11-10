@@ -1,0 +1,12 @@
+[Unit]
+Description=Deploy the default Dux desktop for a new account
+Documentation=https://duxlabs.dev/docs/dms/cli-setup
+# dms refuses to run as root and writes only under the user's home.
+ConditionPathExists=!%h/.config/niri/config.kdl
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/dms setup headless --compositor niri --terminal ghostty --skip-existing
+
+[Install]
+WantedBy=graphical-session-pre.target

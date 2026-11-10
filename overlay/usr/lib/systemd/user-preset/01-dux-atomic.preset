@@ -1,0 +1,2 @@
+enable dux-atomic-desktop.service
+enable dux-atomic-dms-defaults.service

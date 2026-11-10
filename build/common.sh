@@ -19,6 +19,22 @@ else
   echo "no packages in manifests/packages-common.txt yet"
 fi
 
+# A new account gets the Dux desktop on its first graphical login. The units
+# are enabled through the user preset so every account picks them up. The
+# image-level niri.service.wants drop-in starts dms on the first login, before
+# dms setup has written the per-user binding. Xfce never starts niri.service.
+systemctl --global preset dux-atomic-desktop.service dux-atomic-dms-defaults.service
+for unit in dux-atomic-desktop dux-atomic-dms-defaults; do
+  test -L "/etc/systemd/user/graphical-session-pre.target.wants/${unit}.service" || {
+    echo "${unit} was not enabled for new accounts" >&2
+    exit 1
+  }
+done
+test -L /etc/systemd/user/niri.service.wants/dms.service || {
+  echo "dms is not bound to niri.service for new accounts" >&2
+  exit 1
+}
+
 # The greeter compositor needs the video, render, and input device groups.
 # shadow-utils reads only /etc/group, so copy the vendor groups from
 # /usr/lib/group into /etc/group first. usermod exits 0 for a group it cannot

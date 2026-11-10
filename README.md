@@ -42,4 +42,30 @@ QEMU's display-only `virtio-vga` has no render node, so the greeter compositor c
 
 A real install creates the operator account itself, either in the installer or with `useradd -m`. The image never ships a login account or a password.
 
+## First login
+
+The image never runs the Dux setup for root. On the first graphical session, `dux-atomic-desktop.service` runs `dms setup headless --compositor niri --terminal ghostty --skip-existing` as that user. It writes only under the user's home: the niri config, the DMS binds, the Ghostty config, and the `niri.service` binding for `dms.service`. A user who already has `~/.config/niri/config.kdl`, such as a dotfiles-managed account, skips the setup.
+
+`dux-atomic-dms-defaults.service` seeds `~/.local/state/dms/session.json` with a dark DMS background, so the first session is not a blank compositor surface. Replace it with a wallpaper from the Dux library when you want the full documented look.
+
+Both units are enabled through `overlay/usr/lib/systemd/user-preset/01-dux-atomic.preset`, which `build/common.sh` applies with `systemctl --global preset`. `dms.service` is not globally enabled: `overlay/etc/systemd/user/niri.service.wants/dms.service` binds it to the niri session, so it starts on the first login even before `dms setup` writes the per-user binding. The Xfce fallback never starts `niri.service`, so it never starts the Wayland shell.
+
+The greeter keeps the upstream `dms-greeter --command niri` config. Do not copy Zirconium's `[general] service = "greetd-spawn"` stanza: Fedora's greetd 0.10.3 does not ship a `greetd-spawn` binary.
+
+## Dogfood the graphical desktop
+
+The headless smoke test proves the greeter renders, not that the desktop looks right. Boot the candidate disk with a real GL display and log in through the greeter:
+
+```bash
+cp /usr/share/edk2/x64/OVMF_VARS.4m.fd /tmp/dux-vars.fd
+qemu-system-x86_64 -machine q35,accel=kvm -cpu host -m 4096 -smp 2 -snapshot \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/x64/OVMF_CODE.4m.fd \
+  -drive if=pflash,format=raw,file=/tmp/dux-vars.fd \
+  -drive file=output/qcow2/disk.qcow2,if=virtio,format=qcow2 \
+  -nic user,model=virtio-net-pci \
+  -device virtio-vga-gl -display gtk,gl=on
+```
+
+Log in with the test account (`dux` / `dux-test` by default). The DMS bar, the dark background, and the DMS keybinds come from the first-login setup above.
+
 The image disables Plymouth (`plymouth.enable=0`), so both the VM and real hardware show the text boot instead of a splash.
