@@ -30,16 +30,21 @@ fi
 
 config_args=()
 if [[ ${NO_TEST_USER:-0} != 1 ]]; then
+  case "$test_user$test_password" in
+    *'"'* | *'\'* | *$'\n'*)
+      echo "TEST_USER and TEST_PASSWORD must not contain quotes, backslashes, or newlines" >&2
+      exit 2
+      ;;
+  esac
   config_dir=$(mktemp -d)
   trap 'rm -rf "$config_dir"' EXIT
-  cat >"$config_dir/config.toml" <<EOF
-[[customizations.user]]
-name = "$test_user"
-password = "$test_password"
-groups = ["wheel"]
-EOF
+  {
+    echo '[[customizations.user]]'
+    printf 'name = "%s"\n' "$test_user"
+    printf 'password = "%s"\n' "$test_password"
+  } >"$config_dir/config.toml"
   config_args+=(-v "$config_dir/config.toml:/config.toml:ro")
-  echo "test account: $test_user / $test_password" >&2
+  echo "test account: $test_user (no admin groups)" >&2
 fi
 
 podman run --rm --privileged --pull=newer \

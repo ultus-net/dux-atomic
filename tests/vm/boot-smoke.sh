@@ -86,14 +86,20 @@ qemu=(qemu-system-x86_64
 
 "${qemu[@]}" 2>"$run_dir/qemu.err" &
 pid=$!
-# QEMU opens the far end at startup, so this connect finishes immediately.
-exec 7>"$pipe_in"
+# Open the write side read-write so this never blocks, even if QEMU fails to
+# start (no KVM, EGL, or firmware) and never opens its end of the pipe.
+exec 7<>"$pipe_in"
 cleanup() {
+  status=$?
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   kill "$reader_pid" 2>/dev/null || true
   exec 7>&-
   rm -f "$vars" "$pipe_in" "$pipe_out"
+  if (( status != 0 )) && [[ -s $run_dir/qemu.err ]]; then
+    echo "qemu stderr:" >&2
+    tail -20 "$run_dir/qemu.err" >&2 || true
+  fi
 }
 trap cleanup EXIT
 
@@ -176,11 +182,12 @@ if [[ $login == 1 ]]; then
     exit 1
   fi
   serial_write "$test_password"
-  sleep 3
+  # Wait for the login shell's prompt instead of a fixed sleep.
+  wait_for "${test_user}@" 20 || true
 
   serial_write 'echo "DUX_USER:$(id -un)"'
-  serial_write 'loginctl list-sessions --no-legend | grep -q "$(id -un)" && echo DUX_SESSION_OK || echo DUX_SESSION_MISSING'
-  serial_write 'test -e /dev/dri/renderD128 && echo DUX_RENDER_OK || echo DUX_RENDER_NONE'
+  serial_write 'loginctl list-sessions --no-legend | grep -q "$(id -un)" && printf "DUX_SESSION:%s\n" ok || printf "DUX_SESSION:%s\n" missing'
+  serial_write 'test -e /dev/dri/renderD128 && printf "DUX_RENDER:%s\n" ok || printf "DUX_RENDER:%s\n" none'
   serial_write 'echo "DUX_GREETER_GROUPS:$(id -nG greeter | tr " " ",")"'
   serial_write 'echo "DUX_KARGS:$(ls /usr/lib/bootc/kargs.d/ | tr "\n" ",")"'
   serial_write 'echo "DUX_DEPLOYMENT:$(ostree admin status 2>/dev/null | head -2 | tr "\n" " ")"'
@@ -200,11 +207,13 @@ if [[ $login == 1 ]]; then
     echo "login failed: the session probe did not finish" >&2
     exit 1
   fi
-  if ! grep -q 'DUX_SESSION_OK' "$log"; then
+  # The command text holds "DUX_SESSION:%s", so only real output matches the
+  # literal marker.
+  if ! grep -q 'DUX_SESSION:ok' "$log"; then
     echo "login failed: loginctl does not list ${test_user}" >&2
     exit 1
   fi
-  if [[ ${VIRTIO_GL:-0} == 1 ]] && ! grep -q 'DUX_RENDER_OK' "$log"; then
+  if [[ ${VIRTIO_GL:-0} == 1 ]] && ! grep -q 'DUX_RENDER:ok' "$log"; then
     echo "render failed: no /dev/dri/renderD128 under virtio-vga-gl" >&2
     exit 1
   fi

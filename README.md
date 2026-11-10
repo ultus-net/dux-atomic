@@ -29,12 +29,14 @@ sudo tests/vm/make-disk.sh
 tests/vm/boot-smoke.sh
 ```
 
-`make-disk.sh` runs bootc-image-builder as root. It adds one test account (`dux` / `dux-test` by default, override with `TEST_USER` and `TEST_PASSWORD`, skip with `NO_TEST_USER=1`) because the image ships no interactive user. `boot-smoke.sh` boots the qcow2 headless, asserts that `graphical.target`, `greetd`, and a live greeter session scope appear on the serial console, then logs in as that account and checks the console session.
+`make-disk.sh` runs bootc-image-builder as root. It adds one test account (`dux` / `dux-test` by default, override with `TEST_USER` and `TEST_PASSWORD`, skip with `NO_TEST_USER=1`) because the image ships no interactive user. Credentials reject quotes, backslashes, and newlines, which would break the generated TOML. `boot-smoke.sh` boots the qcow2 headless, asserts that `graphical.target`, `greetd`, and a live greeter session scope appear on the serial console, then logs in as that account and checks the console session.
 
 ```bash
 sudo TEST_USER=dux TEST_PASSWORD=dux-test tests/vm/make-disk.sh
-TEST_USER=dux TEST_PASSWORD=dux-test tests/vm/boot-smoke.sh
+VIRTIO_GL=1 TEST_USER=dux TEST_PASSWORD=dux-test tests/vm/boot-smoke.sh
 ```
+
+The login stage needs the same credentials the disk was built with. Pass `BOOT_LOGIN=0` for a disk built with `NO_TEST_USER=1`, which runs the boot assertions only.
 
 QEMU's display-only `virtio-vga` has no render node, so the greeter compositor cannot paint under it. Set `VIRTIO_GL=1` to boot with `virtio-vga-gl` and an offscreen display, which gives the guest a render node; the test then also asserts `/dev/dri/renderD128`. Check the rendered greeter on real hardware for the final confirmation.
 
