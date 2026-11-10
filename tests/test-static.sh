@@ -70,11 +70,13 @@ fi
 
 # A failed regeneration must not truncate the tracked lock, and a failed
 # measurement must not be reported as drift.
-if ! grep -qF 'tmp=manifests/packages-common.lock.tmp' "$repo_root/justfile" ||
-   ! grep -qF 'mv "$tmp" manifests/packages-common.lock' "$repo_root/justfile" ||
-   ! grep -qF 'rm -f "$tmp"' "$repo_root/justfile" ||
-   grep -qF '$$tmp' "$repo_root/justfile"; then
-  echo "FAIL justfile lock recipe does not write a temp file and move it on success" >&2
+lock_recipe=$(grep -A1 '^lock:$' "$repo_root/justfile" | tail -n 1 || true)
+if [[ -z $lock_recipe ]] ||
+   [[ $lock_recipe != *'tmp=manifests/packages-common.lock.tmp'* ]] ||
+   [[ $lock_recipe != *'mv "$tmp" manifests/packages-common.lock'* ]] ||
+   [[ $lock_recipe != *"trap 'rm -f \"\$tmp\"' EXIT"* ]] ||
+   [[ $lock_recipe == *'$$tmp'* ]]; then
+  echo "FAIL justfile lock recipe does not write a temp file, trap it, and move it on success" >&2
   failures=$((failures + 1))
 elif ! grep -qF 'the lock measurement failed' "$repo_root/tests/verify-image.sh" ||
    ! grep -qF 'the package lock has no third-party lines' "$repo_root/tests/verify-image.sh"; then
