@@ -75,3 +75,11 @@ qemu-system-x86_64 -machine q35,accel=kvm -cpu host -m 4096 -smp 2 -snapshot \
 Log in with the test account (`dux` / `dux-test` by default). The DMS bar, the dark background, and the DMS keybinds come from the first-login setup above.
 
 The image disables Plymouth (`plymouth.enable=0`), so both the VM and real hardware show the text boot instead of a splash.
+
+## Known gaps before promotion
+
+- `console=ttyS0,115200` ships a serial getty to every install. It is a deliberate VM-test and recovery console for this branch; gate it behind a test build before publishing.
+- The image has no CI workflow, license, NVIDIA variant, application set, agent sandbox, or snapshot automation yet. The README marks these as planned.
+- The VM test covers the greeter and a serial login. It does not log in through the greeter, start a second session, or exercise the Xfce fallback.
+- `bootc-image-builder` is pinned in `tests/vm/make-disk.sh`, but the base image tag floats and the COPR packages are unpinned.
+- The first-login retry has unit fixtures but no VM coverage yet. Rebuild and re-run the graphical dogfood after the retry change.
