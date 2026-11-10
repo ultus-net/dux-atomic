@@ -28,6 +28,7 @@ fi
 
 bash_scripts=(
   build/common.sh
+  build/package-lock.sh
   tests/lint.sh
   tests/test-static.sh
   tests/verify-image.sh

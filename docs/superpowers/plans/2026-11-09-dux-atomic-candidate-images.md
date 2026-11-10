@@ -1,6 +1,6 @@
 # dux-atomic candidate images implementation plan
 
-Status: draft for operator review. The CI and signing portions are superseded by `.github/workflows/ci.yml` and the README: the shipped pipeline uses keyless OIDC and `sha-<commit>` tags. The repository and `main` protection now exist; the NVIDIA variant work remains unstarted.
+Status: draft for operator review. The CI and signing portions are superseded by `.github/workflows/ci.yml` and the README: the shipped pipeline uses keyless OIDC and `sha-<commit>` tags. The repository and `main` protection now exist; the NVIDIA variant work remains unstarted. The shared `ARG BASE_IMAGE` interface below is also superseded: the base pin is now a literal `FROM` in the `Containerfile`, because Dependabot cannot expand an `ARG` into `FROM`. The NVIDIA variant needs its own pinned `FROM` and a matching static assertion.
 
 > **For agentic workers:** use the `subagent-driven-development` or `executing-plans` skill. Track work with checkbox steps. One commit per task.
 
