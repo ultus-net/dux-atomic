@@ -7,7 +7,7 @@ A planned Fedora bootc developer and gaming workstation for two machines, built 
 
 ![The Dux desktop at first login: the DMS bar and Welcome dialog on a niri session](docs/assets/dux-desktop.png)
 
-The build definition follows the Universal Blue image-template. Every green `main` run publishes a pullable `ghcr.io/ultus-net/dux-atomic:sha-<commit>` image.
+The build definition follows the Universal Blue image-template. Every green push to `main` publishes `ghcr.io/ultus-net/dux-atomic:sha-<commit>`.
 
 ## Status
 
