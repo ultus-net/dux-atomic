@@ -4,7 +4,7 @@ A planned Fedora bootc developer and gaming workstation for two machines.
 
 The build definition is scaffolded from the Universal Blue image-template: the base tag is set in `Containerfile`. The generic image builds and boots to the greeter in a VM; no image has been published yet.
 
-- Base: Universal Blue `base-main`, Fedora 45, on a floating tag while we prototype. The generic x86_64 image ships; an NVIDIA variant is planned and not built.
+- Base: Universal Blue `base-main`, Fedora 45, on a floating tag while we prototype. The generic x86_64 image builds and boots in a VM; no image has been published yet. An NVIDIA variant is planned and not built.
 - Desktop: niri, Dux Modular Shell, Dux Greeter, Ghostty, and an Xfce X11 fallback.
 - Applications: the first desktop set only. Zed, OpenCode, Steam, Discord, Spotify, Bitwarden, Obsidian, Zen Browser, and Lutris are planned and not installed.
 - Configuration: the existing [dotfiles repository](https://github.com/ultus-net/dotfiles) remains authoritative.
@@ -44,7 +44,9 @@ A real install creates the operator account itself, either in the installer or w
 
 ## First login
 
-The image never runs the Dux setup for root. On the first graphical session, `dux-atomic-desktop.service` runs `dms setup headless --compositor niri --terminal ghostty --skip-existing` as that user. It writes only under the user's home: the niri config, the DMS binds, the Ghostty config, and the `niri.service` binding for `dms.service`. A user who already has `~/.config/niri/config.kdl`, such as a dotfiles-managed account, skips the setup.
+The image never runs the Dux setup for root. On the first graphical session, `dux-atomic-desktop.service` runs `dms setup headless --compositor niri --terminal ghostty --skip-existing` as that user. It writes only under the user's home: the niri config, the DMS binds, the Ghostty config, and the `niri.service` binding for `dms.service`. A user who already has a niri config without the DMS includes, such as a dotfiles-managed account, skips the setup.
+
+The unit records success with `~/.local/state/dux-atomic/desktop-setup.done`. `ExecCondition` runs the setup for a fresh home or a dms-generated config without that marker, so a failed or timed-out run retries on the next login instead of leaving a half-written home skipped forever. The marker is written only after `dms setup` exits 0.
 
 `dux-atomic-dms-defaults.service` seeds `~/.local/state/dms/session.json` with a dark DMS background, so the first session is not a blank compositor surface. Replace it with a wallpaper from the Dux library when you want the full documented look.
 

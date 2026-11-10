@@ -44,6 +44,19 @@ test -f /usr/bin/dms || {
   echo "the dms CLI is missing; first-login setup would fail" >&2
   exit 1
 }
+test -x /usr/libexec/dux-atomic/needs-setup.sh || {
+  echo "the first-login condition script is missing or not executable" >&2
+  exit 1
+}
+unit=/usr/lib/systemd/user/dux-atomic-desktop.service
+grep -qx 'ExecCondition=/usr/libexec/dux-atomic/needs-setup.sh' "$unit" || {
+  echo "the first-login unit does not use the setup condition" >&2
+  exit 1
+}
+grep -qx 'ExecStartPost=/usr/bin/install -Dm0644 /dev/null %S/dux-atomic/desktop-setup.done' "$unit" || {
+  echo "the first-login unit has no completion marker" >&2
+  exit 1
+}
 test -f /usr/share/dux-atomic/dms/session.json || {
   echo "the DMS session seed is missing" >&2
   exit 1

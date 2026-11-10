@@ -49,6 +49,11 @@ elif ! grep -qx 'ConditionUser=!root' "$desktop_unit" ||
      ! grep -qx 'Before=graphical-session-pre.target' "$desktop_unit"; then
   echo "FAIL dux-atomic-desktop.service is not ordered or can run as root/greeter" >&2
   failures=$((failures + 1))
+elif ! grep -qx 'ExecCondition=/usr/libexec/dux-atomic/needs-setup.sh' "$desktop_unit" ||
+     ! grep -qx 'ExecStartPost=/usr/bin/install -Dm0644 /dev/null %S/dux-atomic/desktop-setup.done' "$desktop_unit" ||
+     [[ ! -x $repo_root/overlay/usr/libexec/dux-atomic/needs-setup.sh ]]; then
+  echo "FAIL dux-atomic-desktop.service has no setup condition or completion marker" >&2
+  failures=$((failures + 1))
 elif [[ ! -f $defaults_unit ]] ||
      ! grep -qx 'ExecStart=/usr/bin/install -Dm0644 /usr/share/dux-atomic/dms/session.json %S/dms/session.json' "$defaults_unit"; then
   echo "FAIL dux-atomic-dms-defaults.service does not seed the session file" >&2
@@ -102,12 +107,44 @@ else
   echo "ok   the greeter defaults to the niri session"
 fi
 
+# The first-login condition decides retry vs skip. Run the real script against
+# one fixture per case so a change in its logic is visible without a VM.
+condition=$repo_root/overlay/usr/libexec/dux-atomic/needs-setup.sh
+cond_root=$(mktemp -d)
+trap 'rm -rf "$cond_root"' EXIT
+mkdir -p "$cond_root/fresh" \
+  "$cond_root/partial/.config/niri" \
+  "$cond_root/user/.config/niri" \
+  "$cond_root/done/.config/niri" "$cond_root/done/.local/state/dux-atomic" \
+  "$cond_root/reset/.local/state/dux-atomic"
+printf 'include optional=true "dms/binds.kdl"\n' >"$cond_root/partial/.config/niri/config.kdl"
+printf '// user config\n' >"$cond_root/user/.config/niri/config.kdl"
+printf 'include optional=true "dms/binds.kdl"\n' >"$cond_root/done/.config/niri/config.kdl"
+: >"$cond_root/done/.local/state/dux-atomic/desktop-setup.done"
+: >"$cond_root/reset/.local/state/dux-atomic/desktop-setup.done"
+condition_failed=0
+for spec in fresh:run partial:run user:skip done:skip reset:run; do
+  name=${spec%%:*}
+  expected=${spec##*:}
+  if HOME=$cond_root/$name "$condition"; then got=run; else got=skip; fi
+  if [[ $got != "$expected" ]]; then
+    echo "FAIL setup condition ${name}: expected ${expected}, got ${got}" >&2
+    failures=$((failures + 1))
+    condition_failed=1
+  fi
+done
+if ((condition_failed == 0)); then
+  echo "ok   the first-login condition retries partial setups and skips user configs"
+fi
+
 # A regression here is silent: waiting on the echoed command instead of the
 # printf output lets the probe pass before it runs.
 boot_smoke=$repo_root/tests/vm/boot-smoke.sh
 common=$repo_root/build/common.sh
 if ! grep -qF 'wait_for "DUX_USER:${test_user}"' "$boot_smoke" ||
    ! grep -qF "wait_for 'DUX_PROBE_END:ok'" "$boot_smoke" ||
+   ! grep -qF 'if ! wait_for "${test_user}@" 20' "$boot_smoke" ||
+   grep -qF 'wait_for "${test_user}@" 20 || true' "$boot_smoke" ||
    grep -qF "wait_for 'DUX_PROBE_END'" "$boot_smoke"; then
   echo "FAIL boot-smoke waits on an echoed marker instead of printf output" >&2
   failures=$((failures + 1))

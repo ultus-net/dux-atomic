@@ -5,14 +5,19 @@ Documentation=https://duxlabs.dev/docs/dms/cli-setup
 ConditionUser=!root
 # The greeter runs this compositor as the greeter account, not a desktop user.
 ConditionUser=!greeter
-ConditionPathExists=!%h/.config/niri/config.kdl
 Before=graphical-session-pre.target
 
 [Service]
 Type=oneshot
 # A hung setup must not hold the login session forever.
 TimeoutStartSec=120
+# Skip a user-authored niri config and a completed setup. Retry a dms config
+# that has no completion marker, because that is a partial first login.
+ExecCondition=/usr/libexec/dux-atomic/needs-setup.sh
 ExecStart=/usr/bin/dms setup headless --compositor niri --terminal ghostty --skip-existing
+# The marker is written only after a successful setup, so a failed or timed-out
+# run retries on the next login.
+ExecStartPost=/usr/bin/install -Dm0644 /dev/null %S/dux-atomic/desktop-setup.done
 
 [Install]
 WantedBy=graphical-session-pre.target
