@@ -208,29 +208,44 @@ jobs:
       - name: Sign the digest and attest the SBOM
         run: |
           digest=$(cat "$RUNNER_TEMP/digest")
+          # Record the digest before anything can stall. A job that times out
+          # keeps no log, so this line is the only surviving evidence of what
+          # was pushed.
+          echo "::notice::pushed $IMAGE@$digest"
           # Rekor's public instance answered 502 for this image's attestation
           # body at about 86 MB, which the SBOM step now prevents by stripping
           # the file inventory. The retry stays for genuine 5xx and network
           # failures, and cosign gives up after its own four attempts. Each
           # command retries on its own, so a failed attestation does not sign
-          # the digest twice. Six attempts back off to about fifteen minutes
-          # per command, and the job timeout holds that budget.
+          # the digest twice.
+          #
+          # Run 42827200322 stalled in this step for 51 minutes, hit the
+          # 60-minute job timeout, and lost its log, so nothing could say
+          # which call hung. Each attempt is capped and each command has a
+          # wall-clock budget, which keeps both commands inside the job
+          # timeout and turns a stall into a message.
           retry() {
             if (($# == 0)); then
               echo "retry: no command given" >&2
               return 2
             fi
-            local attempt=1 pause=30 max=6
-            until "$@"; do
-              if ((attempt >= max)); then
-                echo "failed after ${attempt} attempts: $*" >&2
-                return 1
-              fi
+            local attempt=1 pause=30 max=6 budget=780 started=$SECONDS
+            local deadline=$((started + budget)) remaining cap
+            while :; do
+              remaining=$((deadline - SECONDS))
+              ((remaining > 0)) || break
+              cap=$((remaining < 300 ? remaining : 300))
+              timeout "$cap" "$@" && return 0
+              ((attempt >= max)) && break
+              remaining=$((deadline - SECONDS))
+              ((remaining > pause)) || break
               echo "::warning::attempt ${attempt} failed; retrying in ${pause}s: $*"
               attempt=$((attempt + 1))
               sleep "$pause"
               pause=$((pause * 2))
             done
+            echo "failed after ${attempt} attempts in $((SECONDS - started))s: $*" >&2
+            return 1
           }
           retry cosign sign --yes "$IMAGE@$digest"
           retry cosign attest --yes --predicate sbom/dux-atomic.spdx.json --type spdxjson "$IMAGE@$digest"

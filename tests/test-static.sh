@@ -189,11 +189,16 @@ if ! grep -qF 'retry cosign sign --yes "$IMAGE@$digest"' "$workflow" ||
    ! grep -qF 'retry cosign attest --yes' "$workflow" ||
    ! grep -qF 'attempt >= max' "$workflow" ||
    ! grep -qF 'max=6' "$workflow" ||
+   ! grep -qF 'timeout "$cap" "$@"' "$workflow" ||
+   ! grep -qF 'cap=$((remaining < 300 ? remaining : 300))' "$workflow" ||
+   ! grep -qF 'budget=780' "$workflow" ||
+   ! grep -qF 'remaining=$((deadline - SECONDS))' "$workflow" ||
+   ! grep -qF '::notice::pushed $IMAGE@$digest' "$workflow" ||
    grep -qF 'until cosign sign' "$workflow"; then
-  echo "FAIL ci.yml does not retry sign and attest separately, or retries forever" >&2
+  echo "FAIL ci.yml does not retry sign and attest separately with a capped attempt, a per-command budget, and the pushed digest" >&2
   failures=$((failures + 1))
 else
-  echo "ok   the publish step retries sign and attest with a bounded loop"
+  echo "ok   the publish step caps each attempt and each command's retry budget"
 fi
 
 # Rekor's public instance rejects the full file inventory, so the filter must
