@@ -201,7 +201,9 @@ if [[ $login == 1 ]]; then
   serial_write 'printf "DUX_DMS_WANTED:%s\n" "$(systemctl --user show -p Wants niri.service | grep -q dms.service && echo ok || echo missing)"'
   serial_write 'printf "DUX_PRE_WANTED:%s\n" "$(systemctl --user show -p Wants niri.service | grep -q graphical-session-pre.target && echo ok || echo missing)"'
   serial_write 'printf "DUX_DESKTOP_ENABLED:%s\n" "$(systemctl --user is-enabled dux-atomic-desktop.service 2>/dev/null | grep -qx enabled && echo ok || echo missing)"'
-  serial_write 'printf "DUX_GREETER_SEED:%s\n" "$(systemctl show -p ConditionResult -p Result dux-atomic-greeter-defaults.service | grep -q "ConditionResult=yes" && systemctl show -p Result dux-atomic-greeter-defaults.service | grep -q "Result=success" && echo ok || echo missing)"'
+  # The greeter cache is 0750 greeter:greeter, so the test user cannot read
+  # memory.json. Assert the seed unit's state over the system bus instead.
+  serial_write 'probe=$(systemctl show -p ConditionResult -p Result dux-atomic-greeter-defaults.service); printf "DUX_GREETER_SEED:%s\n" "$(echo "$probe" | grep -q "ConditionResult=yes" && echo "$probe" | grep -q "Result=success" && echo ok || echo missing)"'
   serial_write 'echo DUX_PROBE_END'
 
   if ! wait_for 'DUX_USER:' 20; then
