@@ -87,9 +87,31 @@ id because selection matches on it first; a greeter change that matched only
 `lastSessionId` would need this seed revisited. An empty existing file also
 counts as a choice, so delete the file to re-seed.
 
-## Deferred
+## Live graphical login
 
-A live graphical session has not yet been booted from this image here. The
-`tests/vm/boot-smoke.sh` stage starts both units after a console login and
-checks the provisioned files and dependency edges; the graphical dogfood must
-still confirm `systemctl --user is-active dms.service` and the rendered bar.
+The graphical dogfood ran on 2026-11-10 against image `3e886bc33a30` (commit
+`e12b116`), from the qcow2 disk that `tests/vm/make-disk.sh` built for that
+image. The VM booted a pristine disk (`-snapshot`) with `virtio-vga-gl` and a
+GL-capable display, so the greeter rendered on a real GPU path.
+
+Observed, in order:
+
+1. The greeter showed a `Select user...` pill and the session dropdown read
+   `Niri`, so the greeter seed selected the niri session on the first boot
+   (`.vm/picker5/41-user-picker.png`).
+2. A pointer click on the pill expanded the user list, and a click on the `dux`
+   row at `(0.452, 0.464)` moved focus to the password field
+   (`.vm/dogfood7/72-user-selected.png`).
+3. The password plus Enter started the session. Arrow keys and Enter on the
+   collapsed picker do nothing, so the pointer path is the only reliable one.
+4. From the serial getty, which shares the login user's manager, the live units
+   reported `DUX_LIVE_NIRI=active`, `DUX_LIVE_DMS=active`, `DUX_LIVE_USER=dux`.
+5. The desktop showed the DMS bar, the DMS Welcome dialog, and the dark session
+   background from the seed (`.vm/dogfood7/74-desktop.png`).
+
+No manual `dms setup` ran at any point. The first graphical login provisioned
+the desktop by itself.
+
+The probe driver is `.vm/dogfood_login.py` with `DOGFOOD_PROBE=7`. It lives in
+the ignored `.vm/` tree as run evidence and is not part of the image.
+
