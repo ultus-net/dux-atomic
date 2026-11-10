@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add a login stage to the VM test: build the candidate disk with one test account, log in on the serial console, and assert the account owns a session. The image ships no interactive user, so a real install must create one.
 - Give the greeter compositor access to the video, render, and input device groups: copy the missing groups from `/usr/lib/group` into `/etc/group`, add `greeter` to them, and fail the build if the membership did not take effect.
 - Disable Plymouth with `plymouth.enable=0`; with no usable display the boot waited forever in `plymouth-quit-wait`.
 - Assert the greeter session in `tests/vm/boot-smoke.sh`: wait for `greetd` and a `Session c1 of User greeter` scope instead of a serial login prompt, then check the scope is still running after a settle period.
