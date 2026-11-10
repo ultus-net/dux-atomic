@@ -5,13 +5,23 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish this build as sha-<commit>
+        type: boolean
+        default: false
+      promote:
+        description: Move latest to this build
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
+  # A PR run may be cancelled. A main run may be publishing, so never cancel it.
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   IMAGE: ghcr.io/ultus-net/dux-atomic
@@ -20,44 +30,22 @@ jobs:
   static:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - name: Install shellcheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Lint and static checks
+        run: tests/lint.sh
 
-      - name: Shell syntax
-        run: |
-          bash -n build/common.sh tests/test-static.sh tests/vm/boot-smoke.sh tests/vm/make-disk.sh
-          sh -n overlay/usr/libexec/dux-atomic/needs-setup.sh
-
-      - name: Shellcheck
-        run: |
-          shellcheck --severity=warning \
-            build/common.sh tests/test-static.sh tests/vm/boot-smoke.sh \
-            tests/vm/make-disk.sh overlay/usr/libexec/dux-atomic/needs-setup.sh
-
-      - name: Static checks
-        run: bash tests/test-static.sh
-
-      - name: Hadolint
-        uses: hadolint/hadolint-action@v3.1.0
-        with:
-          dockerfile: Containerfile
-          failure-threshold: warning
-
+  # Read-only: this job runs repository scripts from the PR head, so it holds no
+  # write token and no OIDC identity.
   image:
     runs-on: ubuntu-24.04
     needs: static
     timeout-minutes: 180
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Free runner disk space
-        uses: jlumbroso/free-disk-space@v1.3.1
+        uses: jlumbroso/free-disk-space@3f13feab2962a87273d379ebc36ea159527e6cc9 # v1.3.2
         with:
           tool-cache: false
           android: true
@@ -86,21 +74,19 @@ jobs:
           podman save localhost/dux-atomic:ci -o .cache/image.tar
 
       - name: SBOM
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
-          file: .cache/image.tar
+          image: docker-archive:.cache/image.tar
           format: spdx-json
           output-file: dux-atomic.spdx.json
           artifact-name: dux-atomic-sbom
 
-      - name: Vulnerability scan
-        uses: aquasecurity/trivy-action@0.28.0
+      - name: Upload SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          input: .cache/image.tar
-          scan-type: image
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: '1'
+          name: sbom
+          path: dux-atomic.spdx.json
+          retention-days: 14
 
       - name: Build disk
         run: |
@@ -108,52 +94,123 @@ jobs:
           sudo tests/vm/make-disk.sh localhost/dux-atomic:ci "$GITHUB_WORKSPACE/output"
 
       - name: Boot smoke test
+        # Hosted runners have no /dev/kvm and no DRM render node, so this is TCG
+        # and headless. It asserts the greeter session and the first-login units,
+        # not rendered pixels. The graphical dogfood stays a local step.
         env:
-          BOOT_TIMEOUT: '1800'
-          BOOT_GRACE: '600'
+          BOOT_TIMEOUT: '900'
+          BOOT_GRACE: '300'
           QEMU_ACCEL: tcg
         run: |
           tests/vm/boot-smoke.sh \
             "$GITHUB_WORKSPACE/output/qcow2/disk.qcow2" \
             "$GITHUB_WORKSPACE/.vm/boot.log"
 
+      - name: Vulnerability scan
+        # Report only until the Fedora base findings are triaged (#3).
+        if: hashFiles('.cache/image.tar') != ''
+        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
+        with:
+          input: .cache/image.tar
+          scan-type: image
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '0'
+          format: table
+          output: trivy-report.txt
+
+      - name: Upload scan report
+        if: hashFiles('trivy-report.txt') != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: trivy-report
+          path: trivy-report.txt
+          retention-days: 14
+
       - name: Upload boot evidence
-        if: failure()
-        uses: actions/upload-artifact@v4
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: boot-evidence
           path: |
             .vm/boot.log
             .vm/qemu.err
+          retention-days: 14
           if-no-files-found: ignore
 
+      - name: Upload image artifact
+        # Only the publish path needs the tar; a PR run does not.
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: image
+          path: .cache/image.tar
+          retention-days: 3
+          compression-level: 0
+
+  # The only job with write token and OIDC identity. It runs no repository code:
+  # it loads the artifact built above and runs the workflow's own commands.
+  publish:
+    needs: image
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish || inputs.promote)
+    runs-on: ubuntu-24.04
+    environment: ghcr
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Download image
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: image
+          path: .cache
+
+      - name: Download SBOM
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sbom
+          path: sbom
+
+      - name: Install podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman
+
       - name: Log in to GHCR
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: redhat-actions/podman-login@v1
+        uses: redhat-actions/podman-login@4934294ad0449894bcd1e9f191899d7292469603 # v1
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push image
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Push the commit tag
         env:
           SHA_TAG: sha-${{ github.sha }}
         run: |
-          podman tag localhost/dux-atomic:ci "$IMAGE:latest"
+          podman load -i .cache/image.tar
           podman tag localhost/dux-atomic:ci "$IMAGE:$SHA_TAG"
-          podman push --digestfile "$RUNNER_TEMP/digest" "$IMAGE:latest"
-          podman push "$IMAGE:$SHA_TAG"
+          podman push --digestfile "$RUNNER_TEMP/digest" "$IMAGE:$SHA_TAG"
 
       - name: Install cosign
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: sigstore/cosign-installer@v3
+        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
         with:
-          cosign-release: v3.1.4
+          cosign-release: v2.6.5
 
-      - name: Sign image and attest SBOM
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Sign the digest and attest the SBOM
         run: |
           digest=$(cat "$RUNNER_TEMP/digest")
           cosign sign --yes "$IMAGE@$digest"
-          cosign attest --yes --predicate dux-atomic.spdx.json --type spdxjson "$IMAGE@$digest"
+          cosign attest --yes --predicate sbom/dux-atomic.spdx.json --type spdxjson "$IMAGE@$digest"
+          cosign verify \
+            --certificate-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$IMAGE@$digest"
+
+      - name: Promote latest
+        if: inputs.promote
+        run: |
+          podman tag localhost/dux-atomic:ci "$IMAGE:latest"
+          podman push --digestfile "$RUNNER_TEMP/digest-latest" "$IMAGE:latest"
+          cmp "$RUNNER_TEMP/digest" "$RUNNER_TEMP/digest-latest"
+          # The digest is signed above, so latest arrives signed.
