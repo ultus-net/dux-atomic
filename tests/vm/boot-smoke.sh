@@ -31,14 +31,22 @@ run_dir=$(dirname -- "$log")
 mkdir -p "$run_dir"
 
 find_ovmf() {
-  local dir suffix
-  for dir in /usr/share/edk2/x64 /usr/share/edk2-ovmf/x64; do
-    for suffix in 4m.fd fd; do
-      if [[ -f $dir/OVMF_CODE.$suffix && -f $dir/OVMF_VARS.$suffix ]]; then
-        echo "$dir/OVMF_CODE.$suffix $dir/OVMF_VARS.$suffix"
-        return 0
-      fi
-    done
+  local pair code vars
+  # Fedora, Arch, and Ubuntu layout the OVMF files differently.
+  local -a pairs=(
+    "/usr/share/edk2/x64/OVMF_CODE.4m.fd /usr/share/edk2/x64/OVMF_VARS.4m.fd"
+    "/usr/share/edk2/x64/OVMF_CODE.fd /usr/share/edk2/x64/OVMF_VARS.fd"
+    "/usr/share/edk2-ovmf/x64/OVMF_CODE.4m.fd /usr/share/edk2-ovmf/x64/OVMF_VARS.4m.fd"
+    "/usr/share/edk2-ovmf/x64/OVMF_CODE.fd /usr/share/edk2-ovmf/x64/OVMF_VARS.fd"
+    "/usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/OVMF/OVMF_VARS_4M.fd"
+    "/usr/share/OVMF/OVMF_CODE.fd /usr/share/OVMF/OVMF_VARS.fd"
+  )
+  for pair in "${pairs[@]}"; do
+    read -r code vars <<<"$pair"
+    if [[ -f $code && -f $vars ]]; then
+      echo "$code $vars"
+      return 0
+    fi
   done
   return 1
 }
@@ -73,16 +81,29 @@ else
   display_args=(-vga virtio -display "vnc=127.0.0.1:${VNC_DISPLAY:-1}")
 fi
 
-qemu=(qemu-system-x86_64
-  -machine q35,accel=kvm -cpu host -m 4096 -smp 2
-  -snapshot
-  -drive if=pflash,format=raw,readonly=on,file="$ovmf_code"
-  -drive if=pflash,format=raw,file="$vars"
-  -drive file="$disk",if=virtio,format=qcow2
-  -nic user,model=virtio-net-pci
-  "${display_args[@]}"
-  -serial "pipe:$run_dir/serial"
-  -no-reboot)
+# KVM where available; TCG on a hosted runner without /dev/kvm. TCG is slow,
+# so raise BOOT_TIMEOUT for a hosted run.
+accel=${QEMU_ACCEL:-kvm}
+if [[ $accel == kvm && ! -e /dev/kvm ]]; then
+  echo "no /dev/kvm; falling back to TCG" >&2
+  accel=tcg
+fi
+cpu=${QEMU_CPU:-host}
+if [[ $accel == tcg && -z ${QEMU_CPU:-} ]]; then
+  cpu=max
+fi
+
+qemu=()
+qemu+=(qemu-system-x86_64)
+qemu+=(-machine "q35,accel=$accel" -cpu "$cpu" -m 4096 -smp 2)
+qemu+=(-snapshot)
+qemu+=(-drive "if=pflash,format=raw,readonly=on,file=$ovmf_code")
+qemu+=(-drive "if=pflash,format=raw,file=$vars")
+qemu+=(-drive "file=$disk,if=virtio,format=qcow2")
+qemu+=(-nic "user,model=virtio-net-pci")
+qemu+=("${display_args[@]}")
+qemu+=(-serial "pipe:$run_dir/serial")
+qemu+=(-no-reboot)
 
 "${qemu[@]}" 2>"$run_dir/qemu.err" &
 pid=$!

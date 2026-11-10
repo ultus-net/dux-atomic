@@ -51,8 +51,15 @@ fi
 # Bump this deliberately; the digest is the manifest this repo was tested with.
 bib_image=${BIB_IMAGE:-quay.io/centos-bootc/bootc-image-builder@sha256:a0ee98db5bfb8337e45efb92f0c5d1a19179c85ce80a3360abc628fd1a17cc5c}
 
+# Podman accepts the SELinux label only on an SELinux host; Ubuntu runners do
+# not have it, so pass it conditionally.
+security_args=()
+if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled; then
+  security_args+=(--security-opt label=type:unconfined_t)
+fi
+
 podman run --rm --privileged \
-  --security-opt label=type:unconfined_t \
+  "${security_args[@]}" \
   "${config_args[@]}" \
   -v "$out:/output" \
   -v /var/lib/containers/storage:/var/lib/containers/storage \

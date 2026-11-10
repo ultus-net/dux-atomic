@@ -1,5 +1,7 @@
 # dux-atomic
 
+[![ci](https://github.com/ultus-net/dux-atomic/actions/workflows/ci.yml/badge.svg)](https://github.com/ultus-net/dux-atomic/actions/workflows/ci.yml)
+
 A planned Fedora bootc developer and gaming workstation for two machines.
 
 The build definition is scaffolded from the Universal Blue image-template: the base tag is set in `Containerfile`. The generic image builds and boots to the greeter in a VM; no image has been published yet.
@@ -19,6 +21,18 @@ podman build -t dux-atomic:dev .
 ```
 
 The `ctx` stage hands `build/`, `manifests/`, and `overlay/` to one build step, so none of them land in the final image. Packages come from `manifests/packages-common.txt`, one name per line.
+
+## CI
+
+`.github/workflows/ci.yml` runs on every pull request, every push to `main`, and manual dispatch.
+
+- `static` runs shell syntax, shellcheck at warning severity, `tests/test-static.sh`, and hadolint.
+- `image` builds the image, runs `bootc container lint` and `systemd-analyze verify`, generates an SPDX SBOM with syft, scans with trivy, builds the qcow2 with bootc-image-builder, and runs `boot-smoke.sh`.
+- On `main` it pushes `ghcr.io/ultus-net/dux-atomic:latest` and `:sha-<commit>`, signs the digest with cosign keyless OIDC, and attests the SBOM.
+
+GitHub-hosted runners have no `/dev/kvm`, so the boot test runs on QEMU TCG. That is slow and headless: it asserts the greeter session and the first-login units, not rendered pixels. Run the graphical dogfood locally before promotion.
+
+`just check` mirrors the static gate. `just build`, `just lint-image`, `just disk`, and `just boot` cover the rest.
 
 ## Test in a VM
 
@@ -81,7 +95,8 @@ The image disables Plymouth (`plymouth.enable=0`), so both the VM and real hardw
 ## Known gaps before promotion
 
 - `console=ttyS0,115200` ships a serial getty to every install. It is a deliberate VM-test and recovery console for this branch; gate it behind a test build before publishing.
-- The image has no CI workflow, license, NVIDIA variant, application set, agent sandbox, or snapshot automation yet. The README marks these as planned.
+- The image has no NVIDIA variant, application set, agent sandbox, or snapshot automation yet. The README marks these as planned.
 - The VM test covers the greeter and a serial login. It does not log in through the greeter, start a second session, or exercise the Xfce fallback.
+- CI runs the boot test on TCG and does not render or inspect the desktop. The graphical dogfood stays a local pre-promotion step.
 - `bootc-image-builder` is pinned in `tests/vm/make-disk.sh`, but the base image tag floats and the COPR packages are unpinned.
 - The first-login retry has unit fixtures and a VM marker assertion, but no partial-home VM coverage yet. Rebuild and re-run the graphical dogfood after the retry change.

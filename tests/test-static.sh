@@ -135,12 +135,12 @@ condition_failed=0
 for spec in fresh:run partial:run user:skip done:skip reset:run xdgstate:skip; do
   name=${spec%%:*}
   expected=${spec##*:}
-  env_args=(HOME=$cond_root/$name)
+  env_args=("HOME=$cond_root/$name")
   if [[ $name == xdgstate ]]; then
-    env_args+=(XDG_STATE_HOME=$cond_root/xdgstate-state)
+    env_args+=("XDG_STATE_HOME=$cond_root/xdgstate-state")
   else
     # Empty means unset for the ${XDG_STATE_HOME:-...} default.
-    env_args+=(XDG_STATE_HOME=)
+    env_args+=("XDG_STATE_HOME=")
   fi
   # Exit 0 means run, 1 means skip. A crash is neither and must fail the test.
   if env "${env_args[@]}" "$condition"; then status=0; else status=$?; fi

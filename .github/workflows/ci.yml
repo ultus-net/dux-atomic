@@ -1,0 +1,159 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/ultus-net/dux-atomic
+
+jobs:
+  static:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Shell syntax
+        run: |
+          bash -n build/common.sh tests/test-static.sh tests/vm/boot-smoke.sh tests/vm/make-disk.sh
+          sh -n overlay/usr/libexec/dux-atomic/needs-setup.sh
+
+      - name: Shellcheck
+        run: |
+          shellcheck --severity=warning \
+            build/common.sh tests/test-static.sh tests/vm/boot-smoke.sh \
+            tests/vm/make-disk.sh overlay/usr/libexec/dux-atomic/needs-setup.sh
+
+      - name: Static checks
+        run: bash tests/test-static.sh
+
+      - name: Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Containerfile
+          failure-threshold: warning
+
+  image:
+    runs-on: ubuntu-24.04
+    needs: static
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+
+      - name: Install podman and qemu
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman qemu-system-x86 qemu-utils ovmf
+
+      - name: Build image
+        run: podman build --layers -t localhost/dux-atomic:ci .
+
+      - name: Image lint and unit verify
+        run: |
+          podman run --rm localhost/dux-atomic:ci bootc container lint
+          podman run --rm localhost/dux-atomic:ci systemd-analyze verify \
+            /usr/lib/systemd/system/dux-atomic-greeter-defaults.service \
+            /usr/lib/systemd/user/dux-atomic-desktop.service \
+            /usr/lib/systemd/user/dux-atomic-dms-defaults.service
+
+      - name: Export image
+        run: |
+          mkdir -p .cache
+          podman save localhost/dux-atomic:ci -o .cache/image.tar
+
+      - name: SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          file: .cache/image.tar
+          format: spdx-json
+          output-file: dux-atomic.spdx.json
+          artifact-name: dux-atomic-sbom
+
+      - name: Vulnerability scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          input: .cache/image.tar
+          scan-type: image
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Build disk
+        run: |
+          sudo podman load -i .cache/image.tar
+          sudo tests/vm/make-disk.sh localhost/dux-atomic:ci "$GITHUB_WORKSPACE/output"
+
+      - name: Boot smoke test
+        env:
+          BOOT_TIMEOUT: '1800'
+          BOOT_GRACE: '600'
+          QEMU_ACCEL: tcg
+        run: |
+          tests/vm/boot-smoke.sh \
+            "$GITHUB_WORKSPACE/output/qcow2/disk.qcow2" \
+            "$GITHUB_WORKSPACE/.vm/boot.log"
+
+      - name: Upload boot evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot-evidence
+          path: |
+            .vm/boot.log
+            .vm/qemu.err
+          if-no-files-found: ignore
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          SHA_TAG: sha-${{ github.sha }}
+        run: |
+          podman tag localhost/dux-atomic:ci "$IMAGE:latest"
+          podman tag localhost/dux-atomic:ci "$IMAGE:$SHA_TAG"
+          podman push --digestfile "$RUNNER_TEMP/digest" "$IMAGE:latest"
+          podman push "$IMAGE:$SHA_TAG"
+
+      - name: Install cosign
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v3.1.4
+
+      - name: Sign image and attest SBOM
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          digest=$(cat "$RUNNER_TEMP/digest")
+          cosign sign --yes "$IMAGE@$digest"
+          cosign attest --yes --predicate dux-atomic.spdx.json --type spdxjson "$IMAGE@$digest"
