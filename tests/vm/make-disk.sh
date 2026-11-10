@@ -28,7 +28,6 @@ if ! podman image exists "$image"; then
   exit 2
 fi
 
-config_args=()
 if [[ ${NO_TEST_USER:-0} != 1 ]]; then
   case "$test_user$test_password" in
     *'"'* | *'\'* | *$'\n'*)
@@ -36,14 +35,24 @@ if [[ ${NO_TEST_USER:-0} != 1 ]]; then
       exit 2
       ;;
   esac
-  config_dir=$(mktemp -d)
-  trap 'rm -rf "$config_dir"' EXIT
-  {
+fi
+
+# TCG boots on a shared runner can run at half speed, and udev then misses
+# systemd's 45s device timeout before /boot appears. Raise the timeout on the
+# test disk only, so the shipped image keeps the stock value.
+config_dir=$(mktemp -d)
+trap 'rm -rf "$config_dir"' EXIT
+{
+  echo '[customizations.kernel]'
+  echo 'append = "systemd.default_device_timeout_sec=180"'
+  if [[ ${NO_TEST_USER:-0} != 1 ]]; then
     echo '[[customizations.user]]'
     printf 'name = "%s"\n' "$test_user"
     printf 'password = "%s"\n' "$test_password"
-  } >"$config_dir/config.toml"
-  config_args+=(-v "$config_dir/config.toml:/config.toml:ro")
+  fi
+} >"$config_dir/config.toml"
+config_args=(-v "$config_dir/config.toml:/config.toml:ro")
+if [[ ${NO_TEST_USER:-0} != 1 ]]; then
   echo "test account: $test_user (no admin groups)" >&2
 fi
 

@@ -34,7 +34,7 @@ The `ctx` stage hands `build/`, `manifests/`, and `overlay/` to one build step, 
 - The `ghcr` environment is the approval hook. Add required reviewers in the repository settings to gate publication.
 - The first push creates a private GHCR package. Set the package visibility to public in the package settings if anonymous pulls are wanted.
 
-GitHub-hosted runners have no `/dev/kvm`, so the boot test runs on QEMU TCG and is headless: it asserts the greeter session and the first-login units, not rendered pixels. The guest still gets a DRM render node from virtio-gpu. Run the graphical dogfood locally before promotion. Record the first hosted run as the TCG baseline and adjust `BOOT_TIMEOUT` from it.
+GitHub-hosted runners have no `/dev/kvm`, so the boot test runs on QEMU TCG and is headless: it asserts the greeter session and the first-login units, not rendered pixels. The guest still gets a DRM render node from virtio-gpu. TCG throughput varies run to run, so `make-disk.sh` raises the test disk's `systemd.default_device_timeout_sec` to 180s; the shipped image keeps the stock 45s. Run the graphical dogfood locally before promotion. Record the first hosted run as the TCG baseline and adjust `BOOT_TIMEOUT` from it.
 
 `just check` mirrors the static gate. `just build`, `just lint-image`, `just disk`, and `just boot` cover the rest.
 
