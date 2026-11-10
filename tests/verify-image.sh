@@ -30,9 +30,11 @@ done
 # move with the updates repository on every build, so only other vendors are
 # compared; a drift there is a third-party rebuild and needs a lock update.
 # The vendor string is package-controlled, so this is a drift signal rather
-# than a provenance check; docs/known-gaps.md records the limitation.
+# than a provenance check; docs/known-gaps.md records the limitation. A +git
+# build tracks an upstream branch, so it cannot be pinned; the generator leaves
+# it out and the VM boot test covers a broken build.
 lock=$repo_root/manifests/packages-common.lock
-expected=$(grep -vE '^(#|$)' "$lock" | grep -vE $'\tFedora Project$' || true)
+expected=$(grep -vE '^(#|$)' "$lock" | grep -vE $'\tFedora Project$' | grep -vF '+git' || true)
 if [[ -z $expected ]]; then
   echo "FAIL the package lock has no third-party lines to compare" >&2
   exit 1
@@ -44,7 +46,7 @@ if ! raw=$(CONTAINER_RUNTIME=$runtime "$repo_root/build/package-lock.sh" "$image
   echo "FAIL the lock measurement failed; the generator or the image is broken" >&2
   exit 1
 fi
-measured=$(grep -vE '^(#|$)' <<<"$raw" | grep -vE $'\tFedora Project$' || true)
+measured=$(grep -vE '^(#|$)' <<<"$raw" | grep -vE $'\tFedora Project$' | grep -vF '+git' || true)
 if [[ $measured != "$expected" ]]; then
   echo "FAIL the third-party package lock drifted; run 'just lock'" >&2
   diff -u <(printf '%s\n' "$expected") <(printf '%s\n' "$measured") >&2 || true

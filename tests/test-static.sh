@@ -82,6 +82,10 @@ elif ! grep -qF 'the lock measurement failed' "$repo_root/tests/verify-image.sh"
    ! grep -qF 'the package lock has no third-party lines' "$repo_root/tests/verify-image.sh"; then
   echo "FAIL tests/verify-image.sh does not separate a failed measurement from drift" >&2
   failures=$((failures + 1))
+elif ! grep -qF "grep -vF '+git'" "$repo_root/tests/verify-image.sh" ||
+   ! grep -qF 'index($0, "+git")' "$repo_root/build/package-lock.sh"; then
+  echo "FAIL the lock and its comparison do not leave +git builds out" >&2
+  failures=$((failures + 1))
 else
   echo "ok   the lock is written atomically and a failed measurement is not drift"
 fi
