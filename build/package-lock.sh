@@ -35,15 +35,13 @@ if [[ -z $packages ]]; then
   echo "no packages in $manifest" >&2
   exit 1
 fi
-# Word splitting is intended: the manifest is one package per line.
-# shellcheck disable=SC2086
 mapfile -t names <<<"$packages"
 
 cat <<'HEADER'
 # manifests/packages-common.lock - regenerate with 'just lock'
-# One line per resolved package: <nevra> TAB <vendor>. tests/verify-image.sh
-# compares the non-Fedora lines, because Fedora packages move with the updates
-# repository on every build.
+# One line per package the manifest names: <nevra> TAB <vendor>.
+# tests/verify-image.sh compares the non-Fedora lines, because Fedora
+# packages move with the updates repository on every build.
 HEADER
 
 "$runtime" run --rm "$image" bash -c '

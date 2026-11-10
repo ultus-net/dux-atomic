@@ -15,8 +15,8 @@ elif grep -q 'ARG BASE_IMAGE' "$repo_root/Containerfile"; then
   echo "FAIL Containerfile still declares BASE_IMAGE; Dependabot cannot expand an ARG into FROM" >&2
   failures=$((failures + 1))
 elif base=$(grep -E '^FROM ghcr\.io/ublue-os/base-main:[0-9]+@sha256:[0-9a-f]{64}$' "$repo_root/Containerfile"); then
-  base_total=$(grep -cE '^FROM ghcr\.io/ublue-os/' "$repo_root/Containerfile")
-  base_pinned=$(grep -cE '^FROM ghcr\.io/ublue-os/base-main:[0-9]+@sha256:[0-9a-f]{64}$' "$repo_root/Containerfile")
+  base_total=$(grep -cE '^FROM ghcr\.io/ublue-os/' "$repo_root/Containerfile" || true)
+  base_pinned=$(grep -cE '^FROM ghcr\.io/ublue-os/base-main:[0-9]+@sha256:[0-9a-f]{64}$' "$repo_root/Containerfile" || true)
   if ((base_total != base_pinned)); then
     echo "FAIL Containerfile has ${base_total} ublue base FROM lines but only ${base_pinned} pinned" >&2
     failures=$((failures + 1))
@@ -66,6 +66,21 @@ else
   else
     echo "ok   packages-common.lock is present, headed and sorted"
   fi
+fi
+
+# A failed regeneration must not truncate the tracked lock, and a failed
+# measurement must not be reported as drift.
+if ! grep -qF 'manifests/packages-common.lock.tmp' "$repo_root/justfile" ||
+   ! grep -qF 'mv "$$tmp" manifests/packages-common.lock' "$repo_root/justfile" ||
+   ! grep -qF "trap 'rm -f \"\$\$tmp\"' EXIT" "$repo_root/justfile"; then
+  echo "FAIL justfile lock recipe does not write a temp file and move it on success" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'the lock measurement failed' "$repo_root/tests/verify-image.sh" ||
+   ! grep -qF 'the package lock has no third-party lines' "$repo_root/tests/verify-image.sh"; then
+  echo "FAIL tests/verify-image.sh does not separate a failed measurement from drift" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the lock is written atomically and a failed measurement is not drift"
 fi
 
 desktop_unit=$repo_root/overlay/usr/lib/systemd/user/dux-atomic-desktop.service

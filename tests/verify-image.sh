@@ -33,10 +33,15 @@ done
 # than a provenance check; docs/known-gaps.md records the limitation.
 lock=$repo_root/manifests/packages-common.lock
 expected=$(grep -vE '^(#|$)' "$lock" | grep -vE $'\tFedora Project$' || true)
-measured=$(CONTAINER_RUNTIME=$runtime "$repo_root/build/package-lock.sh" "$image" |
-  grep -vE '^(#|$)' | grep -vE $'\tFedora Project$' || true)
 if [[ -z $expected ]]; then
   echo "FAIL the package lock has no third-party lines to compare" >&2
+  exit 1
+fi
+# A nonzero status here means the generator or the image is broken, not that the
+# lock drifted, so keep the two diagnoses apart.
+if ! measured=$(CONTAINER_RUNTIME=$runtime "$repo_root/build/package-lock.sh" "$image" |
+  grep -vE '^(#|$)' | grep -vE $'\tFedora Project$'); then
+  echo "FAIL the lock measurement failed; the generator or the image is broken" >&2
   exit 1
 fi
 if [[ $measured != "$expected" ]]; then
