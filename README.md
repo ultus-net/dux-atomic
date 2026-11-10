@@ -5,9 +5,9 @@
 
 A planned Fedora bootc developer and gaming workstation for two machines, built on Universal Blue's `base-main`.
 
-![The Dux desktop after a first login: the DMS bar on a niri session](docs/assets/dux-desktop.png)
+![The Dux desktop at first login: the DMS bar and Welcome dialog on a niri session](docs/assets/dux-desktop.png)
 
-The build definition follows the Universal Blue image-template. The generic image builds, boots to the greeter in a VM, and provisions the desktop on the first graphical login. CI publishes `ghcr.io/ultus-net/dux-atomic:sha-<commit>` from `main`; `:latest` moves only on a manual promotion.
+The build definition follows the Universal Blue image-template. CI publishes `ghcr.io/ultus-net/dux-atomic:sha-<commit>` from `main`, so every merge is a pullable image.
 
 ## Status
 
@@ -28,7 +28,7 @@ The build definition follows the Universal Blue image-template. The generic imag
 just ci-local
 ```
 
-`just ci-local` runs the static gate, builds the image, and lints it. `just disk` and `just boot` take it into a VM. See [Build](docs/build.md) and [Testing](docs/testing.md).
+`just ci-local` runs the static gate, builds the image, and lints it. `just disk` and `just boot` take it into a VM. `just disk` needs the image in rootful podman storage; [Testing](docs/testing.md) has the load step, and [Build](docs/build.md) covers the build inputs.
 
 ## What's in the image
 
