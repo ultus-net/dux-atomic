@@ -1,0 +1,229 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish this build as sha-<commit>
+        type: boolean
+        default: false
+      promote:
+        description: Move latest to this build
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  # A PR run may be cancelled. A main run may be publishing, so never cancel it.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE: ghcr.io/ultus-net/dux-atomic
+
+jobs:
+  static:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Lint and static checks
+        run: tests/lint.sh
+
+  # Read-only: this job runs repository scripts from the PR head, so it holds no
+  # write token and no OIDC identity.
+  image:
+    runs-on: ubuntu-24.04
+    needs: static
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # This job runs PR code; leave no token in the checkout's git config.
+          persist-credentials: false
+
+      - name: Free runner disk space
+        uses: jlumbroso/free-disk-space@3f13feab2962a87273d379ebc36ea159527e6cc9 # v1.3.2
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+
+      - name: Install podman and qemu
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman qemu-system-x86 qemu-utils ovmf
+
+      - name: Build image
+        run: podman build --layers -t localhost/dux-atomic:ci .
+
+      - name: Image lint and unit verify
+        run: tests/verify-image.sh localhost/dux-atomic:ci
+
+      - name: Export image
+        run: |
+          mkdir -p .cache
+          podman save localhost/dux-atomic:ci -o .cache/image.tar
+
+      - name: SBOM
+        # A digest-pinned syft scans a flattened rootfs and writes the report
+        # to a file. Scanning the docker archive needed more than 8 GB here,
+        # and the former action buffered the report in memory until the Node
+        # heap died, which left the step with no error line.
+        run: |
+          set -o pipefail
+          podman create --name sbom-rootfs localhost/dux-atomic:ci
+          mkdir -p "$RUNNER_TEMP/rootfs"
+          podman export sbom-rootfs | tar -x -C "$RUNNER_TEMP/rootfs"
+          podman rm sbom-rootfs
+          podman run --rm -v "$RUNNER_TEMP/rootfs:/rootfs:ro" \
+            ghcr.io/anchore/syft:v1.42.3@sha256:5999d209a342e55e9edf70bf8930fb5b86d8f2a783fa401178372c50e21b1d36 \
+            scan dir:/rootfs \
+            --source-name dux-atomic --source-version "$GITHUB_SHA" \
+            -o spdx-json > dux-atomic.spdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sbom
+          path: dux-atomic.spdx.json
+          retention-days: 14
+
+      - name: Build disk
+        run: |
+          sudo podman load -i .cache/image.tar
+          sudo tests/vm/make-disk.sh localhost/dux-atomic:ci "$GITHUB_WORKSPACE/output"
+
+      - name: Boot smoke test
+        # Hosted runners have no /dev/kvm and no host GPU, so this is TCG and
+        # headless. It asserts the greeter session and the first-login units,
+        # not rendered pixels. The graphical dogfood stays a local step.
+        env:
+          BOOT_TIMEOUT: '900'
+          BOOT_GRACE: '300'
+          QEMU_ACCEL: tcg
+        run: |
+          tests/vm/boot-smoke.sh \
+            "$GITHUB_WORKSPACE/output/qcow2/disk.qcow2" \
+            "$GITHUB_WORKSPACE/.vm/boot.log"
+
+      - name: Vulnerability scan
+        # Report only until the Fedora base findings are triaged (#3).
+        # A pinned container avoids the action's unpinned setup-trivy dependency.
+        run: |
+          podman run --rm -v "$PWD:/src:ro" -w /src \
+            docker.io/aquasec/trivy:0.76.2@sha256:6fa071ef8daa2e58b90cbf1710bedca91adbb3bf98693533226f442035b836a6 \
+            image --input .cache/image.tar --severity CRITICAL,HIGH \
+            --ignore-unfixed --cache-dir /tmp/trivy --format table > trivy-report.txt
+
+      - name: Upload scan report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: trivy-report
+          path: trivy-report.txt
+          retention-days: 14
+
+      - name: Upload boot evidence
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: boot-evidence
+          path: |
+            .vm/boot.log
+            .vm/qemu.err
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload image artifact
+        # Only the publish path needs the tar; a PR run does not.
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: image
+          path: .cache/image.tar
+          retention-days: 3
+          compression-level: 0
+
+  # The only job with write token and OIDC identity. It runs no repository code:
+  # it loads the artifact built above and runs the workflow's own commands.
+  publish:
+    needs: image
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish || inputs.promote)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: ghcr
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Download image
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: image
+          path: .cache
+
+      - name: Download SBOM
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sbom
+          path: sbom
+
+      - name: Install podman and skopeo
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman skopeo
+
+      - name: Log in to GHCR
+        uses: redhat-actions/podman-login@4934294ad0449894bcd1e9f191899d7292469603 # v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push the commit tag
+        env:
+          SHA_TAG: sha-${{ github.sha }}
+        run: |
+          podman load -i .cache/image.tar
+          podman tag localhost/dux-atomic:ci "$IMAGE:$SHA_TAG"
+          podman push --digestfile "$RUNNER_TEMP/digest" "$IMAGE:$SHA_TAG"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+        with:
+          cosign-release: v2.6.5
+
+      - name: Sign the digest and attest the SBOM
+        run: |
+          digest=$(cat "$RUNNER_TEMP/digest")
+          cosign sign --yes "$IMAGE@$digest"
+          cosign attest --yes --predicate sbom/dux-atomic.spdx.json --type spdxjson "$IMAGE@$digest"
+          cosign verify \
+            --certificate-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$IMAGE@$digest"
+          cosign verify-attestation \
+            --type spdxjson \
+            --certificate-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$IMAGE@$digest"
+
+      - name: Promote latest
+        if: inputs.promote
+        # Copy the signed manifest to the tag, so the tag moves only to that
+        # digest. A failed copy leaves the previous tag and alerts.
+        run: |
+          digest=$(cat "$RUNNER_TEMP/digest")
+          skopeo copy --preserve-digests "docker://$IMAGE@$digest" "docker://$IMAGE:latest"
+          live=$(skopeo inspect --format '{{.Digest}}' "docker://$IMAGE:latest")
+          if [[ $live != "$digest" ]]; then
+            echo "latest resolves to $live, expected $digest" >&2
+            exit 1
+          fi

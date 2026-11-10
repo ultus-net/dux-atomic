@@ -28,22 +28,36 @@ if ! podman image exists "$image"; then
   exit 2
 fi
 
-config_args=()
-if [[ ${NO_TEST_USER:-0} != 1 ]]; then
+with_test_user=1
+if [[ ${NO_TEST_USER:-0} == 1 ]]; then
+  with_test_user=0
+fi
+
+if ((with_test_user)); then
   case "$test_user$test_password" in
     *'"'* | *'\'* | *$'\n'*)
       echo "TEST_USER and TEST_PASSWORD must not contain quotes, backslashes, or newlines" >&2
       exit 2
       ;;
   esac
-  config_dir=$(mktemp -d)
-  trap 'rm -rf "$config_dir"' EXIT
-  {
+fi
+
+# TCG boots on a shared runner can run at half speed, and udev then misses
+# systemd's 45s device timeout before /boot appears. Raise the timeout on the
+# test disk only, so the shipped image keeps the stock value.
+config_dir=$(mktemp -d)
+trap 'rm -rf "$config_dir"' EXIT
+{
+  echo '[customizations.kernel]'
+  echo 'append = "systemd.default_device_timeout_sec=180"'
+  if ((with_test_user)); then
     echo '[[customizations.user]]'
     printf 'name = "%s"\n' "$test_user"
     printf 'password = "%s"\n' "$test_password"
-  } >"$config_dir/config.toml"
-  config_args+=(-v "$config_dir/config.toml:/config.toml:ro")
+  fi
+} >"$config_dir/config.toml"
+config_args=(-v "$config_dir/config.toml:/config.toml:ro")
+if ((with_test_user)); then
   echo "test account: $test_user (no admin groups)" >&2
 fi
 
@@ -51,8 +65,15 @@ fi
 # Bump this deliberately; the digest is the manifest this repo was tested with.
 bib_image=${BIB_IMAGE:-quay.io/centos-bootc/bootc-image-builder@sha256:a0ee98db5bfb8337e45efb92f0c5d1a19179c85ce80a3360abc628fd1a17cc5c}
 
+# Podman accepts the SELinux label only on an SELinux host; Ubuntu runners do
+# not have it, so pass it conditionally.
+security_args=()
+if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled; then
+  security_args+=(--security-opt label=type:unconfined_t)
+fi
+
 podman run --rm --privileged \
-  --security-opt label=type:unconfined_t \
+  "${security_args[@]}" \
   "${config_args[@]}" \
   -v "$out:/output" \
   -v /var/lib/containers/storage:/var/lib/containers/storage \

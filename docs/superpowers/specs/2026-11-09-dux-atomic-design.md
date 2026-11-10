@@ -225,7 +225,7 @@ Do not install the same tool in both layers.
 | Operations toolbelt | Rootless Podman, Distrobox, networking, and no host package layering | A pinned operations container with kubectl, Helm, OpenTofu, cloud CLIs, k9s, stern, and kubectx | Tools run from the container and the host image stays unchanged |
 | Project runtimes | Base libraries only | The existing mise or devcontainer setup, project pin files, and direnv | A project pins its toolchain without a global install |
 | Secrets and signing | No private keys or credentials in the image | Bitwarden SSH agent, age or sops, and a gitleaks pre-commit hook | No plaintext secret enters git and commits are signed |
-| CI parity | Own the image repo's CI workflow (planned; no workflow exists yet), the pinned tool versions, and the image scan (hadolint, shellcheck, trivy, syft) | Mirror the same tool pins in local pre-commit and `just` recipes | Local and CI run the same pinned versions |
+| CI parity | Own the image repo's CI workflow, the pinned tool versions, and the image scan (hadolint, shellcheck, trivy, syft) | Mirror the same tool pins in local `just` recipes | Local and CI run the same pinned versions |
 | Junior onboarding | A TTY recovery path and a system diagnostics entry | A first-day checklist, project template, PR template, and break-glass runbook | A new user completes setup in one session |
 | Learning aids | The offline recovery page | `tldr`, `cheat`, `/explain`, and labeled cheatsheets | Lookup works without network |
 | Local cluster | Podman and the required kernel support | An optional kind or k3d helper with tested rootless limits | Cluster create and delete leave host state clean |
@@ -324,6 +324,7 @@ Zirconium remains a reference for desktop integration, not a copied configuratio
 Build pull requests without publishing trusted stable releases.
 Verify image contents, run bootc container lint, and boot a candidate in a VM.
 Publish immutable candidate references with signatures and build provenance.
+The current pipeline signs the digest and attests the SBOM; build provenance attestation is planned (#5).
 Only promote a hardware-approved candidate digest to the stable channel.
 Do not rebuild a different image during promotion.
 Both variants require their hardware acceptance records before their own promotion.
@@ -332,6 +333,8 @@ Hosts verify our signing identity through an installed containers policy and pin
 A valid signature establishes publisher identity, not correctness.
 Test rejected unsigned and incorrectly signed images.
 Private signing material stays in CI secrets, never the image or git.
+CI signs and verifies each published digest with keyless OIDC.
+The shipped policy and the rejection tests are planned (#4).
 
 Automatic updates stage only the stable channel.
 Do not configure automatic reboot.

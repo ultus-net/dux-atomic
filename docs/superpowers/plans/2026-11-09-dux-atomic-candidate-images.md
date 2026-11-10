@@ -1,6 +1,6 @@
 # dux-atomic candidate images implementation plan
 
-Status: draft for operator review. No task in this plan is authorized until the design is approved.
+Status: draft for operator review. The CI and signing portions are superseded by `.github/workflows/ci.yml` and the README: the shipped pipeline uses keyless OIDC and `sha-<commit>` tags. The repository and `main` protection now exist; the NVIDIA variant work remains unstarted.
 
 > **For agentic workers:** use the `subagent-driven-development` or `executing-plans` skill. Track work with checkbox steps. One commit per task.
 
@@ -22,7 +22,7 @@ Status: draft for operator review. No task in this plan is authorized until the 
 
 These are defined here and are not created by this plan.
 
-- Initial commit on the current design branch, then a PR to `main`. The repository currently has no commits.
+- Initial history on `main`, with branch protection.
 - `main` becomes protected. Only `feature/*`, `fix/*`, `chore/*`, and `experiment/*` branches build.
 - Forge work items are created once the GitHub repository exists. Create one item per task. Do not create a remote repository or issues as part of this plan.
 - No shared writable `.git` hooks or config across clones. Each clone configures hooks itself.

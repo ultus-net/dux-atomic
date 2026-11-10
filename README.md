@@ -1,14 +1,16 @@
 # dux-atomic
 
+[![ci](https://github.com/ultus-net/dux-atomic/actions/workflows/ci.yml/badge.svg)](https://github.com/ultus-net/dux-atomic/actions/workflows/ci.yml)
+
 A planned Fedora bootc developer and gaming workstation for two machines.
 
-The build definition is scaffolded from the Universal Blue image-template: the base tag is set in `Containerfile`. The generic image builds and boots to the greeter in a VM; no image has been published yet.
+The build definition is scaffolded from the Universal Blue image-template: the base tag is set in `Containerfile`. The generic image builds and boots to the greeter in a VM. CI publishes `ghcr.io/ultus-net/dux-atomic:sha-<commit>` from `main`; `:latest` moves only on a manual promotion dispatch.
 
-- Base: Universal Blue `base-main`, Fedora 45, on a floating tag while we prototype. The generic x86_64 image builds and boots in a VM; no image has been published yet. An NVIDIA variant is planned and not built.
+- Base: Universal Blue `base-main`, Fedora 45, on a floating tag while we prototype. The generic x86_64 image builds and boots in a VM. An NVIDIA variant is planned and not built.
 - Desktop: niri, Dux Modular Shell, Dux Greeter, Ghostty, and an Xfce X11 fallback.
 - Applications: the first desktop set only. Zed, OpenCode, Steam, Discord, Spotify, Bitwarden, Obsidian, Zen Browser, and Lutris are planned and not installed.
 - Configuration: the existing [dotfiles repository](https://github.com/ultus-net/dotfiles) remains authoritative.
-- Safety: signed image publication, explicit rollback, project-scoped rootless agent containers, and local home snapshots are planned. The current image relies on the base's `bootc` update and rollback mechanics and ships no agent sandbox.
+- Safety: CI signs every published digest with cosign keyless OIDC and attests the SBOM. Explicit rollback, project-scoped rootless agent containers, and local home snapshots are planned. The current image relies on the base's `bootc` update and rollback mechanics and ships no agent sandbox.
 
 Read the [approved design](docs/superpowers/specs/2026-11-09-dux-atomic-design.md).
 
@@ -20,6 +22,22 @@ podman build -t dux-atomic:dev .
 
 The `ctx` stage hands `build/`, `manifests/`, and `overlay/` to one build step, so none of them land in the final image. Packages come from `manifests/packages-common.txt`, one name per line.
 
+## CI
+
+`.github/workflows/ci.yml` runs on every pull request, every push to `main`, and manual dispatch. Every action is pinned to a commit SHA, and the job that runs PR code holds only `contents: read`.
+
+- `static` runs `tests/lint.sh`: shell syntax, shellcheck, `tests/test-static.sh`, hadolint, and actionlint. `tests/lint.sh` pins the linter images by digest, and `just check` runs the same script.
+- `image` builds the image, runs `tests/verify-image.sh` (`bootc container lint` and `systemd-analyze verify`), generates an SPDX SBOM with syft, builds the qcow2 with bootc-image-builder, and runs `boot-smoke.sh`. It then scans with a digest-pinned trivy container and uploads the report. The scan is report-only until the Fedora base findings are triaged (#3).
+- `publish` runs only on `main`, holds the write token and OIDC identity, and runs no repository code. It loads the built artifact, pushes `:sha-<commit>`, signs the digest with cosign keyless OIDC, attests the SBOM, and verifies both the signature and the attestation.
+- A `workflow_dispatch` on `main` with `promote` set copies the signed manifest to `:latest` and asserts the registry digest. A failed copy leaves the previous tag, alerts, and needs a human retry. A push never moves `:latest`.
+- `static` and `image` are required checks on `main`; a red hosted `image` run blocks merge.
+- The `ghcr` environment is the approval hook. Add required reviewers in the repository settings to gate publication.
+- The first push creates a private GHCR package. Set the package visibility to public in the package settings if anonymous pulls are wanted.
+
+GitHub-hosted runners have no `/dev/kvm`, so the boot test runs on QEMU TCG and is headless: it asserts the greeter session and the first-login units, not rendered pixels. The guest still gets a DRM render node from virtio-gpu. TCG throughput varies run to run, so `make-disk.sh` raises the test disk's `systemd.default_device_timeout_sec` to 180s; the shipped image keeps the stock 45s. The workflow gives the boot 900s and `greetd` 300s to start. Run the graphical dogfood locally before promotion.
+
+`just check` mirrors the static gate. `just build`, `just lint-image`, `just disk`, and `just boot` cover the rest.
+
 ## Test in a VM
 
 ```bash
@@ -29,7 +47,7 @@ sudo tests/vm/make-disk.sh
 tests/vm/boot-smoke.sh
 ```
 
-`make-disk.sh` runs bootc-image-builder as root. The builder image is pinned by digest so a moving `:latest` cannot change the disk; override the pin with `BIB_IMAGE`. It adds one test account (`dux` / `dux-test` by default, override with `TEST_USER` and `TEST_PASSWORD`, skip with `NO_TEST_USER=1`) because the image ships no interactive user. Credentials reject quotes, backslashes, and newlines, which would break the generated TOML. `boot-smoke.sh` boots the qcow2 headless, asserts that `graphical.target`, `greetd`, and a live greeter session scope appear on the serial console, then logs in as that account. It starts the two first-login units the way `graphical-session-pre.target` does, then checks the niri config, the DMS binds, the dark session seed, the per-user `dms.service` link, the image-level `niri.service` binding, and the preset enablement.
+`make-disk.sh` runs bootc-image-builder as root. The builder image is pinned by digest so a moving `:latest` cannot change the disk; override the pin with `BIB_IMAGE`. It adds one test account (`dux` / `dux-test` by default, override with `TEST_USER` and `TEST_PASSWORD`, skip with `NO_TEST_USER=1`) because the image ships no interactive user. Credentials reject quotes, backslashes, and newlines, which would break the generated TOML. `boot-smoke.sh` boots the qcow2 headless, asserts that `greetd` starts, treats the greeter session line on the serial console as the fast signal, warns when `graphical.target` is not reported, then logs in as that account and asserts the live greeter session through `loginctl`. It starts the two first-login units the way `graphical-session-pre.target` does, then checks the niri config, the DMS binds, the dark session seed, the per-user `dms.service` link, the image-level `niri.service` binding, and the preset enablement.
 
 ```bash
 sudo TEST_USER=dux TEST_PASSWORD=dux-test tests/vm/make-disk.sh
@@ -38,7 +56,7 @@ VIRTIO_GL=1 TEST_USER=dux TEST_PASSWORD=dux-test tests/vm/boot-smoke.sh
 
 The login stage needs the same credentials the disk was built with. Pass `BOOT_LOGIN=0` for a disk built with `NO_TEST_USER=1`, which runs the boot assertions only.
 
-QEMU's display-only `virtio-vga` has no render node, so the greeter compositor cannot paint under it. Set `VIRTIO_GL=1` to boot with `virtio-vga-gl` and an offscreen display, which gives the guest a render node; the test then also asserts `/dev/dri/renderD128`. Check the rendered greeter on real hardware for the final confirmation.
+QEMU's `virtio-vga` exposes a render node, so the greeter session starts even on a host without GL. That does not prove the greeter painted. Set `VIRTIO_GL=1` on a host with a GPU to render with GL; the test then also asserts `/dev/dri/renderD128`. Check the rendered greeter on real hardware for the final confirmation.
 
 A real install creates the operator account itself, either in the installer or with `useradd -m`. The image never ships a login account or a password.
 
@@ -62,7 +80,7 @@ The seed is a `Wants=` dependency, not `Requires=`, so a failed seed does not bl
 
 ## Dogfood the graphical desktop
 
-The headless smoke test proves the greeter renders, not that the desktop looks right. Boot the candidate disk with a real GL display and log in through the greeter:
+The headless smoke test proves the greeter session starts, not that the desktop looks right. Boot the candidate disk with a real GL display and log in through the greeter:
 
 ```bash
 cp /usr/share/edk2/x64/OVMF_VARS.4m.fd /tmp/dux-vars.fd
@@ -81,7 +99,8 @@ The image disables Plymouth (`plymouth.enable=0`), so both the VM and real hardw
 ## Known gaps before promotion
 
 - `console=ttyS0,115200` ships a serial getty to every install. It is a deliberate VM-test and recovery console for this branch; gate it behind a test build before publishing.
-- The image has no CI workflow, license, NVIDIA variant, application set, agent sandbox, or snapshot automation yet. The README marks these as planned.
+- The image has no NVIDIA variant, application set, agent sandbox, or snapshot automation yet. The README marks these as planned.
 - The VM test covers the greeter and a serial login. It does not log in through the greeter, start a second session, or exercise the Xfce fallback.
-- `bootc-image-builder` is pinned in `tests/vm/make-disk.sh`, but the base image tag floats and the COPR packages are unpinned.
+- CI runs the boot test on TCG and does not render or inspect the desktop. The graphical dogfood stays a local pre-promotion step.
+- `bootc-image-builder` is pinned in `tests/vm/make-disk.sh`, but the base image tag floats and the COPR packages are unpinned (#2).
 - The first-login retry has unit fixtures and a VM marker assertion, but no partial-home VM coverage yet. Rebuild and re-run the graphical dogfood after the retry change.

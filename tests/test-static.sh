@@ -135,12 +135,12 @@ condition_failed=0
 for spec in fresh:run partial:run user:skip done:skip reset:run xdgstate:skip; do
   name=${spec%%:*}
   expected=${spec##*:}
-  env_args=(HOME=$cond_root/$name)
+  env_args=("HOME=$cond_root/$name")
   if [[ $name == xdgstate ]]; then
-    env_args+=(XDG_STATE_HOME=$cond_root/xdgstate-state)
+    env_args+=("XDG_STATE_HOME=$cond_root/xdgstate-state")
   else
     # Empty means unset for the ${XDG_STATE_HOME:-...} default.
-    env_args+=(XDG_STATE_HOME=)
+    env_args+=("XDG_STATE_HOME=")
   fi
   # Exit 0 means run, 1 means skip. A crash is neither and must fail the test.
   if env "${env_args[@]}" "$condition"; then status=0; else status=$?; fi
@@ -165,9 +165,11 @@ boot_smoke=$repo_root/tests/vm/boot-smoke.sh
 common=$repo_root/build/common.sh
 if ! grep -qF 'wait_for "DUX_USER:${test_user}"' "$boot_smoke" ||
    ! grep -qF "wait_for 'DUX_PROBE_END:ok'" "$boot_smoke" ||
+   ! grep -qF "wait_for 'DUX_DIAG_END:ok'" "$boot_smoke" ||
    ! grep -qF 'if ! wait_for "${test_user}@" 20' "$boot_smoke" ||
    ! grep -qF 'DUX_SETUP_MARKER' "$boot_smoke" ||
    grep -qF 'wait_for "${test_user}@" 20 || true' "$boot_smoke" ||
+   grep -qF "wait_for 'DUX_DIAG_END'" "$boot_smoke" ||
    grep -qF "wait_for 'DUX_PROBE_END'" "$boot_smoke"; then
   echo "FAIL boot-smoke waits on an echoed marker instead of printf output" >&2
   failures=$((failures + 1))

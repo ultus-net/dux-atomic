@@ -16,6 +16,8 @@ COPY build /build
 COPY manifests /manifests
 COPY overlay /overlay
 
+# BASE_IMAGE is a build arg with an explicit tag; hadolint cannot resolve it.
+# hadolint ignore=DL3006
 FROM ${BASE_IMAGE}
 
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
