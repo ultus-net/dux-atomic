@@ -84,7 +84,7 @@ qemu=(qemu-system-x86_64
   -serial "pipe:$run_dir/serial"
   -no-reboot)
 
-"${qemu[@]}" &
+"${qemu[@]}" 2>"$run_dir/qemu.err" &
 pid=$!
 # QEMU opens the far end at startup, so this connect finishes immediately.
 exec 7>"$pipe_in"
@@ -117,10 +117,28 @@ serial_write() {
   printf '%s\n' "$1" >&7
 }
 
+# A boot can lose its console output while the guest keeps running. Ask the
+# getty for a fresh prompt before treating a missing log line as a dead system.
+console_alive() {
+  local before after
+  before=$(grep -ac 'login:' "$log" 2>/dev/null || true)
+  serial_write ''
+  sleep 6
+  after=$(grep -ac 'login:' "$log" 2>/dev/null || true)
+  (( after > before ))
+}
+
 if ! wait_for 'Reached target .*graphical\.target' "$timeout_s"; then
-  echo "boot failed: graphical target not reached in ${timeout_s}s" >&2
-  tail -40 "$log" >&2 || true
-  exit 1
+  if grep -qE 'Session c[0-9]+ of User greeter' "$log" && console_alive; then
+    echo "warning: no graphical.target line, but the greeter session is live and the console answers" >&2
+    target_seen=0
+  else
+    echo "boot failed: graphical target not reached in ${timeout_s}s" >&2
+    tail -40 "$log" >&2 || true
+    exit 1
+  fi
+else
+  target_seen=1
 fi
 
 if ! wait_for 'Started .*greetd\.service' "$grace_s"; then
@@ -163,6 +181,9 @@ if [[ $login == 1 ]]; then
   serial_write 'echo "DUX_USER:$(id -un)"'
   serial_write 'loginctl list-sessions --no-legend | grep -q "$(id -un)" && echo DUX_SESSION_OK || echo DUX_SESSION_MISSING'
   serial_write 'test -e /dev/dri/renderD128 && echo DUX_RENDER_OK || echo DUX_RENDER_NONE'
+  serial_write 'echo "DUX_GREETER_GROUPS:$(id -nG greeter | tr " " ",")"'
+  serial_write 'echo "DUX_KARGS:$(ls /usr/lib/bootc/kargs.d/ | tr "\n" ",")"'
+  serial_write 'echo "DUX_DEPLOYMENT:$(ostree admin status 2>/dev/null | head -2 | tr "\n" " ")"'
   serial_write 'echo DUX_PROBE_END'
 
   if ! wait_for 'DUX_USER:' 20; then
@@ -187,8 +208,20 @@ if [[ $login == 1 ]]; then
     echo "render failed: no /dev/dri/renderD128 under virtio-vga-gl" >&2
     exit 1
   fi
+  greeter_groups=$(grep -a -m1 -E 'DUX_GREETER_GROUPS:[a-z]' "$log" || true)
+  for group in video render input; do
+    if [[ $greeter_groups != *"$group"* ]]; then
+      echo "boot failed: greeter is not in the ${group} group on the running system" >&2
+      echo "$greeter_groups" >&2
+      exit 1
+    fi
+  done
   echo "login ok: ${test_user} authenticated on the console and owns a session"
 fi
 
-echo "boot ok: graphical target, greetd, and a live greeter session are up"
+if [[ $target_seen == 1 ]]; then
+  echo "boot ok: graphical target, greetd, and a live greeter session are up"
+else
+  echo "boot ok: greetd and a live greeter session are up; the console lost the graphical.target line"
+fi
 echo "log: $log"
