@@ -193,7 +193,8 @@ if ! grep -qF 'retry cosign sign --yes "$IMAGE@$digest"' "$workflow" ||
    ! grep -qF 'cap=$((remaining < 300 ? remaining : 300))' "$workflow" ||
    ! grep -qF 'budget=600' "$workflow" ||
    ! grep -qF 'remaining=$((deadline - SECONDS))' "$workflow" ||
-   ! grep -qF 'timeout 180 cosign verify' "$workflow" ||
+   ! grep -qF 'timeout 180 cosign verify \' "$workflow" ||
+   ! grep -qF 'timeout 180 cosign verify-attestation' "$workflow" ||
    ! grep -qF '::notice::pushed $IMAGE@$digest' "$workflow" ||
    grep -qF 'until cosign sign' "$workflow"; then
   echo "FAIL ci.yml does not retry sign and attest separately with a capped attempt, a per-command budget, capped verification, and the pushed digest" >&2
