@@ -78,6 +78,29 @@ else
   echo "ok   first-login desktop units are enabled through the user preset"
 fi
 
+greeter_unit=$repo_root/overlay/usr/lib/systemd/system/dux-atomic-greeter-defaults.service
+greeter_seed=$repo_root/overlay/usr/share/dux-atomic/greeter/memory.json
+greeter_wants=$repo_root/overlay/usr/lib/systemd/system/greetd.service.wants/dux-atomic-greeter-defaults.service
+if [[ ! -f $greeter_unit ]] ||
+   ! grep -qx 'ExecStart=/usr/bin/install -m 0644 -o greeter -g greeter /usr/share/dux-atomic/greeter/memory.json /var/cache/dms-greeter/.local/state/memory.json' "$greeter_unit"; then
+  echo "FAIL dux-atomic-greeter-defaults.service does not seed the greeter memory" >&2
+  failures=$((failures + 1))
+elif ! grep -qx 'Before=greetd.service' "$greeter_unit"; then
+  echo "FAIL dux-atomic-greeter-defaults.service is not ordered before greetd" >&2
+  failures=$((failures + 1))
+elif [[ ! -f $greeter_seed ]] || ! grep -q '"lastSessionDesktopId": "niri.desktop"' "$greeter_seed"; then
+  echo "FAIL the greeter memory seed does not default to niri" >&2
+  failures=$((failures + 1))
+elif [[ ! -L $greeter_wants ]] || [[ $(readlink "$greeter_wants") != /usr/lib/systemd/system/dux-atomic-greeter-defaults.service ]]; then
+  echo "FAIL dux-atomic-greeter-defaults.service is not bound to greetd" >&2
+  failures=$((failures + 1))
+elif ! grep -q 'getent passwd greeter' "$repo_root/build/common.sh"; then
+  echo "FAIL build/common.sh does not check the greeter account" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the greeter defaults to the niri session"
+fi
+
 if ((failures > 0)); then
   exit 1
 fi

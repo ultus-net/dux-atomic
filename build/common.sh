@@ -49,6 +49,22 @@ test -f /usr/share/dux-atomic/dms/session.json || {
   exit 1
 }
 
+# The greeter picks session index 0 when it has no memory, and the desktop-file
+# order is asynchronous. Seed niri as the first-login session.
+for path in \
+  /usr/lib/systemd/system/dux-atomic-greeter-defaults.service \
+  /usr/lib/systemd/system/greetd.service.wants/dux-atomic-greeter-defaults.service \
+  /usr/share/dux-atomic/greeter/memory.json; do
+  test -e "$path" || {
+    echo "missing ${path}; the greeter default would be undefined" >&2
+    exit 1
+  }
+done
+getent passwd greeter >/dev/null || {
+  echo "the greeter account is missing; the session seed cannot be owned" >&2
+  exit 1
+}
+
 # The greeter compositor needs the video, render, and input device groups.
 # shadow-utils reads only /etc/group, so copy the vendor groups from
 # /usr/lib/group into /etc/group first. usermod exits 0 for a group it cannot

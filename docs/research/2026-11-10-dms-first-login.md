@@ -62,6 +62,28 @@ It does not write `~/.local/state/dms/session.json`, so the seed unit and the
 setup unit cannot race on that file. `dms setup` refuses to run as root, which
 is why the unit runs at `graphical-session-pre.target` as the login user.
 
+## Greeter session default
+
+The greeter builds its session list from `wayland-sessions` and `xsessions`
+in asynchronous load order, then calls `selectSessionIndex(0)` when it has no
+remembered choice. On this image that made the first login nondeterministic:
+one boot opened Niri, another opened the Xfce session.
+
+The greeter stores its choice in `/var/cache/dms-greeter/.local/state/memory.json`.
+Read from the `dux-greeter` source (`core/internal/greeter/installer.go`):
+
+```
+LastSessionID        string `json:"lastSessionId"`
+LastSessionDesktopID string `json:"lastSessionDesktopId"`
+```
+
+`GreeterContent.qml` selects the remembered desktop by its desktop-file
+basename, and `rememberLastSession` defaults to true. Seeding
+`{"lastSessionDesktopId": "niri.desktop"}` therefore selects
+`/usr/share/wayland-sessions/niri.desktop` on the first login. A later
+login overwrites the file, and `ConditionPathExists=!...memory.json` makes the
+seed unit skip once a user has made a choice.
+
 ## Deferred
 
 A live graphical session has not yet been booted from this image here. The

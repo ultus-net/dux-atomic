@@ -201,6 +201,7 @@ if [[ $login == 1 ]]; then
   serial_write 'printf "DUX_DMS_WANTED:%s\n" "$(systemctl --user show -p Wants niri.service | grep -q dms.service && echo ok || echo missing)"'
   serial_write 'printf "DUX_PRE_WANTED:%s\n" "$(systemctl --user show -p Wants niri.service | grep -q graphical-session-pre.target && echo ok || echo missing)"'
   serial_write 'printf "DUX_DESKTOP_ENABLED:%s\n" "$(systemctl --user is-enabled dux-atomic-desktop.service 2>/dev/null | grep -qx enabled && echo ok || echo missing)"'
+  serial_write 'printf "DUX_GREETER_SEED:%s\n" "$(grep -q niri.desktop /var/cache/dms-greeter/.local/state/memory.json 2>/dev/null && echo ok || echo missing)"'
   serial_write 'echo DUX_PROBE_END'
 
   if ! wait_for 'DUX_USER:' 20; then
@@ -228,7 +229,7 @@ if [[ $login == 1 ]]; then
     grep -a 'DUX_UNITS:' "$log" >&2 || true
     exit 1
   fi
-  for marker in DUX_NIRI_CONFIG DUX_DMS_BINDS DUX_SESSION_SEED DUX_USER_DMS_LINK DUX_DMS_WANTED DUX_PRE_WANTED DUX_DESKTOP_ENABLED; do
+  for marker in DUX_NIRI_CONFIG DUX_DMS_BINDS DUX_SESSION_SEED DUX_USER_DMS_LINK DUX_DMS_WANTED DUX_PRE_WANTED DUX_DESKTOP_ENABLED DUX_GREETER_SEED; do
     if ! grep -q "${marker}:ok" "$log"; then
       echo "first login failed: ${marker} is not ok" >&2
       grep -a "${marker}:" "$log" >&2 || true
