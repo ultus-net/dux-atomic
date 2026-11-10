@@ -89,18 +89,13 @@ if [[ $accel == kvm && ! -e /dev/kvm ]]; then
   accel=tcg
 fi
 cpu=${QEMU_CPU:-host}
-smp=2
-if [[ $accel == tcg ]]; then
-  # A hosted TCG boot logged the second vCPU as unresponsive (the watchdog
-  # read timed out). One vCPU removes the cross-CPU timeout; the smoke test
-  # asserts startup, not desktop performance.
-  cpu=${QEMU_CPU:-max}
-  smp=1
+if [[ $accel == tcg && -z ${QEMU_CPU:-} ]]; then
+  cpu=max
 fi
 
 qemu=()
 qemu+=(qemu-system-x86_64)
-qemu+=(-machine "q35,accel=$accel" -cpu "$cpu" -m 4096 -smp "$smp")
+qemu+=(-machine "q35,accel=$accel" -cpu "$cpu" -m 4096 -smp 2)
 qemu+=(-snapshot)
 qemu+=(-drive "if=pflash,format=raw,readonly=on,file=$ovmf_code")
 qemu+=(-drive "if=pflash,format=raw,file=$vars")
