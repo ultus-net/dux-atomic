@@ -89,13 +89,18 @@ if [[ $accel == kvm && ! -e /dev/kvm ]]; then
   accel=tcg
 fi
 cpu=${QEMU_CPU:-host}
-if [[ $accel == tcg && -z ${QEMU_CPU:-} ]]; then
-  cpu=max
+smp=2
+if [[ $accel == tcg ]]; then
+  # A hosted TCG boot stalled one vCPU (the watchdog read timed out) and never
+  # started the greeter's user manager. One vCPU keeps the boot deterministic;
+  # the smoke test asserts startup, not desktop performance.
+  cpu=${QEMU_CPU:-max}
+  smp=1
 fi
 
 qemu=()
 qemu+=(qemu-system-x86_64)
-qemu+=(-machine "q35,accel=$accel" -cpu "$cpu" -m 4096 -smp 2)
+qemu+=(-machine "q35,accel=$accel" -cpu "$cpu" -m 4096 -smp "$smp")
 qemu+=(-snapshot)
 qemu+=(-drive "if=pflash,format=raw,readonly=on,file=$ovmf_code")
 qemu+=(-drive "if=pflash,format=raw,file=$vars")
@@ -144,6 +149,50 @@ serial_write() {
   printf '%s\n' "$1" >&7
 }
 
+serial_login() {
+  if ! wait_for 'login: *$' "$grace_s"; then
+    echo "login failed: no getty prompt on the serial console" >&2
+    return 1
+  fi
+  serial_write "$test_user"
+  if ! wait_for 'Password:' 20; then
+    echo "login failed: no password prompt for ${test_user}" >&2
+    return 1
+  fi
+  serial_write "$test_password"
+  # Wait for the login shell's prompt instead of a fixed sleep. A missing
+  # prompt means the login failed, so do not send probes into an unknown state.
+  if ! wait_for "${test_user}@" 20; then
+    echo "login failed: no shell prompt for ${test_user}" >&2
+    return 1
+  fi
+  return 0
+}
+
+# A greeter that never starts leaves nothing on the serial console: the unit's
+# output goes to the journal, which the unprivileged test account cannot read.
+# Process state, wait channels, and unit state are readable, and they say
+# whether greetd never spawned the greeter or the greeter hung.
+dump_greeter_diagnostics() {
+  echo "collecting greeter diagnostics on the serial console" >&2
+  if [[ $login != 1 ]]; then
+    echo "diagnostics need the test account; rerun with BOOT_LOGIN=1" >&2
+    return 0
+  fi
+  if ! serial_login; then
+    echo "diagnostics skipped: no shell for ${test_user}" >&2
+    return 0
+  fi
+  serial_write 'echo DUX_DIAG_BEGIN'
+  serial_write "ps -eo user,pid,stat,wchan:20,comm | grep -E 'greetd|dms-greeter|niri|systemd' | head -30"
+  serial_write 'systemctl --no-pager status greetd | head -15'
+  serial_write 'loginctl list-sessions --no-legend'
+  serial_write 'ls -l /dev/dri'
+  serial_write 'systemctl --failed --no-pager'
+  serial_write 'echo DUX_DIAG_END'
+  wait_for 'DUX_DIAG_END' 60 || echo "diagnostics did not finish in 60s" >&2
+}
+
 # The greeter session is the primary signal: it proves the graphical stack is
 # up. Some boots reach it without logging graphical.target, so a missing target
 # line is a warning, not a failure.
@@ -154,6 +203,7 @@ fi
 
 if ! wait_for 'Session c[0-9]+ of User greeter' "$timeout_s"; then
   echo "boot failed: no greeter session started in ${timeout_s}s" >&2
+  dump_greeter_diagnostics
   exit 1
 fi
 
@@ -177,22 +227,7 @@ if grep -qE 'Stopped .*session-c[0-9]+\.scope' "$log"; then
 fi
 
 if [[ $login == 1 ]]; then
-  if ! wait_for 'login: *$' "$grace_s"; then
-    echo "login failed: no getty prompt on the serial console" >&2
-    exit 1
-  fi
-
-  serial_write "$test_user"
-  if ! wait_for 'Password:' 20; then
-    echo "login failed: no password prompt for ${test_user}" >&2
-    tail -20 "$log" >&2 || true
-    exit 1
-  fi
-  serial_write "$test_password"
-  # Wait for the login shell's prompt instead of a fixed sleep. A missing
-  # prompt means the login failed, so do not send probes into an unknown state.
-  if ! wait_for "${test_user}@" 20; then
-    echo "login failed: no shell prompt for ${test_user}" >&2
+  if ! serial_login; then
     tail -20 "$log" >&2 || true
     exit 1
   fi
