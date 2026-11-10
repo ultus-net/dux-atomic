@@ -28,7 +28,12 @@ if ! podman image exists "$image"; then
   exit 2
 fi
 
-if [[ ${NO_TEST_USER:-0} != 1 ]]; then
+with_test_user=1
+if [[ ${NO_TEST_USER:-0} == 1 ]]; then
+  with_test_user=0
+fi
+
+if ((with_test_user)); then
   case "$test_user$test_password" in
     *'"'* | *'\'* | *$'\n'*)
       echo "TEST_USER and TEST_PASSWORD must not contain quotes, backslashes, or newlines" >&2
@@ -45,14 +50,14 @@ trap 'rm -rf "$config_dir"' EXIT
 {
   echo '[customizations.kernel]'
   echo 'append = "systemd.default_device_timeout_sec=180"'
-  if [[ ${NO_TEST_USER:-0} != 1 ]]; then
+  if ((with_test_user)); then
     echo '[[customizations.user]]'
     printf 'name = "%s"\n' "$test_user"
     printf 'password = "%s"\n' "$test_password"
   fi
 } >"$config_dir/config.toml"
 config_args=(-v "$config_dir/config.toml:/config.toml:ro")
-if [[ ${NO_TEST_USER:-0} != 1 ]]; then
+if ((with_test_user)); then
   echo "test account: $test_user (no admin groups)" >&2
 fi
 

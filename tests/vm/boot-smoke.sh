@@ -176,13 +176,17 @@ dump_greeter_diagnostics() {
   serial_write 'loginctl list-sessions --no-legend'
   serial_write 'ls -l /dev/dri'
   serial_write 'systemctl --failed --no-pager'
-  serial_write 'echo DUX_DIAG_END'
-  wait_for 'DUX_DIAG_END' 60 || echo "diagnostics did not finish in 60s" >&2
+  serial_write 'printf "DUX_DIAG_END:%s\n" ok'
+  wait_for 'DUX_DIAG_END:ok' 60 || echo "diagnostics did not finish in 60s" >&2
+  # The reader writes console output to the log asynchronously, and the failure
+  # path exits and kills QEMU. Let the last bytes reach the file first.
+  sleep 2
 }
 
-# The greeter session is the primary signal: it proves the graphical stack is
-# up. Some boots reach it without logging graphical.target, so a missing target
-# line is a warning, not a failure.
+# The console session line is the fast signal. A hosted TCG boot can stop
+# printing while the session is live, so with BOOT_LOGIN=1 a missing line is a
+# warning and the logind probe after login decides. Without login there is no
+# probe, so the line is required.
 if ! wait_for 'Started .*greetd\.service' "$grace_s"; then
   echo "boot failed: greetd did not start in ${grace_s}s" >&2
   exit 1

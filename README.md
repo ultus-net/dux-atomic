@@ -34,7 +34,7 @@ The `ctx` stage hands `build/`, `manifests/`, and `overlay/` to one build step, 
 - The `ghcr` environment is the approval hook. Add required reviewers in the repository settings to gate publication.
 - The first push creates a private GHCR package. Set the package visibility to public in the package settings if anonymous pulls are wanted.
 
-GitHub-hosted runners have no `/dev/kvm`, so the boot test runs on QEMU TCG and is headless: it asserts the greeter session and the first-login units, not rendered pixels. The guest still gets a DRM render node from virtio-gpu. TCG throughput varies run to run, so `make-disk.sh` raises the test disk's `systemd.default_device_timeout_sec` to 180s; the shipped image keeps the stock 45s. Run the graphical dogfood locally before promotion. Record the first hosted run as the TCG baseline and adjust `BOOT_TIMEOUT` from it.
+GitHub-hosted runners have no `/dev/kvm`, so the boot test runs on QEMU TCG and is headless: it asserts the greeter session and the first-login units, not rendered pixels. The guest still gets a DRM render node from virtio-gpu. TCG throughput varies run to run, so `make-disk.sh` raises the test disk's `systemd.default_device_timeout_sec` to 180s; the shipped image keeps the stock 45s. The workflow gives the boot 900s and `greetd` 300s to start. Run the graphical dogfood locally before promotion.
 
 `just check` mirrors the static gate. `just build`, `just lint-image`, `just disk`, and `just boot` cover the rest.
 
@@ -47,7 +47,7 @@ sudo tests/vm/make-disk.sh
 tests/vm/boot-smoke.sh
 ```
 
-`make-disk.sh` runs bootc-image-builder as root. The builder image is pinned by digest so a moving `:latest` cannot change the disk; override the pin with `BIB_IMAGE`. It adds one test account (`dux` / `dux-test` by default, override with `TEST_USER` and `TEST_PASSWORD`, skip with `NO_TEST_USER=1`) because the image ships no interactive user. Credentials reject quotes, backslashes, and newlines, which would break the generated TOML. `boot-smoke.sh` boots the qcow2 headless, asserts that `greetd` starts and that a live greeter session scope appears on the serial console, warns when `graphical.target` is not reported, then logs in as that account. It starts the two first-login units the way `graphical-session-pre.target` does, then checks the niri config, the DMS binds, the dark session seed, the per-user `dms.service` link, the image-level `niri.service` binding, and the preset enablement.
+`make-disk.sh` runs bootc-image-builder as root. The builder image is pinned by digest so a moving `:latest` cannot change the disk; override the pin with `BIB_IMAGE`. It adds one test account (`dux` / `dux-test` by default, override with `TEST_USER` and `TEST_PASSWORD`, skip with `NO_TEST_USER=1`) because the image ships no interactive user. Credentials reject quotes, backslashes, and newlines, which would break the generated TOML. `boot-smoke.sh` boots the qcow2 headless, asserts that `greetd` starts, treats the greeter session line on the serial console as the fast signal, warns when `graphical.target` is not reported, then logs in as that account and asserts the live greeter session through `loginctl`. It starts the two first-login units the way `graphical-session-pre.target` does, then checks the niri config, the DMS binds, the dark session seed, the per-user `dms.service` link, the image-level `niri.service` binding, and the preset enablement.
 
 ```bash
 sudo TEST_USER=dux TEST_PASSWORD=dux-test tests/vm/make-disk.sh

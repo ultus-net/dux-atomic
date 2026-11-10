@@ -43,6 +43,9 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # This job runs PR code; leave no token in the checkout's git config.
+          persist-credentials: false
 
       - name: Free runner disk space
         uses: jlumbroso/free-disk-space@3f13feab2962a87273d379ebc36ea159527e6cc9 # v1.3.2
@@ -113,7 +116,6 @@ jobs:
       - name: Vulnerability scan
         # Report only until the Fedora base findings are triaged (#3).
         # A pinned container avoids the action's unpinned setup-trivy dependency.
-        if: hashFiles('.cache/image.tar') != ''
         run: |
           podman run --rm -v "$PWD:/src:ro" -w /src \
             docker.io/aquasec/trivy:0.76.2@sha256:6fa071ef8daa2e58b90cbf1710bedca91adbb3bf98693533226f442035b836a6 \
@@ -121,7 +123,6 @@ jobs:
             --ignore-unfixed --cache-dir /tmp/trivy --format table > trivy-report.txt
 
       - name: Upload scan report
-        if: hashFiles('trivy-report.txt') != ''
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: trivy-report
@@ -155,6 +156,7 @@ jobs:
     needs: image
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish || inputs.promote)
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     environment: ghcr
     permissions:
       contents: read
