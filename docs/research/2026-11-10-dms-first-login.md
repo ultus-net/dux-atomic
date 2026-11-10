@@ -82,7 +82,10 @@ basename, and `rememberLastSession` defaults to true. Seeding
 `{"lastSessionDesktopId": "niri.desktop"}` therefore selects
 `/usr/share/wayland-sessions/niri.desktop` on the first login. A later
 login overwrites the file, and `ConditionPathExists=!...memory.json` makes the
-seed unit skip once a user has made a choice.
+seed unit skip once a user has made a choice. The seed sets only the desktop
+id because selection matches on it first; a greeter change that matched only
+`lastSessionId` would need this seed revisited. An empty existing file also
+counts as a choice, so delete the file to re-seed.
 
 ## Deferred
 

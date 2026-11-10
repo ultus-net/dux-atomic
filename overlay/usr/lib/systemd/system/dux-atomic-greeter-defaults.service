@@ -1,6 +1,6 @@
 [Unit]
 Description=Default the Dux greeter to the Niri session
-Documentation=https://duxlabs.dev/docs/dms-greeter
+Documentation=https://github.com/duxlabs-dev/dux-greeter
 # The greeter picks index 0 when it has no remembered session, and the
 # desktop-file load order is asynchronous. Seed Niri so the first login is
 # deterministic. A remembered choice on a later boot wins.
@@ -9,6 +9,8 @@ Before=greetd.service
 
 [Service]
 Type=oneshot
+# The package tmpfiles rule owns /var/cache/dms-greeter. Create only the state
+# directory here so the seed works before that rule has ever run.
 ExecStartPre=/usr/bin/install -d -m 0755 -o greeter -g greeter /var/cache/dms-greeter/.local/state
 ExecStart=/usr/bin/install -m 0644 -o greeter -g greeter /usr/share/dux-atomic/greeter/memory.json /var/cache/dms-greeter/.local/state/memory.json
 

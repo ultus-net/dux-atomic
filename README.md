@@ -52,7 +52,9 @@ Both units are enabled through `overlay/usr/lib/systemd/user-preset/01-dux-atomi
 
 The greeter keeps the upstream `dms-greeter --command niri` config. Do not copy Zirconium's `[general] service = "greetd-spawn"` stanza: Fedora's greetd 0.10.3 does not ship a `greetd-spawn` binary.
 
-The greeter picks session index 0 when it has no memory, and the desktop files load in asynchronous order. `dux-atomic-greeter-defaults.service` runs before `greetd.service` and seeds `/var/cache/dms-greeter/.local/state/memory.json` with `lastSessionDesktopId: "niri.desktop"`, so a fresh install always opens niri. A session remembered from a previous login still wins.
+The greeter picks session index 0 when it has no memory, and the desktop files load in asynchronous order. `dux-atomic-greeter-defaults.service` runs before `greetd.service` and seeds `/var/cache/dms-greeter/.local/state/memory.json` with `lastSessionDesktopId: "niri.desktop"`, so a fresh install always opens niri. A session remembered from a previous login still wins, and any existing file, including an empty one, is left alone; delete it to re-seed.
+
+The seed is a `Wants=` dependency, not `Requires=`, so a failed seed does not block the login. Its failure contract is retry on the next boot with the result visible in the unit journal; greetd then falls back to the first session it loads, which may be the Xfce fallback. Check `systemctl status dux-atomic-greeter-defaults.service` after a first boot.
 
 ## Dogfood the graphical desktop
 
