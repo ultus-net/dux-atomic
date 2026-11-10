@@ -156,7 +156,7 @@ jobs:
     needs: image
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish || inputs.promote)
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     environment: ghcr
     permissions:
       contents: read
@@ -208,14 +208,14 @@ jobs:
           # path red and waiting for a manual re-run. Each command retries on
           # its own, so a failed attestation does not sign the digest twice.
           # Rekor failed for at least nine minutes across two runs
-          # (42799652955 at 11:03:10Z and 11:12:31Z), so back off for a few
-          # minutes rather than sixty seconds.
+          # (42799652955 at 11:03:10Z and 11:12:31Z), so the backoff runs to
+          # about fifteen minutes per command, wider than the measured outage.
           retry() {
             if (($# == 0)); then
               echo "retry: no command given" >&2
               return 2
             fi
-            local attempt=1 pause=30 max=5
+            local attempt=1 pause=30 max=6
             until "$@"; do
               if ((attempt >= max)); then
                 echo "failed after ${attempt} attempts: $*" >&2

@@ -7,3 +7,4 @@
 - The test disk raises `systemd.default_device_timeout_sec` to 180s so slow TCG boots reach `/boot`. CI therefore cannot catch a regression that only exceeds the shipped 45s.
 - `bootc-image-builder` is pinned in `tests/vm/make-disk.sh`, but the base image tag floats and the COPR packages are unpinned (#2).
 - The first-login retry has unit fixtures and a VM marker assertion, but no partial-home VM coverage yet. Rebuild and re-run the graphical dogfood after the retry change.
+- `publish` retries signing and attesting for about fifteen minutes per command before it fails. A Rekor outage longer than that still leaves `:sha-<commit>` pushed without an attestation until a re-run, and a permanent signing error costs that waiting time before the run goes red.
