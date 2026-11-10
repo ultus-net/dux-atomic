@@ -38,12 +38,13 @@ if [[ -z $expected ]]; then
   exit 1
 fi
 # A nonzero status here means the generator or the image is broken, not that the
-# lock drifted, so keep the two diagnoses apart.
-if ! measured=$(CONTAINER_RUNTIME=$runtime "$repo_root/build/package-lock.sh" "$image" |
-  grep -vE '^(#|$)' | grep -vE $'\tFedora Project$'); then
+# lock drifted, so keep the two diagnoses apart. The filters run afterwards, so
+# an empty third-party set reads as drift with a diff instead.
+if ! raw=$(CONTAINER_RUNTIME=$runtime "$repo_root/build/package-lock.sh" "$image"); then
   echo "FAIL the lock measurement failed; the generator or the image is broken" >&2
   exit 1
 fi
+measured=$(grep -vE '^(#|$)' <<<"$raw" | grep -vE $'\tFedora Project$' || true)
 if [[ $measured != "$expected" ]]; then
   echo "FAIL the third-party package lock drifted; run 'just lock'" >&2
   diff -u <(printf '%s\n' "$expected") <(printf '%s\n' "$measured") >&2 || true

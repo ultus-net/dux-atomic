@@ -39,7 +39,7 @@ mapfile -t names <<<"$packages"
 
 cat <<'HEADER'
 # manifests/packages-common.lock - regenerate with 'just lock'
-# One line per package the manifest names: <nevra> TAB <vendor>.
+# One line per resolved NEVRA: <nevra> TAB <vendor>.
 # tests/verify-image.sh compares the non-Fedora lines, because Fedora
 # packages move with the updates repository on every build.
 HEADER

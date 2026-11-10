@@ -17,8 +17,9 @@ lint-image:
 
 # Regenerate the third-party package lock from a built image. The temp file
 # keeps a failed run from truncating the tracked lock, and the trap removes it.
+# just has no `$$` escape: the `$` goes to bash unchanged.
 lock:
-    @tmp=manifests/packages-common.lock.tmp; trap 'rm -f "$$tmp"' EXIT; build/package-lock.sh {{image}} > "$$tmp"; mv "$$tmp" manifests/packages-common.lock
+    @tmp=manifests/packages-common.lock.tmp; trap 'rm -f "$tmp"' EXIT; build/package-lock.sh {{image}} > "$tmp"; mv "$tmp" manifests/packages-common.lock
 
 disk:
     sudo tests/vm/make-disk.sh {{image}}
