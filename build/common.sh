@@ -20,9 +20,9 @@ else
 fi
 
 # A new account gets the Dux desktop on its first graphical login. A user
-# preset enables both units, and the image-level niri.service.wants link starts
-# dms before dms setup has written the per-user binding. The Xfce fallback
-# never starts niri.service.
+# preset enables both units, and the image-level niri.service.wants link keeps
+# dms running for an account that already owns a niri config and skips setup.
+# The Xfce fallback never starts niri.service.
 systemctl --global preset dux-atomic-desktop.service dux-atomic-dms-defaults.service
 for unit in dux-atomic-desktop dux-atomic-dms-defaults; do
   test -L "/etc/systemd/user/graphical-session-pre.target.wants/${unit}.service" || {
