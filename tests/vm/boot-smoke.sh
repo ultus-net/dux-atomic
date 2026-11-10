@@ -191,6 +191,15 @@ if [[ $login == 1 ]]; then
   serial_write 'echo "DUX_GREETER_GROUPS:$(id -nG greeter | tr " " ",")"'
   serial_write 'echo "DUX_KARGS:$(ls /usr/lib/bootc/kargs.d/ | tr "\n" ",")"'
   serial_write 'echo "DUX_DEPLOYMENT:$(ostree admin status 2>/dev/null | head -2 | tr "\n" " ")"'
+  # Run the first-login units the way graphical-session-pre.target would, then
+  # check the provisioned files. The unit conditions skip a provisioned home.
+  serial_write 'systemctl --user start dux-atomic-desktop.service dux-atomic-dms-defaults.service; printf "DUX_UNITS:%s\n" "$?"'
+  serial_write 'printf "DUX_NIRI_CONFIG:%s\n" "$(test -f "$HOME/.config/niri/config.kdl" && echo ok || echo missing)"'
+  serial_write 'printf "DUX_DMS_BINDS:%s\n" "$(test -f "$HOME/.config/niri/dms/binds.kdl" && echo ok || echo missing)"'
+  serial_write 'printf "DUX_SESSION_SEED:%s\n" "$(grep -q 101418 "$HOME/.local/state/dms/session.json" 2>/dev/null && echo ok || echo missing)"'
+  serial_write 'printf "DUX_USER_DMS_LINK:%s\n" "$(test -L "$HOME/.config/systemd/user/niri.service.wants/dms.service" && echo ok || echo missing)"'
+  serial_write 'printf "DUX_DMS_WANTED:%s\n" "$(systemctl --user show -p Wants niri.service | grep -q dms.service && echo ok || echo missing)"'
+  serial_write 'printf "DUX_DESKTOP_ENABLED:%s\n" "$(systemctl --user is-enabled dux-atomic-desktop.service 2>/dev/null | grep -qx enabled && echo ok || echo missing)"'
   serial_write 'echo DUX_PROBE_END'
 
   if ! wait_for 'DUX_USER:' 20; then
@@ -203,7 +212,7 @@ if [[ $login == 1 ]]; then
     grep -a 'DUX_USER:' "$log" >&2 || true
     exit 1
   fi
-  if ! wait_for 'DUX_PROBE_END' 20; then
+  if ! wait_for 'DUX_PROBE_END' 90; then
     echo "login failed: the session probe did not finish" >&2
     exit 1
   fi
@@ -213,6 +222,18 @@ if [[ $login == 1 ]]; then
     echo "login failed: loginctl does not list ${test_user}" >&2
     exit 1
   fi
+  if ! grep -q 'DUX_UNITS:0' "$log"; then
+    echo "first login failed: the provisioning units did not both succeed" >&2
+    grep -a 'DUX_UNITS:' "$log" >&2 || true
+    exit 1
+  fi
+  for marker in DUX_NIRI_CONFIG DUX_DMS_BINDS DUX_SESSION_SEED DUX_USER_DMS_LINK DUX_DMS_WANTED DUX_DESKTOP_ENABLED; do
+    if ! grep -q "${marker}:ok" "$log"; then
+      echo "first login failed: ${marker} is not ok" >&2
+      grep -a "${marker}:" "$log" >&2 || true
+      exit 1
+    fi
+  done
   if [[ ${VIRTIO_GL:-0} == 1 ]] && ! grep -q 'DUX_RENDER:ok' "$log"; then
     echo "render failed: no /dev/dri/renderD128 under virtio-vga-gl" >&2
     exit 1

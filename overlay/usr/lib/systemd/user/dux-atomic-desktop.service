@@ -2,10 +2,16 @@
 Description=Deploy the default Dux desktop for a new account
 Documentation=https://duxlabs.dev/docs/dms/cli-setup
 # dms refuses to run as root and writes only under the user's home.
+ConditionUser=!root
+# The greeter runs this compositor as the greeter account, not a desktop user.
+ConditionUser=!greeter
 ConditionPathExists=!%h/.config/niri/config.kdl
+Before=graphical-session-pre.target
 
 [Service]
 Type=oneshot
+# A hung setup must not hold the login session forever.
+TimeoutStartSec=120
 ExecStart=/usr/bin/dms setup headless --compositor niri --terminal ghostty --skip-existing
 
 [Install]

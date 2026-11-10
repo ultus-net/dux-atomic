@@ -19,10 +19,10 @@ else
   echo "no packages in manifests/packages-common.txt yet"
 fi
 
-# A new account gets the Dux desktop on its first graphical login. The units
-# are enabled through the user preset so every account picks them up. The
-# image-level niri.service.wants drop-in starts dms on the first login, before
-# dms setup has written the per-user binding. Xfce never starts niri.service.
+# A new account gets the Dux desktop on its first graphical login. A user
+# preset enables both units, and the image-level niri.service.wants link starts
+# dms before dms setup has written the per-user binding. The Xfce fallback
+# never starts niri.service.
 systemctl --global preset dux-atomic-desktop.service dux-atomic-dms-defaults.service
 for unit in dux-atomic-desktop dux-atomic-dms-defaults; do
   test -L "/etc/systemd/user/graphical-session-pre.target.wants/${unit}.service" || {
@@ -30,8 +30,22 @@ for unit in dux-atomic-desktop dux-atomic-dms-defaults; do
     exit 1
   }
 done
-test -L /etc/systemd/user/niri.service.wants/dms.service || {
+for unit in /usr/lib/systemd/user/dms.service /usr/lib/systemd/user/niri.service; do
+  test -f "$unit" || {
+    echo "missing ${unit}; the first-login binding would dangle" >&2
+    exit 1
+  }
+done
+test -L /usr/lib/systemd/user/niri.service.wants/dms.service || {
   echo "dms is not bound to niri.service for new accounts" >&2
+  exit 1
+}
+test -f /usr/bin/dms || {
+  echo "the dms CLI is missing; first-login setup would fail" >&2
+  exit 1
+}
+test -f /usr/share/dux-atomic/dms/session.json || {
+  echo "the DMS session seed is missing" >&2
   exit 1
 }
 

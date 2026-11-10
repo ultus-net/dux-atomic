@@ -36,12 +36,30 @@ fi
 desktop_unit=$repo_root/overlay/usr/lib/systemd/user/dux-atomic-desktop.service
 defaults_unit=$repo_root/overlay/usr/lib/systemd/user/dux-atomic-dms-defaults.service
 user_preset=$repo_root/overlay/usr/lib/systemd/user-preset/01-dux-atomic.preset
-dms_binding=$repo_root/overlay/etc/systemd/user/niri.service.wants/dms.service
-if [[ ! -f $desktop_unit ]] || ! grep -q '^ExecStart=/usr/bin/dms setup headless --compositor niri --terminal ghostty --skip-existing$' "$desktop_unit"; then
+dms_binding=$repo_root/overlay/usr/lib/systemd/user/niri.service.wants/dms.service
+seed_source=$repo_root/overlay/usr/share/dux-atomic/dms/session.json
+if [[ ! -f $desktop_unit ]] || ! grep -qx 'ExecStart=/usr/bin/dms setup headless --compositor niri --terminal ghostty --skip-existing' "$desktop_unit"; then
   echo "FAIL dux-atomic-desktop.service does not run dms setup headless" >&2
   failures=$((failures + 1))
-elif [[ ! -f $defaults_unit ]]; then
-  echo "FAIL dux-atomic-dms-defaults.service is missing" >&2
+elif ! grep -qx 'TimeoutStartSec=120' "$desktop_unit"; then
+  echo "FAIL dux-atomic-desktop.service has no start timeout" >&2
+  failures=$((failures + 1))
+elif ! grep -qx 'ConditionUser=!root' "$desktop_unit" ||
+     ! grep -qx 'ConditionUser=!greeter' "$desktop_unit" ||
+     ! grep -qx 'Before=graphical-session-pre.target' "$desktop_unit"; then
+  echo "FAIL dux-atomic-desktop.service is not ordered or can run as root/greeter" >&2
+  failures=$((failures + 1))
+elif [[ ! -f $defaults_unit ]] ||
+     ! grep -qx 'ExecStart=/usr/bin/install -Dm0644 /usr/share/dux-atomic/dms/session.json %S/dms/session.json' "$defaults_unit"; then
+  echo "FAIL dux-atomic-dms-defaults.service does not seed the session file" >&2
+  failures=$((failures + 1))
+elif ! grep -qx 'ConditionUser=!root' "$defaults_unit" ||
+     ! grep -qx 'ConditionUser=!greeter' "$defaults_unit" ||
+     ! grep -qx 'Before=graphical-session-pre.target' "$defaults_unit"; then
+  echo "FAIL dux-atomic-dms-defaults.service is not ordered or can run as root/greeter" >&2
+  failures=$((failures + 1))
+elif [[ ! -f $seed_source ]] || ! grep -q '"wallpaperPath": "#101418"' "$seed_source"; then
+  echo "FAIL the DMS session seed is missing or has no dark background" >&2
   failures=$((failures + 1))
 elif [[ ! -L $dms_binding ]] || [[ $(readlink "$dms_binding") != /usr/lib/systemd/user/dms.service ]]; then
   echo "FAIL the image-level dms.service binding is missing" >&2
@@ -53,7 +71,7 @@ elif ! grep -qx 'enable dux-atomic-desktop.service' "$user_preset" ||
      ! grep -qx 'enable dux-atomic-dms-defaults.service' "$user_preset"; then
   echo "FAIL the user preset does not enable both first-login units" >&2
   failures=$((failures + 1))
-elif ! grep -q 'systemctl --global preset dux-atomic-desktop.service dux-atomic-dms-defaults.service' "$repo_root/build/common.sh"; then
+elif ! grep -qx 'systemctl --global preset dux-atomic-desktop.service dux-atomic-dms-defaults.service' "$repo_root/build/common.sh"; then
   echo "FAIL build/common.sh does not apply the user preset" >&2
   failures=$((failures + 1))
 else

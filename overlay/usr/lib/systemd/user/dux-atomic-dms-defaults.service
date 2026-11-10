@@ -1,6 +1,11 @@
 [Unit]
 Description=Seed the default DMS session state for a new account
+ConditionUser=!root
+ConditionUser=!greeter
 ConditionPathExists=!%S/dms/session.json
+Before=graphical-session-pre.target
+# DMS reads this file through SessionData.qml (configVersion 7). A colour is a
+# supported wallpaper source, so the first session gets a dark surface.
 
 [Service]
 Type=oneshot

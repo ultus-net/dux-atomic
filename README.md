@@ -29,7 +29,7 @@ sudo tests/vm/make-disk.sh
 tests/vm/boot-smoke.sh
 ```
 
-`make-disk.sh` runs bootc-image-builder as root. It adds one test account (`dux` / `dux-test` by default, override with `TEST_USER` and `TEST_PASSWORD`, skip with `NO_TEST_USER=1`) because the image ships no interactive user. Credentials reject quotes, backslashes, and newlines, which would break the generated TOML. `boot-smoke.sh` boots the qcow2 headless, asserts that `graphical.target`, `greetd`, and a live greeter session scope appear on the serial console, then logs in as that account and checks the console session.
+`make-disk.sh` runs bootc-image-builder as root. It adds one test account (`dux` / `dux-test` by default, override with `TEST_USER` and `TEST_PASSWORD`, skip with `NO_TEST_USER=1`) because the image ships no interactive user. Credentials reject quotes, backslashes, and newlines, which would break the generated TOML. `boot-smoke.sh` boots the qcow2 headless, asserts that `graphical.target`, `greetd`, and a live greeter session scope appear on the serial console, then logs in as that account. It starts the two first-login units the way `graphical-session-pre.target` does, then checks the niri config, the DMS binds, the dark session seed, the per-user `dms.service` link, the image-level `niri.service` binding, and the preset enablement.
 
 ```bash
 sudo TEST_USER=dux TEST_PASSWORD=dux-test tests/vm/make-disk.sh
@@ -48,7 +48,7 @@ The image never runs the Dux setup for root. On the first graphical session, `du
 
 `dux-atomic-dms-defaults.service` seeds `~/.local/state/dms/session.json` with a dark DMS background, so the first session is not a blank compositor surface. Replace it with a wallpaper from the Dux library when you want the full documented look.
 
-Both units are enabled through `overlay/usr/lib/systemd/user-preset/01-dux-atomic.preset`, which `build/common.sh` applies with `systemctl --global preset`. `dms.service` is not globally enabled: `overlay/etc/systemd/user/niri.service.wants/dms.service` binds it to the niri session, so it starts on the first login even before `dms setup` writes the per-user binding. The Xfce fallback never starts `niri.service`, so it never starts the Wayland shell.
+Both units are enabled through `overlay/usr/lib/systemd/user-preset/01-dux-atomic.preset`, which `build/common.sh` applies with `systemctl --global preset`. `dms.service` is not globally enabled: `overlay/usr/lib/systemd/user/niri.service.wants/dms.service` binds it to the niri session, so it starts on the first login even before `dms setup` writes the per-user binding. The Xfce fallback never starts `niri.service`, so it never starts the Wayland shell. Both units skip root and the greeter account.
 
 The greeter keeps the upstream `dms-greeter --command niri` config. Do not copy Zirconium's `[general] service = "greetd-spawn"` stanza: Fedora's greetd 0.10.3 does not ship a `greetd-spawn` binary.
 
