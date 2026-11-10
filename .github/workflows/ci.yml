@@ -69,11 +69,21 @@ jobs:
           podman save localhost/dux-atomic:ci -o .cache/image.tar
 
       - name: SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
-        with:
-          image: docker-archive:.cache/image.tar
-          format: spdx-json
-          output-file: dux-atomic.spdx.json
+        # A digest-pinned syft scans a flattened rootfs and writes the report
+        # to a file. Scanning the docker archive needed more than 8 GB here,
+        # and the former action buffered the report in memory until the Node
+        # heap died, which left the step with no error line.
+        run: |
+          set -o pipefail
+          podman create --name sbom-rootfs localhost/dux-atomic:ci
+          mkdir -p "$RUNNER_TEMP/rootfs"
+          podman export sbom-rootfs | tar -x -C "$RUNNER_TEMP/rootfs"
+          podman rm sbom-rootfs
+          podman run --rm -v "$RUNNER_TEMP/rootfs:/rootfs:ro" \
+            ghcr.io/anchore/syft:v1.42.3@sha256:5999d209a342e55e9edf70bf8930fb5b86d8f2a783fa401178372c50e21b1d36 \
+            scan dir:/rootfs \
+            --source-name dux-atomic --source-version "$GITHUB_SHA" \
+            -o spdx-json > dux-atomic.spdx.json
 
       - name: Upload SBOM
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
