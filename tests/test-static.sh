@@ -196,6 +196,46 @@ else
   echo "ok   the publish step retries sign and attest with a bounded loop"
 fi
 
+# Rekor's public instance rejects the full file inventory, so the filter must
+# keep dropping files and the relationships that point at them.
+sbom_root=$(mktemp -d)
+trap 'rm -rf "$cond_root" "$sbom_root"' EXIT
+cat >"$sbom_root/in.json" <<'JSON'
+{
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "files": [
+    {"fileName": "etc/motd", "SPDXID": "SPDXRef-File-etc-motd"},
+    {"fileName": "usr/bin/sh", "SPDXID": "SPDXRef-File-usr-bin-sh"}
+  ],
+  "packages": [{"SPDXID": "SPDXRef-Package-coreutils", "name": "coreutils"}],
+  "relationships": [
+    {"spdxElementId": "SPDXRef-Package-coreutils", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-File-etc-motd"},
+    {"spdxElementId": "SPDXRef-Package-coreutils", "relationshipType": "DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-Package-bash"},
+    {"spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-Package-coreutils"}
+  ]
+}
+JSON
+if ! command -v jq >/dev/null 2>&1; then
+  echo "FAIL jq is missing, so the SBOM filter cannot be checked" >&2
+  failures=$((failures + 1))
+elif ! jq -c -f "$repo_root/build/sbom-packages-only.jq" \
+     "$sbom_root/in.json" >"$sbom_root/out.json"; then
+  echo "FAIL build/sbom-packages-only.jq did not run" >&2
+  failures=$((failures + 1))
+elif [[ $(jq '.files | length' "$sbom_root/out.json") != 0 ]] ||
+     [[ $(jq '.relationships | length' "$sbom_root/out.json") != 2 ]] ||
+     jq -e '.relationships[] | select(.relatedSpdxElement == "SPDXRef-File-etc-motd")' \
+       "$sbom_root/out.json" >/dev/null; then
+  echo "FAIL the SBOM filter keeps files or the relationships that point at them" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'jq -c -f build/sbom-packages-only.jq' "$workflow" ||
+     ! grep -qF '> dux-atomic.spdx.json' "$workflow"; then
+  echo "FAIL ci.yml does not filter the SBOM into the uploaded file" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the SBOM filter drops files and their relationships"
+fi
+
 if ((failures > 0)); then
   exit 1
 fi
