@@ -208,10 +208,11 @@ jobs:
 
       - name: Promote latest
         if: inputs.promote
+        # Copy the signed manifest to the tag, so the tag moves only to that
+        # digest. A failed copy leaves the previous tag and alerts.
         run: |
           digest=$(cat "$RUNNER_TEMP/digest")
-          podman tag localhost/dux-atomic:ci "$IMAGE:latest"
-          podman push "$IMAGE:latest"
+          skopeo copy --preserve-digests "docker://$IMAGE@$digest" "docker://$IMAGE:latest"
           live=$(skopeo inspect --format '{{.Digest}}' "docker://$IMAGE:latest")
           if [[ $live != "$digest" ]]; then
             echo "latest resolves to $live, expected $digest" >&2

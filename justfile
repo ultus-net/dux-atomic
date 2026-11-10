@@ -1,5 +1,5 @@
 # Local parity for the CI gates. Run `just check` before every push.
-# Needs: bash, podman (or docker), and qemu for `just boot`.
+# Needs bash and podman; the static gate also accepts docker. `just boot` needs qemu.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
@@ -18,12 +18,12 @@ lint-image:
 disk:
     sudo tests/vm/make-disk.sh {{image}}
 
-# VIRTIO_GL gives the greeter a render node; without it the session starts but
-# the compositor cannot paint.
+# VIRTIO_GL gives the guest a GL path and the script asserts the render node.
+# Without it the session starts, but pixel correctness is unproven.
 boot:
     VIRTIO_GL=1 tests/vm/boot-smoke.sh
 
-# The hosted CI runner has no /dev/kvm or render node, so it runs TCG headless.
+# The hosted CI runner has no /dev/kvm, so it runs TCG headless.
 boot-tcg:
     QEMU_ACCEL=tcg BOOT_TIMEOUT=900 BOOT_GRACE=300 tests/vm/boot-smoke.sh
 

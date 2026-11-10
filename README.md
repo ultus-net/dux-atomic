@@ -29,7 +29,8 @@ The `ctx` stage hands `build/`, `manifests/`, and `overlay/` to one build step, 
 - `static` runs `tests/lint.sh`: shell syntax, shellcheck, `tests/test-static.sh`, hadolint, and actionlint. `tests/lint.sh` pins the linter images by digest, and `just check` runs the same script.
 - `image` builds the image, runs `tests/verify-image.sh` (`bootc container lint` and `systemd-analyze verify`), generates an SPDX SBOM with syft, builds the qcow2 with bootc-image-builder, and runs `boot-smoke.sh`. It then scans with trivy and uploads the report. The scan is report-only until the Fedora base findings are triaged (#3).
 - `publish` runs only on `main`, holds the write token and OIDC identity, and runs no repository code. It loads the built artifact, pushes `:sha-<commit>`, signs the digest with cosign keyless OIDC, attests the SBOM, and verifies both the signature and the attestation.
-- A `workflow_dispatch` on `main` with `promote` set moves `:latest` and asserts the registry digest equals the signed one. A push never moves `:latest`.
+- A `workflow_dispatch` on `main` with `promote` set copies the signed manifest to `:latest` and asserts the registry digest. A failed copy leaves the previous tag, alerts, and needs a human retry. A push never moves `:latest`.
+- `static` and `image` are required checks on `main`; a red hosted `image` run blocks merge.
 - The `ghcr` environment is the approval hook. Add required reviewers in the repository settings to gate publication.
 - The first push creates a private GHCR package. Set the package visibility to public in the package settings if anonymous pulls are wanted.
 
