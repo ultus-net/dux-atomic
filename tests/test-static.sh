@@ -187,7 +187,8 @@ fi
 workflow=$repo_root/.github/workflows/ci.yml
 if ! grep -qF 'retry cosign sign --yes "$IMAGE@$digest"' "$workflow" ||
    ! grep -qF 'retry cosign attest --yes' "$workflow" ||
-   ! grep -qF 'attempt >= 3' "$workflow" ||
+   ! grep -qF 'attempt >= max' "$workflow" ||
+   ! grep -qF 'max=5' "$workflow" ||
    grep -qF 'until cosign sign' "$workflow"; then
   echo "FAIL ci.yml does not retry sign and attest separately, or retries forever" >&2
   failures=$((failures + 1))

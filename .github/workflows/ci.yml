@@ -156,7 +156,7 @@ jobs:
     needs: image
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish || inputs.promote)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     environment: ghcr
     permissions:
       contents: read
@@ -207,20 +207,24 @@ jobs:
           # four attempts. A transient outage must not leave the only publish
           # path red and waiting for a manual re-run. Each command retries on
           # its own, so a failed attestation does not sign the digest twice.
+          # Rekor failed for at least nine minutes across two runs
+          # (42799652955 at 11:03:10Z and 11:12:31Z), so back off for a few
+          # minutes rather than sixty seconds.
           retry() {
             if (($# == 0)); then
               echo "retry: no command given" >&2
               return 2
             fi
-            local attempt=1
+            local attempt=1 pause=30 max=5
             until "$@"; do
-              if ((attempt >= 3)); then
+              if ((attempt >= max)); then
                 echo "failed after ${attempt} attempts: $*" >&2
                 return 1
               fi
-              echo "::warning::attempt ${attempt} failed; retrying in 30s: $*"
+              echo "::warning::attempt ${attempt} failed; retrying in ${pause}s: $*"
               attempt=$((attempt + 1))
-              sleep 30
+              sleep "$pause"
+              pause=$((pause * 2))
             done
           }
           retry cosign sign --yes "$IMAGE@$digest"
