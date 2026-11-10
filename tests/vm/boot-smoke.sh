@@ -182,8 +182,13 @@ if [[ $login == 1 ]]; then
     exit 1
   fi
   serial_write "$test_password"
-  # Wait for the login shell's prompt instead of a fixed sleep.
-  wait_for "${test_user}@" 20 || true
+  # Wait for the login shell's prompt instead of a fixed sleep. A missing
+  # prompt means the login failed, so do not send probes into an unknown state.
+  if ! wait_for "${test_user}@" 20; then
+    echo "login failed: no shell prompt for ${test_user}" >&2
+    tail -20 "$log" >&2 || true
+    exit 1
+  fi
 
   serial_write 'printf "DUX_USER:%s\n" "$(id -un)"'
   serial_write 'loginctl list-sessions --no-legend | grep -q "$(id -un)" && printf "DUX_SESSION:%s\n" ok || printf "DUX_SESSION:%s\n" missing'

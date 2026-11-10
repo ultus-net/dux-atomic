@@ -47,11 +47,15 @@ if [[ ${NO_TEST_USER:-0} != 1 ]]; then
   echo "test account: $test_user (no admin groups)" >&2
 fi
 
-podman run --rm --privileged --pull=newer \
+# Pin the builder by digest so a moving :latest cannot change the disk output.
+# Bump this deliberately; the digest is the manifest this repo was tested with.
+bib_image=${BIB_IMAGE:-quay.io/centos-bootc/bootc-image-builder@sha256:a0ee98db5bfb8337e45efb92f0c5d1a19179c85ce80a3360abc628fd1a17cc5c}
+
+podman run --rm --privileged \
   --security-opt label=type:unconfined_t \
   "${config_args[@]}" \
   -v "$out:/output" \
   -v /var/lib/containers/storage:/var/lib/containers/storage \
-  quay.io/centos-bootc/bootc-image-builder:latest \
+  "$bib_image" \
   build "$image" --type qcow2 --rootfs btrfs --use-librepo=True --output /output \
   --chown "${SUDO_UID:-0}:${SUDO_GID:-0}"

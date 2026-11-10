@@ -1,0 +1,7 @@
+# The image build reads build/, manifests/, and overlay/ through the ctx stage.
+# Keep VM disks, build logs, docs, and tests out of the build context.
+.git
+.vm
+output
+docs
+tests

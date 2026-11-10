@@ -113,5 +113,10 @@ No manual `dms setup` ran at any point. The first graphical login provisioned
 the desktop by itself.
 
 The probe driver is `.vm/dogfood_login.py` with `DOGFOOD_PROBE=7`. It lives in
-the ignored `.vm/` tree as run evidence and is not part of the image.
+the ignored `.vm/` tree as run evidence and is not part of the image. The
+tracked evidence is the marker output quoted above; the screenshots stay local.
+
+Later commits `98ef7d3` and `0307e9a` change documentation, test assertions, and
+the tmpfiles comment, not the runtime units, seeds, packages, or build inputs.
+Rebuild and re-run this dogfood after any change to those inputs.
 

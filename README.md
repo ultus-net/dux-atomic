@@ -4,11 +4,11 @@ A planned Fedora bootc developer and gaming workstation for two machines.
 
 The build definition is scaffolded from the Universal Blue image-template: the base tag is set in `Containerfile`. The generic image builds and boots to the greeter in a VM; no image has been published yet.
 
-- Base: Universal Blue `base-main`, Fedora 45, on a floating tag while we prototype, with generic and NVIDIA variants.
-- Desktop: niri, Dux Modular Shell, Dux Greeter, and Ghostty.
-- Applications: Zed, OpenCode, Steam, Discord, Spotify, Bitwarden, Obsidian, Zen Browser, and Lutris.
+- Base: Universal Blue `base-main`, Fedora 45, on a floating tag while we prototype. The generic x86_64 image ships; an NVIDIA variant is planned and not built.
+- Desktop: niri, Dux Modular Shell, Dux Greeter, Ghostty, and an Xfce X11 fallback.
+- Applications: the first desktop set only. Zed, OpenCode, Steam, Discord, Spotify, Bitwarden, Obsidian, Zen Browser, and Lutris are planned and not installed.
 - Configuration: the existing [dotfiles repository](https://github.com/ultus-net/dotfiles) remains authoritative.
-- Safety: signed OS updates, explicit rollback, project-scoped rootless agent containers, and local home snapshots.
+- Safety: signed image publication, explicit rollback, project-scoped rootless agent containers, and local home snapshots are planned. The current image relies on the base's `bootc` update and rollback mechanics and ships no agent sandbox.
 
 Read the [approved design](docs/superpowers/specs/2026-11-09-dux-atomic-design.md).
 
@@ -29,7 +29,7 @@ sudo tests/vm/make-disk.sh
 tests/vm/boot-smoke.sh
 ```
 
-`make-disk.sh` runs bootc-image-builder as root. It adds one test account (`dux` / `dux-test` by default, override with `TEST_USER` and `TEST_PASSWORD`, skip with `NO_TEST_USER=1`) because the image ships no interactive user. Credentials reject quotes, backslashes, and newlines, which would break the generated TOML. `boot-smoke.sh` boots the qcow2 headless, asserts that `graphical.target`, `greetd`, and a live greeter session scope appear on the serial console, then logs in as that account. It starts the two first-login units the way `graphical-session-pre.target` does, then checks the niri config, the DMS binds, the dark session seed, the per-user `dms.service` link, the image-level `niri.service` binding, and the preset enablement.
+`make-disk.sh` runs bootc-image-builder as root. The builder image is pinned by digest so a moving `:latest` cannot change the disk; override the pin with `BIB_IMAGE`. It adds one test account (`dux` / `dux-test` by default, override with `TEST_USER` and `TEST_PASSWORD`, skip with `NO_TEST_USER=1`) because the image ships no interactive user. Credentials reject quotes, backslashes, and newlines, which would break the generated TOML. `boot-smoke.sh` boots the qcow2 headless, asserts that `graphical.target`, `greetd`, and a live greeter session scope appear on the serial console, then logs in as that account. It starts the two first-login units the way `graphical-session-pre.target` does, then checks the niri config, the DMS binds, the dark session seed, the per-user `dms.service` link, the image-level `niri.service` binding, and the preset enablement.
 
 ```bash
 sudo TEST_USER=dux TEST_PASSWORD=dux-test tests/vm/make-disk.sh
