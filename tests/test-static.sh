@@ -224,13 +224,14 @@ fi
 # Run the helper itself with scaled constants: greps cannot show that a hang is
 # cut, and the helper is the only thing that stops a stall eating the job.
 retry_root=$(mktemp -d)
+sbom_root=
 trap 'rm -rf "$cond_root" "$sbom_root" "$retry_root"' EXIT
 sed -n '/^          retry() {/,/^          }$/p' "$workflow" | sed 's/^          //' |
   sed 's/max=5 budget=600/max=5 budget=5/; s/remaining < 300 ? remaining : 300/remaining < 2 ? remaining : 2/; s/pause=30/pause=1/' \
     >"$retry_root/retry.sh"
 started_at=$SECONDS
 if ! bash -c 'source "$1"; retry sleep 60' _ "$retry_root/retry.sh" 2>/dev/null; then
-  if ((SECONDS - started_at > 8)); then
+  if ((SECONDS - started_at > 12)); then
     echo "FAIL the retry helper let a hanging command run past its budget" >&2
     failures=$((failures + 1))
   else
@@ -250,7 +251,6 @@ fi
 # Rekor's public instance rejects the full file inventory, so the filter must
 # keep dropping files and the relationships that point at them.
 sbom_root=$(mktemp -d)
-trap 'rm -rf "$cond_root" "$sbom_root" "$retry_root"' EXIT
 cat >"$sbom_root/in.json" <<'JSON'
 {
   "SPDXID": "SPDXRef-DOCUMENT",

@@ -222,8 +222,9 @@ jobs:
           # Run 42827200322 stalled in this step for 51 minutes, hit the
           # 60-minute job timeout, and lost its log, so nothing could say
           # which call hung. Each attempt is capped and each command has a
-          # wall-clock budget. The five attempts fit the budget, because the
-          # pauses before them total 450s.
+          # wall-clock budget, so the step is bounded even when every call
+          # hangs. The fast-failure path reaches five attempts; a command whose
+          # attempts each hang exhausts the budget in two.
           retry() {
             if (($# == 0)); then
               echo "retry: no command given" >&2
