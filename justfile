@@ -15,9 +15,11 @@ build:
 lint-image:
     tests/verify-image.sh {{image}}
 
-# Regenerate the third-party package lock from a built image.
+# Regenerate the third-party package lock from a built image. The temp file
+# keeps a failed run from truncating the tracked lock.
 lock:
-    build/package-lock.sh {{image}} > manifests/packages-common.lock
+    build/package-lock.sh {{image}} > manifests/packages-common.lock.tmp
+    mv manifests/packages-common.lock.tmp manifests/packages-common.lock
 
 disk:
     sudo tests/vm/make-disk.sh {{image}}

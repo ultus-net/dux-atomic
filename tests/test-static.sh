@@ -15,7 +15,14 @@ elif grep -q 'ARG BASE_IMAGE' "$repo_root/Containerfile"; then
   echo "FAIL Containerfile still declares BASE_IMAGE; Dependabot cannot expand an ARG into FROM" >&2
   failures=$((failures + 1))
 elif base=$(grep -E '^FROM ghcr\.io/ublue-os/base-main:[0-9]+@sha256:[0-9a-f]{64}$' "$repo_root/Containerfile"); then
-  echo "ok   Containerfile pins the base by tag and digest (${base#FROM })"
+  base_total=$(grep -cE '^FROM ghcr\.io/ublue-os/' "$repo_root/Containerfile")
+  base_pinned=$(grep -cE '^FROM ghcr\.io/ublue-os/base-main:[0-9]+@sha256:[0-9a-f]{64}$' "$repo_root/Containerfile")
+  if ((base_total != base_pinned)); then
+    echo "FAIL Containerfile has ${base_total} ublue base FROM lines but only ${base_pinned} pinned" >&2
+    failures=$((failures + 1))
+  else
+    echo "ok   Containerfile pins the base by tag and digest (${base#FROM })"
+  fi
 else
   echo "FAIL Containerfile does not pin the base as FROM ghcr.io/ublue-os/base-main:<tag>@sha256:<digest>" >&2
   failures=$((failures + 1))
@@ -50,7 +57,10 @@ else
   if [[ -z $lock_data ]]; then
     echo "FAIL packages-common.lock has no package lines" >&2
     failures=$((failures + 1))
-  elif [[ $lock_data != "$(printf '%s\n' "$lock_data" | sort)" ]]; then
+  elif grep -qvE $'^[^\t]+\t[^\t]+$' <<<"$lock_data"; then
+    echo "FAIL packages-common.lock has a line without a single <nevra> TAB <vendor>" >&2
+    failures=$((failures + 1))
+  elif [[ $lock_data != "$(printf '%s\n' "$lock_data" | LC_ALL=C sort)" ]]; then
     echo "FAIL packages-common.lock is not sorted; regenerate it with 'just lock'" >&2
     failures=$((failures + 1))
   else

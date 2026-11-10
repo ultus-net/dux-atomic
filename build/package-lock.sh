@@ -8,6 +8,9 @@
 # entry may name a provides rather than a package (xinit, dms-greeter), so a
 # failed exact query falls back to the providing package. Regenerate the lock
 # with `just lock`.
+#
+# Scope: manifest names only. Packages those names pull in transitively from a
+# third-party repo are not locked; docs/known-gaps.md records that gap.
 
 set -euo pipefail
 
@@ -16,11 +19,25 @@ image=${1:-localhost/dux-atomic:dev}
 runtime=${CONTAINER_RUNTIME:-podman}
 manifest=$repo_root/manifests/packages-common.txt
 
-mapfile -t packages < <(grep -Ev '^[[:space:]]*(#.*)?$' "$manifest")
-if ((${#packages[@]} == 0)); then
+# grep exits 1 for an all-comment manifest, which is not an error. Any other
+# non-zero exit is a read failure and must stop the run.
+if packages=$(grep -Ev '^[[:space:]]*(#.*)?$' "$manifest"); then
+  :
+else
+  status=$?
+  if ((status != 1)); then
+    echo "cannot read ${manifest} (grep exit ${status})" >&2
+    exit 1
+  fi
+  packages=
+fi
+if [[ -z $packages ]]; then
   echo "no packages in $manifest" >&2
   exit 1
 fi
+# Word splitting is intended: the manifest is one package per line.
+# shellcheck disable=SC2086
+mapfile -t names <<<"$packages"
 
 cat <<'HEADER'
 # manifests/packages-common.lock - regenerate with 'just lock'
@@ -31,15 +48,16 @@ HEADER
 
 "$runtime" run --rm "$image" bash -c '
   set -euo pipefail
-  format="%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\t%{VENDOR}\n"
+  format="%{NEVRA}\t%{VENDOR}\n"
   for name in "$@"; do
     if out=$(rpm -q --qf "$format" "$name" 2>/dev/null); then
       printf "%s\n" "$out"
     elif providers=$(rpm -q --whatprovides "$name" 2>/dev/null); then
+      # Word splitting is intended: rpm prints one provider per line.
       rpm -q --qf "$format" $providers
     else
       echo "no installed package provides ${name}" >&2
       exit 1
     fi
   done
-' _ "${packages[@]}" | sort -u
+' _ "${names[@]}" | LC_ALL=C sort -u
