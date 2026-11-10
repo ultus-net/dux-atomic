@@ -229,7 +229,7 @@ jobs:
               echo "retry: no command given" >&2
               return 2
             fi
-            local attempt=1 pause=30 max=6 budget=780 started=$SECONDS
+            local attempt=1 pause=30 max=6 budget=600 started=$SECONDS
             local deadline=$((started + budget)) remaining cap
             while :; do
               remaining=$((deadline - SECONDS))
@@ -249,11 +249,13 @@ jobs:
           }
           retry cosign sign --yes "$IMAGE@$digest"
           retry cosign attest --yes --predicate sbom/dux-atomic.spdx.json --type spdxjson "$IMAGE@$digest"
-          cosign verify \
+          # Verification is single-shot, but it reads the same network path as
+          # the signing above, so it gets the same cap.
+          timeout 180 cosign verify \
             --certificate-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             "$IMAGE@$digest"
-          cosign verify-attestation \
+          timeout 180 cosign verify-attestation \
             --type spdxjson \
             --certificate-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
