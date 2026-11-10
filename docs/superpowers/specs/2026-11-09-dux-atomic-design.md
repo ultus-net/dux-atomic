@@ -324,6 +324,7 @@ Zirconium remains a reference for desktop integration, not a copied configuratio
 Build pull requests without publishing trusted stable releases.
 Verify image contents, run bootc container lint, and boot a candidate in a VM.
 Publish immutable candidate references with signatures and build provenance.
+The current pipeline signs the digest and attests the SBOM; build provenance attestation is planned (#5).
 Only promote a hardware-approved candidate digest to the stable channel.
 Do not rebuild a different image during promotion.
 Both variants require their hardware acceptance records before their own promotion.

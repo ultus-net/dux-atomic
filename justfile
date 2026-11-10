@@ -13,8 +13,7 @@ build:
     podman build --layers -t {{image}} .
 
 lint-image:
-    podman run --rm {{image}} bootc container lint
-    podman run --rm {{image}} systemd-analyze verify /usr/lib/systemd/system/dux-atomic-greeter-defaults.service /usr/lib/systemd/user/dux-atomic-desktop.service /usr/lib/systemd/user/dux-atomic-dms-defaults.service
+    tests/verify-image.sh {{image}}
 
 disk:
     sudo tests/vm/make-disk.sh {{image}}
@@ -29,4 +28,4 @@ boot-tcg:
     QEMU_ACCEL=tcg BOOT_TIMEOUT=900 BOOT_GRACE=300 tests/vm/boot-smoke.sh
 
 # Static gate plus an image build and lint. The disk and boot need root and a VM.
-ci-static: check build lint-image
+ci-local: check build lint-image

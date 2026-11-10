@@ -61,12 +61,7 @@ jobs:
         run: podman build --layers -t localhost/dux-atomic:ci .
 
       - name: Image lint and unit verify
-        run: |
-          podman run --rm localhost/dux-atomic:ci bootc container lint
-          podman run --rm localhost/dux-atomic:ci systemd-analyze verify \
-            /usr/lib/systemd/system/dux-atomic-greeter-defaults.service \
-            /usr/lib/systemd/user/dux-atomic-desktop.service \
-            /usr/lib/systemd/user/dux-atomic-dms-defaults.service
+        run: tests/verify-image.sh localhost/dux-atomic:ci
 
       - name: Export image
         run: |
@@ -79,7 +74,6 @@ jobs:
           image: docker-archive:.cache/image.tar
           format: spdx-json
           output-file: dux-atomic.spdx.json
-          artifact-name: dux-atomic-sbom
 
       - name: Upload SBOM
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -172,10 +166,10 @@ jobs:
           name: sbom
           path: sbom
 
-      - name: Install podman
+      - name: Install podman and skopeo
         run: |
           sudo apt-get update
-          sudo apt-get install -y podman
+          sudo apt-get install -y podman skopeo
 
       - name: Log in to GHCR
         uses: redhat-actions/podman-login@4934294ad0449894bcd1e9f191899d7292469603 # v1
@@ -206,11 +200,20 @@ jobs:
             --certificate-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             "$IMAGE@$digest"
+          cosign verify-attestation \
+            --type spdxjson \
+            --certificate-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$IMAGE@$digest"
 
       - name: Promote latest
         if: inputs.promote
         run: |
+          digest=$(cat "$RUNNER_TEMP/digest")
           podman tag localhost/dux-atomic:ci "$IMAGE:latest"
-          podman push --digestfile "$RUNNER_TEMP/digest-latest" "$IMAGE:latest"
-          cmp "$RUNNER_TEMP/digest" "$RUNNER_TEMP/digest-latest"
-          # The digest is signed above, so latest arrives signed.
+          podman push "$IMAGE:latest"
+          live=$(skopeo inspect --format '{{.Digest}}' "docker://$IMAGE:latest")
+          if [[ $live != "$digest" ]]; then
+            echo "latest resolves to $live, expected $digest" >&2
+            exit 1
+          fi

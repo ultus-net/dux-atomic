@@ -5,10 +5,10 @@
 # output to ttyS0 through overlay/usr/lib/bootc/kargs.d/, and this script keeps
 # that console bidirectional: it captures the log and types into it.
 #
-# The greeter itself needs a DRM render node to paint, which the default
-# display-only virtio-gpu does not provide. Set VIRTIO_GL=1 to boot with
-# virtio-vga-gl and an offscreen GL display, which gives the guest a render
-# node; the script then also asserts the node exists.
+# virtio-gpu exposes a DRM render node, so the greeter session starts even
+# without host GL. That does not prove it painted. Set VIRTIO_GL=1 on a host
+# with a GPU to render with GL; the script then also asserts the node. Pixel
+# correctness is the graphical dogfood's job, not this script's.
 #
 # The login stage needs an account. make-disk.sh creates one, and the same
 # TEST_USER and TEST_PASSWORD must be exported to this script. Set BOOT_LOGIN=0

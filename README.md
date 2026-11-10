@@ -26,14 +26,14 @@ The `ctx` stage hands `build/`, `manifests/`, and `overlay/` to one build step, 
 
 `.github/workflows/ci.yml` runs on every pull request, every push to `main`, and manual dispatch. Every action is pinned to a commit SHA, and the job that runs PR code holds only `contents: read`.
 
-- `static` runs `tests/lint.sh`: shell syntax, shellcheck, `tests/test-static.sh`, and hadolint. `tests/lint.sh` pins the linter containers, and `just check` runs the same script.
-- `image` builds the image, runs `bootc container lint` and `systemd-analyze verify`, generates an SPDX SBOM with syft, builds the qcow2 with bootc-image-builder, and runs `boot-smoke.sh`. It then scans with trivy and uploads the report. The scan is report-only until the Fedora base findings are triaged.
-- `publish` runs only on `main`, holds the write token and OIDC identity, and runs no repository code. It loads the built artifact, pushes `:sha-<commit>`, signs the digest with cosign keyless OIDC, attests the SBOM, and verifies the signature.
-- A `workflow_dispatch` on `main` with `promote` set moves `:latest` after asserting the digest matches the signed one. A push never moves `:latest`.
+- `static` runs `tests/lint.sh`: shell syntax, shellcheck, `tests/test-static.sh`, hadolint, and actionlint. `tests/lint.sh` pins the linter images by digest, and `just check` runs the same script.
+- `image` builds the image, runs `tests/verify-image.sh` (`bootc container lint` and `systemd-analyze verify`), generates an SPDX SBOM with syft, builds the qcow2 with bootc-image-builder, and runs `boot-smoke.sh`. It then scans with trivy and uploads the report. The scan is report-only until the Fedora base findings are triaged (#3).
+- `publish` runs only on `main`, holds the write token and OIDC identity, and runs no repository code. It loads the built artifact, pushes `:sha-<commit>`, signs the digest with cosign keyless OIDC, attests the SBOM, and verifies both the signature and the attestation.
+- A `workflow_dispatch` on `main` with `promote` set moves `:latest` and asserts the registry digest equals the signed one. A push never moves `:latest`.
 - The `ghcr` environment is the approval hook. Add required reviewers in the repository settings to gate publication.
 - The first push creates a private GHCR package. Set the package visibility to public in the package settings if anonymous pulls are wanted.
 
-GitHub-hosted runners have no `/dev/kvm` and no DRM render node, so the boot test runs on QEMU TCG and is headless: it asserts the greeter session and the first-login units, not rendered pixels. Run the graphical dogfood locally before promotion. Record the first hosted run as the TCG baseline and adjust `BOOT_TIMEOUT` from it.
+GitHub-hosted runners have no `/dev/kvm`, so the boot test runs on QEMU TCG and is headless: it asserts the greeter session and the first-login units, not rendered pixels. The guest still gets a DRM render node from virtio-gpu. Run the graphical dogfood locally before promotion. Record the first hosted run as the TCG baseline and adjust `BOOT_TIMEOUT` from it.
 
 `just check` mirrors the static gate. `just build`, `just lint-image`, `just disk`, and `just boot` cover the rest.
 
@@ -46,7 +46,7 @@ sudo tests/vm/make-disk.sh
 tests/vm/boot-smoke.sh
 ```
 
-`make-disk.sh` runs bootc-image-builder as root. The builder image is pinned by digest so a moving `:latest` cannot change the disk; override the pin with `BIB_IMAGE`. It adds one test account (`dux` / `dux-test` by default, override with `TEST_USER` and `TEST_PASSWORD`, skip with `NO_TEST_USER=1`) because the image ships no interactive user. Credentials reject quotes, backslashes, and newlines, which would break the generated TOML. `boot-smoke.sh` boots the qcow2 headless, asserts that systemd reports `graphical.target`, that `greetd` starts, and that a live greeter session scope appears on the serial console, then logs in as that account. It starts the two first-login units the way `graphical-session-pre.target` does, then checks the niri config, the DMS binds, the dark session seed, the per-user `dms.service` link, the image-level `niri.service` binding, and the preset enablement.
+`make-disk.sh` runs bootc-image-builder as root. The builder image is pinned by digest so a moving `:latest` cannot change the disk; override the pin with `BIB_IMAGE`. It adds one test account (`dux` / `dux-test` by default, override with `TEST_USER` and `TEST_PASSWORD`, skip with `NO_TEST_USER=1`) because the image ships no interactive user. Credentials reject quotes, backslashes, and newlines, which would break the generated TOML. `boot-smoke.sh` boots the qcow2 headless, asserts that `greetd` starts and that a live greeter session scope appears on the serial console, warns when `graphical.target` is not reported, then logs in as that account. It starts the two first-login units the way `graphical-session-pre.target` does, then checks the niri config, the DMS binds, the dark session seed, the per-user `dms.service` link, the image-level `niri.service` binding, and the preset enablement.
 
 ```bash
 sudo TEST_USER=dux TEST_PASSWORD=dux-test tests/vm/make-disk.sh
@@ -55,7 +55,7 @@ VIRTIO_GL=1 TEST_USER=dux TEST_PASSWORD=dux-test tests/vm/boot-smoke.sh
 
 The login stage needs the same credentials the disk was built with. Pass `BOOT_LOGIN=0` for a disk built with `NO_TEST_USER=1`, which runs the boot assertions only.
 
-QEMU's display-only `virtio-vga` has no render node, so the greeter compositor cannot paint under it. Set `VIRTIO_GL=1` to boot with `virtio-vga-gl` and an offscreen display, which gives the guest a render node; the test then also asserts `/dev/dri/renderD128`. Check the rendered greeter on real hardware for the final confirmation.
+QEMU's `virtio-vga` exposes a render node, so the greeter session starts even on a host without GL. That does not prove the greeter painted. Set `VIRTIO_GL=1` on a host with a GPU to render with GL; the test then also asserts `/dev/dri/renderD128`. Check the rendered greeter on real hardware for the final confirmation.
 
 A real install creates the operator account itself, either in the installer or with `useradd -m`. The image never ships a login account or a password.
 
