@@ -1,5 +1,0 @@
-# Send kernel and systemd output to the first serial port, so a headless VM
-# test can assert on the boot log. This ships a serial getty to every install;
-# it is a deliberate test and recovery console for this branch. Gate it behind
-# a test build before promotion.
-kargs = ["console=ttyS0,115200"]
