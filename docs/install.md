@@ -35,7 +35,7 @@ sudo podman run --rm --privileged --pid=host --ipc=host \
   /dev/nvme0n1
 ```
 
-The image ships no `/usr/lib/bootc/install` configuration, so `--filesystem` is required; `btrfs` matches the filesystem the VM disk uses. `--wipe` erases the device. `--target-imgref` sets the reference day-2 updates fetch, so installing `:latest` keeps updates on the promoted channel. Only the device name is machine specific.
+The image carries no `/usr/lib/bootc/install` fragment, so nothing pins the filesystem type; the page passes `--filesystem btrfs` explicitly to match the filesystem `tests/vm/make-disk.sh` builds and the repo's btrfs expectation. `--wipe` erases the device. `--target-imgref` sets the reference day-2 updates fetch, so installing `:latest` keeps updates on the promoted channel. Only the device name is machine specific.
 
 `--source-imgref` is the flag for an installer that already runs inside a chroot from the image. Upstream still requires the image's chroot, so this page does not run `bootc install` directly on the live host.
 
@@ -111,6 +111,7 @@ sudo bootc rollback --apply
 - `lsblk`: https://man7.org/linux/man-pages/man8/lsblk.8.html
 - The `podman run` install invocation, its `--privileged`, `--pid=host`, `--ipc=host`, `-v`, and `--security-opt` flags, and `--source-imgref`: https://bootc.dev/bootc/bootc-installation.7.html
 - `bootc install to-disk`, its device argument, `--wipe`, `--filesystem`, `--target-imgref`, and `--block-setup`: https://bootc.dev/bootc/man/bootc-install-to-disk.8.html
+- The optional `filesystem.root.type` setting in `/usr/lib/bootc/install` fragments, and that a base image may provide a default: https://bootc.dev/bootc/man/bootc-install-config.5.html
 - `mkdir -p`: https://man7.org/linux/man-pages/man1/mkdir.1.html
 - `bootc-image-builder` `--type`, `--rootfs`, `--output`, the positional image, the podman flags, and `/config.toml`: https://github.com/osbuild/image-builder/blob/main/doc/20-advanced/20-bootc/50-migration.md
 - `iso` and `anaconda-iso` are legacy types: https://github.com/osbuild/image-builder/blob/main/doc/20-advanced/20-bootc/20-legacy-isos.md
