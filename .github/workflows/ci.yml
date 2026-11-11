@@ -138,7 +138,11 @@ jobs:
         # headless. It asserts the greeter session and the first-login units,
         # not rendered pixels. The graphical dogfood stays a local step.
         env:
-          BOOT_TIMEOUT: '900'
+          # A hosted runner is TCG with no /dev/kvm, measured at roughly 4.6x
+          # wall-clock slowdown: run 43068532421 needed 21 minutes to reach the
+          # login prompt. 1800s leaves room for a slower runner, and the image
+          # job's timeout-minutes: 180 still bounds the whole build.
+          BOOT_TIMEOUT: '1800'
           BOOT_GRACE: '300'
           QEMU_ACCEL: tcg
         run: |

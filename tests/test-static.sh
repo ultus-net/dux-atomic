@@ -217,12 +217,17 @@ if ((condition_failed == 0)); then
 fi
 
 # A regression here is silent: waiting on the echoed command instead of the
-# printf output lets the probe pass before it runs.
+# printf output lets the probe pass before it runs. The login prompt must also
+# not be anchored to end of line: a kernel message can land on the prompt's line
+# (#50). Run 43068532421 printed "fedora login: [ 275.126011] clocksource: ..."
+# and the old end-anchored pattern missed it, burning the whole login budget.
 boot_smoke=$repo_root/tests/vm/boot-smoke.sh
 common=$repo_root/build/common.sh
 if ! grep -qF 'wait_for "DUX_USER:${test_user}"' "$boot_smoke" ||
    ! grep -qF "wait_for 'DUX_PROBE_END:ok'" "$boot_smoke" ||
    ! grep -qF "wait_for 'DUX_DIAG_END:ok'" "$boot_smoke" ||
+   ! grep -qF "wait_for '^[A-Za-z0-9._-]+ login: '" "$boot_smoke" ||
+   grep -qF "wait_for 'login: *\$'" "$boot_smoke" ||
    ! awk '
       # The operator chose to accept any window of 60s or more (#36), so a
       # later raise does not red the gate. The wait must still be the prompt
@@ -254,6 +259,30 @@ elif ! grep -qF 'readlink "$portal_mask"' "$common" ||
   failures=$((failures + 1))
 else
   echo "ok   the vm login probes and greeter mask fail closed"
+fi
+
+# A hosted TCG boot reached the login prompt after 21 minutes in run 43068532421
+# (#50), so the login wait must consume BOOT_TIMEOUT and CI must budget for it.
+# Lowering either brings back a red release for a slow runner, not a broken image.
+ci_workflow=$repo_root/.github/workflows/ci.yml
+if ! grep -qF "login: ' \"\$timeout_s\"" "$boot_smoke" ||
+   ! awk '
+      # Scope to the boot step: a BOOT_TIMEOUT on another job or step must not
+      # satisfy this. The env block follows the step name, and the next
+      # "- name:" ends the step.
+      /^[[:space:]]*- name: Boot smoke test[[:space:]]*$/ { step = 1; next }
+      step && /^[[:space:]]*- name: / { step = 0 }
+      step && /^[[:space:]]+BOOT_TIMEOUT: / {
+        v = $0; gsub(/[^0-9]/, "", v)
+        if (v + 0 >= 1800) ok = 1
+        step = 0
+      }
+      END { exit !ok }
+    ' "$ci_workflow"; then
+  echo "FAIL ci.yml budgets less than 1800s for the hosted boot, or boot-smoke does not spend BOOT_TIMEOUT on the login prompt" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the hosted boot budget covers a slow TCG login"
 fi
 
 # The serial console is a test-only karg (#39): in the overlay it puts a serial

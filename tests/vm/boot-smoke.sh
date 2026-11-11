@@ -83,7 +83,9 @@ else
 fi
 
 # KVM where available; TCG on a hosted runner without /dev/kvm. TCG is slow,
-# so raise BOOT_TIMEOUT for a hosted run.
+# so raise BOOT_TIMEOUT for a hosted run. Run 43068532421 measured 275s of guest
+# time at roughly 4.6x wall-clock slowdown, so a hosted boot needs the better
+# part of half an hour before the login prompt appears.
 accel=${QEMU_ACCEL:-kvm}
 if [[ $accel == kvm && ! -e /dev/kvm ]]; then
   echo "no /dev/kvm; falling back to TCG" >&2
@@ -146,7 +148,11 @@ serial_write() {
 }
 
 serial_login() {
-  if ! wait_for 'login: *$' "$timeout_s"; then
+  # Match the hostname-prefixed prompt, not an end-of-line anchor. Run
+  # 43068532421 showed the console write the prompt and a kernel message on one
+  # line: "fedora login: [  275.126011] clocksource: Watchdog ...". An anchor
+  # at `$` never matched it and the login stage waited out its whole budget.
+  if ! wait_for '^[A-Za-z0-9._-]+ login: ' "$timeout_s"; then
     echo "login failed: no getty prompt on the serial console" >&2
     return 1
   fi
