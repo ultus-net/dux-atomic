@@ -262,9 +262,15 @@ jobs:
             shift
             : >"$file"
             "$@" >>"$file" 2>&1 || status=$?
-            # A survivor can still hold the file open, so bound the read too.
-            # Ignore the cut, or `bash -e` would return 124 and hide a success.
-            timeout 10 cat "$file" || true
+            # One 8.7 MB line from `cosign verify-attestation` stalled the runner's
+            # log pipeline (actions/runner#1031), and no step timeout ended it. Print
+            # a bounded prefix and report what was dropped.
+            local bytes
+            bytes=$(wc -c <"$file")
+            timeout 10 head -c 20000 "$file" || true
+            if ((bytes > 20000)); then
+              echo "[with_log: printed 20000 of ${bytes} bytes from ${file##*/}]"
+            fi
             return "$status"
           }
           retry() {
@@ -363,28 +369,50 @@ jobs:
           cosign-release: v2.6.5
 
       - name: Verify the signature
-        # Each call carries its own cap, so a killable stall ends here rather
-        # than at the job cap. The job bound is the backstop for one that
-        # ignores signals.
+        # cosign prints the payload on stdout; a failed check prints on stderr.
+        # The attested SBOM is about 8.7 MB on one line, and the runner's log
+        # pipeline stalled on it, so stdout goes to a file and only a prefix is
+        # printed. The job bound remains the backstop.
         timeout-minutes: 8
         env:
           DIGEST: ${{ needs.publish.outputs.digest }}
         run: |
+          status=0
           timeout --kill-after=10 180 cosign verify \
             --certificate-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-            "$IMAGE@$DIGEST"
+            "$IMAGE@$DIGEST" >"$RUNNER_TEMP/verify.log" || status=$?
+          timeout 10 head -c 20000 "$RUNNER_TEMP/verify.log" || true
+          exit "$status"
 
       - name: Verify the attestation
+        # cosign prints the attestation on stdout; a failed check prints on stderr.
+        # The attested SBOM is about 8.7 MB on one line, and the runner's log
+        # pipeline stalled on it, so stdout goes to a file and only a prefix is
+        # printed. The job bound remains the backstop.
         timeout-minutes: 8
         env:
           DIGEST: ${{ needs.publish.outputs.digest }}
         run: |
+          status=0
           timeout --kill-after=10 180 cosign verify-attestation \
             --type spdxjson \
             --certificate-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-            "$IMAGE@$DIGEST"
+            "$IMAGE@$DIGEST" >"$RUNNER_TEMP/verify-attestation.log" || status=$?
+          timeout 10 head -c 20000 "$RUNNER_TEMP/verify-attestation.log" || true
+          exit "$status"
+
+      - name: Upload verify logs
+        # A capped job drops the artifact step, but a step that finishes keeps
+        # its logs, and the bounded print above means the job can finish.
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: verify-logs
+          path: ${{ runner.temp }}/*.log
+          if-no-files-found: ignore
+          retention-days: 14
 
   # Promotion stays behind verification, so a tag moves only to a digest whose
   # signature and attestation both verified.
