@@ -223,9 +223,24 @@ common=$repo_root/build/common.sh
 if ! grep -qF 'wait_for "DUX_USER:${test_user}"' "$boot_smoke" ||
    ! grep -qF "wait_for 'DUX_PROBE_END:ok'" "$boot_smoke" ||
    ! grep -qF "wait_for 'DUX_DIAG_END:ok'" "$boot_smoke" ||
-   ! grep -qF 'if ! wait_for "${test_user}@" 20' "$boot_smoke" ||
+   ! awk '
+      # The operator chose to accept any window of 60s or more (#36), so a
+      # later raise does not red the gate. The wait must still be the prompt
+      # wait in serial_login and must still fail the login.
+      /^serial_login\(\) \{/ { in_fn = 1; next }
+      in_fn && /^\}/ { exit }
+      in_fn && /if[[:space:]]+![[:space:]]+wait_for[[:space:]]+"\$\{test_user\}@"[[:space:]]+[0-9]+;[[:space:]]*then/ {
+        n = $0
+        sub(/.*@[}"]/, "", n)
+        sub(/; then.*/, "", n)
+        wait = (n + 0 >= 60)
+      }
+      in_fn && /echo "login failed: no shell prompt for \$\{test_user\}" >&2/ { msg = 1 }
+      msg && /return 1/ { ret = 1 }
+      END { exit !(wait && msg && ret) }
+    ' "$boot_smoke" ||
    ! grep -qF 'DUX_SETUP_MARKER' "$boot_smoke" ||
-   grep -qF 'wait_for "${test_user}@" 20 || true' "$boot_smoke" ||
+   grep -qE 'wait_for "\$\{test_user\}@" [0-9]+ \|\| true' "$boot_smoke" ||
    grep -qF "wait_for 'DUX_DIAG_END'" "$boot_smoke" ||
    grep -qF "wait_for 'DUX_PROBE_END'" "$boot_smoke"; then
   echo "FAIL boot-smoke waits on an echoed marker instead of printf output" >&2
