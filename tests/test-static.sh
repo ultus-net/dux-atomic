@@ -224,9 +224,12 @@ if ! grep -qF 'wait_for "DUX_USER:${test_user}"' "$boot_smoke" ||
    ! grep -qF "wait_for 'DUX_PROBE_END:ok'" "$boot_smoke" ||
    ! grep -qF "wait_for 'DUX_DIAG_END:ok'" "$boot_smoke" ||
    ! awk '
+      # The operator chose to accept any window of 60s or more (#36), so a
+      # later raise does not red the gate. The wait must still be the prompt
+      # wait in serial_login and must still fail the login.
       /^serial_login\(\) \{/ { in_fn = 1; next }
       in_fn && /^\}/ { exit }
-      in_fn && /if ! wait_for "\$\{test_user\}@" [0-9]+; then/ {
+      in_fn && /if[[:space:]]+![[:space:]]+wait_for[[:space:]]+"\$\{test_user\}@"[[:space:]]+[0-9]+;[[:space:]]*then/ {
         n = $0
         sub(/.*@[}"]/, "", n)
         sub(/; then.*/, "", n)

@@ -51,4 +51,4 @@ tests/test-signing.sh
 
 ## CI boot test
 
-GitHub-hosted runners have no `/dev/kvm`, so the boot test runs on QEMU TCG and is headless: it asserts the greeter session and the first-login units, not rendered pixels. The guest still gets a DRM render node from virtio-gpu. The workflow gives the boot 900s, `greetd` 300s, and the login shell prompt 60s to appear, and `make-disk.sh` raises the test disk's device timeout to 180s because TCG throughput varies run to run. Run the graphical dogfood locally before promotion. See [CI](ci.md).
+GitHub-hosted runners have no `/dev/kvm`, so the boot test runs on QEMU TCG and is headless: it asserts the greeter session and the first-login units, not rendered pixels. The guest still gets a DRM render node from virtio-gpu. The workflow gives the boot 900s, `greetd` 300s, and the login shell prompt at least 60s to appear, and `make-disk.sh` raises the test disk's device timeout to 180s because TCG throughput varies run to run. Run the graphical dogfood locally before promotion. See [CI](ci.md).
