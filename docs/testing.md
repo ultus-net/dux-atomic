@@ -22,7 +22,7 @@ rm -rf output
 sudo tests/vm/make-disk.sh ghcr.io/ultus-net/dux-atomic@"$digest" output
 ```
 
-`make-disk.sh` refuses an image that is not in rootful podman storage, hence the explicit pull. The `skopeo inspect` call is the same one the promotion record uses, so this digest matches the recorded one. `make-disk.sh` does not clear the output directory, so run `rm -rf output` to stop an older candidate's disk from being booted by mistake.
+`make-disk.sh` refuses an image that is not in rootful podman storage, hence the explicit pull. The `skopeo inspect` call is the same one the promotion record uses, so this digest matches the recorded one. `output/` holds only bootc-image-builder output and is gitignored, and `make-disk.sh` does not clear it, so `rm -rf output` drops an earlier candidate's disk that later commands on this page would otherwise boot.
 
 `boot-smoke.sh` boots the qcow2 headless, asserts that `greetd` starts, treats the greeter session line on the serial console as the fast signal, warns when `graphical.target` is not reported, then logs in as that account and asserts the live greeter session through `loginctl`. When the login probe finds no greeter session, it prints process wait channels, the `greetd` unit state, sessions, the `/dev/dri` entries, and failed units to the console, because the unprivileged test account cannot read the journal. It then starts the two first-login units the way `graphical-session-pre.target` does, and checks the niri config, the DMS binds, the dark session seed, the per-user `dms.service` link, the image-level `niri.service` binding, the preset enablement, and the greeter seed.
 
@@ -58,7 +58,7 @@ Log in with the test account (`dux` / `dux-test` by default). The DMS bar, the d
 DOGFOOD_PROBE=7 python3 .vm/dogfood_login.py .vm/dogfood-7 output/qcow2/disk.qcow2
 ```
 
-Probe 7 logs in on the serial console, clicks through the greeter's user picker, types the password, then polls `niri.service` and `dms.service` as the user. It exits 0 only when both report `active`, and it writes screenshots to the run directory. The driver is local and untracked: `.gitignore` excludes `.vm/`, so a fresh clone has the procedure but not the driver.
+Probe 7 logs in on the serial console, clicks through the greeter's user picker, types the password, then polls `niri.service` and `dms.service` as the user. It exits 0 only when both report `active`, and it writes screenshots to the run directory, so give each candidate its own directory. The driver is local and untracked: `.gitignore` excludes `.vm/`, so a fresh clone has the procedure but not the driver.
 
 The image disables Plymouth (`plymouth.enable=0`), so both the VM and real hardware show the text boot instead of a splash.
 
