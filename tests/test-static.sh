@@ -339,6 +339,13 @@ elif [[ -z $verify_block ]] ||
    grep -qF 'id-token: write' <<<"$verify_block"; then
   echo "FAIL the verify job is missing, unbounded, does not read the publish digest, or asks for an OIDC identity" >&2
   failures=$((failures + 1))
+elif [[ $(grep -cF 'head -c 20000' <<<"$verify_block") -lt 2 ]] ||
+     ! grep -qF '>"$RUNNER_TEMP/verify.log" || status=$?' <<<"$verify_block" ||
+     ! grep -qF '>"$RUNNER_TEMP/verify-attestation.log" || status=$?' <<<"$verify_block" ||
+     ! awk '/- name: Upload verify logs/{found=1; next} found && /if: always\(\)/{ok=1; exit} found && /- name:/{exit} END{exit !ok}' <<<"$verify_block" ||
+     ! grep -qE 'name: verify-logs$' <<<"$verify_block"; then
+  echo "FAIL the verify job does not keep cosign's payload out of the step log, or does not upload the logs on every outcome" >&2
+  failures=$((failures + 1))
 elif [[ -z $promote_block ]] ||
      ! grep -qF 'needs: [publish, verify]' <<<"$promote_block" ||
      ! grep -qF 'if: inputs.promote' <<<"$promote_block"; then
@@ -384,12 +391,13 @@ fi
 sed -n '/^          with_log() {/,/^          }$/p' "$workflow" | sed 's/^          //' \
   >"$retry_root/with_log.sh"
 if ! grep -qF '"$@" >>"$file" 2>&1 || status=$?' "$retry_root/with_log.sh" ||
-   ! grep -qF 'timeout 10 cat "$file" || true' "$retry_root/with_log.sh" ||
+   ! grep -qF 'timeout 10 head -c 20000 "$file" || true' "$retry_root/with_log.sh" ||
+   ! grep -qF 'echo "[with_log: printed 20000 of ${bytes} bytes from ${file##*/}]"' "$retry_root/with_log.sh" ||
    ! grep -qF 'return "$status"' "$retry_root/with_log.sh"; then
-  echo "FAIL with_log does not ignore a cut read or does not keep its command's status" >&2
+  echo "FAIL with_log does not bound its print, report the cut, or keep its command's status" >&2
   failures=$((failures + 1))
 else
-  echo "ok   with_log bounds and ignores a cut read and keeps its command's status"
+  echo "ok   with_log bounds its print, reports the cut, and keeps its command's status"
 fi
 logged=$(bash -ec 'source "$1"; with_log "$2" bash -c "echo printed; exit 3"' _ \
   "$retry_root/with_log.sh" "$retry_root/out.log" 2>&1) && rc=0 || rc=$?
@@ -401,6 +409,49 @@ elif [[ $logged != *printed* ]]; then
   failures=$((failures + 1))
 else
   echo "ok   with_log under bash -e prints its command's output and keeps its failure status"
+fi
+
+# A command that prints a large single line must have its print trimmed by the
+# bounded `head -c 20000`, as cosign verify-attestation does. The file keeps the
+# whole output; only the step log is bounded.
+cat >"$retry_root/long.sh" <<'SH'
+head -c 30000 </dev/zero | tr '\0' A
+SH
+bash -ec 'source "$1"; with_log "$2" bash "$3"' _ \
+  "$retry_root/with_log.sh" "$retry_root/long.log" "$retry_root/long.sh" \
+  >"$retry_root/long.out" 2>&1 && rc=0 || rc=$?
+if ((rc != 0)); then
+  echo "FAIL with_log reported failure for a command that printed one long line" >&2
+  failures=$((failures + 1))
+elif [[ $(wc -c <"$retry_root/long.log") -ne 30000 ]]; then
+  echo "FAIL with_log did not keep the full output in the file" >&2
+  failures=$((failures + 1))
+elif [[ $(wc -c <"$retry_root/long.out") -gt 21000 ]]; then
+  echo "FAIL with_log did not trim its print to 20000 bytes (got $(wc -c <"$retry_root/long.out") bytes)" >&2
+  failures=$((failures + 1))
+elif ! grep -qF '[with_log: printed 20000 of 30000 bytes from long.log]' "$retry_root/long.out"; then
+  echo "FAIL with_log did not report the bytes it dropped" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   with_log trims one long line to 20000 bytes and reports the drop"
+fi
+
+cat >"$retry_root/long-fail.sh" <<'SH'
+head -c 30000 </dev/zero | tr '\0' A
+exit 3
+SH
+bash -ec 'source "$1"; with_log "$2" bash "$3"' _ \
+  "$retry_root/with_log.sh" "$retry_root/long-fail.log" "$retry_root/long-fail.sh" \
+  >"$retry_root/long-fail.out" 2>&1 && rc=0 || rc=$?
+if ((rc != 3)); then
+  echo "FAIL with_log dropped the exit status of a command that printed a long line (got $rc)" >&2
+  failures=$((failures + 1))
+elif [[ $(wc -c <"$retry_root/long-fail.out") -gt 21000 ]] ||
+     ! grep -qF '[with_log: printed 20000 of 30000 bytes from long-fail.log]' "$retry_root/long-fail.out"; then
+  echo "FAIL with_log did not trim and report the long output of a failing command" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   with_log trims a long line and keeps the failing command's status"
 fi
 
 # Rekor's public instance rejects the full file inventory, so the filter must
