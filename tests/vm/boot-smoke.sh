@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Boot the candidate qcow2 under QEMU, wait for the greeter, then log in.
 #
-# Needs qemu-system-x86_64 and edk2-ovmf. The image writes kernel and systemd
-# output to ttyS0 through overlay/usr/lib/bootc/kargs.d/, and this script keeps
-# that console bidirectional: it captures the log and types into it.
+# Needs qemu-system-x86_64 and edk2-ovmf. The test disk appends
+# console=ttyS0,115200 through tests/vm/make-disk.sh's kernel customisation, and
+# this script keeps that console bidirectional: it captures the log and types
+# into it.
 #
 # virtio-gpu exposes a DRM render node, so the greeter session starts even
 # without host GL. That does not prove it painted. Set VIRTIO_GL=1 on a host
