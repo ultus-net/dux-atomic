@@ -238,6 +238,9 @@ jobs:
           cosign-release: v2.6.5
 
       - name: Sign the digest and attest the SBOM
+        # The commands below are capped, but a descendant that outlives its
+        # timeout can still hold the step open, so the step gets its own bound.
+        timeout-minutes: 40
         run: |
           digest=$(cat "$RUNNER_TEMP/digest")
           # Record the digest before anything can stall, as a check-run
@@ -257,6 +260,22 @@ jobs:
           # wall-clock budget, so the step is bounded even when every call
           # hangs. The fast-failure path reaches five attempts; a command whose
           # attempts each hang exhausts the budget in two.
+          #
+          # Run 42917390106 then held this step open for 33 minutes, past the
+          # 26 minutes the caps allow, which points to a descendant that
+          # outlives the kill and keeps the step's stdout pipe open. Each
+          # command now writes to a file that no descendant shares with the
+          # runner, and the step is bounded whatever the cause.
+          with_log() {
+            local file=$1 status=0
+            shift
+            : >"$file"
+            "$@" >>"$file" 2>&1 || status=$?
+            # A survivor can still hold the file open, so bound the read too.
+            # Ignore the cut, or `bash -e` would return 124 and hide a success.
+            timeout 10 cat "$file" || true
+            return "$status"
+          }
           retry() {
             if (($# == 0)); then
               echo "retry: no command given" >&2
@@ -280,15 +299,15 @@ jobs:
             echo "failed after ${attempt} attempts in $((SECONDS - started))s: $*" >&2
             return 1
           }
-          retry cosign sign --yes "$IMAGE@$digest"
-          retry cosign attest --yes --predicate sbom/dux-atomic.spdx.json --type spdxjson "$IMAGE@$digest"
+          with_log "$RUNNER_TEMP/sign.log" retry cosign sign --yes "$IMAGE@$digest"
+          with_log "$RUNNER_TEMP/attest.log" retry cosign attest --yes --predicate sbom/dux-atomic.spdx.json --type spdxjson "$IMAGE@$digest"
           # Verification is single-shot, but it reads the same network path as
           # the signing above, so it gets the same cap.
-          timeout --kill-after=10 180 cosign verify \
+          with_log "$RUNNER_TEMP/verify.log" timeout --kill-after=10 180 cosign verify \
             --certificate-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             "$IMAGE@$digest"
-          timeout --kill-after=10 180 cosign verify-attestation \
+          with_log "$RUNNER_TEMP/verify-attestation.log" timeout --kill-after=10 180 cosign verify-attestation \
             --type spdxjson \
             --certificate-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
