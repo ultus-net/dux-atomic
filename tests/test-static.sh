@@ -424,6 +424,34 @@ else
   echo "ok   the SBOM filter drops files and their relationships"
 fi
 
+# A report-only scan hides a new finding, and an ignore entry without an expiry
+# hides it forever. Both are regressions the run would otherwise not show.
+trivyignore=$repo_root/.trivyignore
+if [[ ! -f $trivyignore ]]; then
+  echo "FAIL .trivyignore is missing" >&2
+  failures=$((failures + 1))
+else
+  trivy_entries=$(grep -cE '^(CVE-[0-9]{4}-[0-9]+|GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}) ' "$trivyignore" || true)
+  trivy_bad=$(grep -nEv '^[[:space:]]*(#.*)?$|^(CVE-[0-9]{4}-[0-9]+|GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}) exp:[0-9]{4}-[0-9]{2}-[0-9]{2}$' "$trivyignore" || true)
+  if [[ -n $trivy_bad ]]; then
+    echo "FAIL .trivyignore has a line that is not a comment or '<advisory-id> exp:<date>':"$'\n'"$trivy_bad" >&2
+    failures=$((failures + 1))
+  elif ((trivy_entries == 0)); then
+    echo "FAIL .trivyignore has no triaged entries" >&2
+    failures=$((failures + 1))
+  elif ! grep -qF -- '--exit-code 1' "$workflow" ||
+       grep -qF 'continue-on-error: true' "$workflow" ||
+       ! grep -qF -- '--ignorefile .trivyignore' "$workflow"; then
+    echo "FAIL the vulnerability scan does not fail on a new finding or read .trivyignore" >&2
+    failures=$((failures + 1))
+  elif ! awk '/- name: Upload scan report/{found=1; next} found && /if: always\(\)/{ok=1; exit} found && /- name:/{exit} END{exit !ok}' "$workflow"; then
+    echo "FAIL the scan-report upload does not run on failure" >&2
+    failures=$((failures + 1))
+  else
+    echo "ok   the trivy scan is blocking, reads expiring ignores, and keeps the report on failure"
+  fi
+fi
+
 if ((failures > 0)); then
   exit 1
 fi
