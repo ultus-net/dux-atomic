@@ -2,9 +2,10 @@
 
 `ghcr.io/ultus-net/dux-atomic:latest` moved to the digest of commit `284942b`,
 the merge of PR #53. This is the second promotion through the pipeline, and the
-first to carry the hardening merged after the first one: the apt retry and
-failover, the hostname-anchored boot prompt, the raised boot budget, the verify
-job split, and the checkout in `publish` and `promote`.
+first whose build commit includes the CI hardening merged after the first one:
+the apt retry and failover (#46), the hostname-anchored boot prompt (#50), the
+raised boot budget (#50), the `verify` job split (#44), and the checkout in
+`publish` and `promote` (#52).
 
 ## What moved
 
@@ -54,9 +55,10 @@ first instead of gating the queue.
 | Boot smoke test | 6m38s |
 | Vulnerability scan | 2m30s |
 
-`Boot smoke test` took 6m38s here. Run 43068532421 needed 21 minutes of wall
-clock for 275s of guest time on the same TCG setting, so the TCG cost varies by
-runner and the 1800s budget is headroom rather than a measured need.
+`Boot smoke test` took 6m38s here. Run 43068532421 spent 42m53s in the same job
+on the same TCG setting before failing on the login prompt, so boot wall clock
+varies widely with the runner and the 1800s `BOOT_TIMEOUT` is what bounds it
+rather than a figure any run measured as sufficient.
 
 ### Where publish's 13m13s went
 
@@ -85,10 +87,10 @@ annotation:
 attempt.
 
 `promote` installed `skopeo` in 8s, logged in to GHCR in 2s, and spent 6s on
-`Promote latest`, which copies with `--preserve-digests` and then asserts that
-`skopeo inspect :latest` equals the publish digest. It is gated on `publish` and
-`verify`, so the tag moved only onto a digest whose signature and attestation
-verified.
+`Promote latest`. That step is the workflow's `skopeo copy --preserve-digests`
+followed by an equality check on `skopeo inspect :latest`
+(`.github/workflows/ci.yml`), and the job needs `publish` and `verify`, so the tag
+moved onto a digest whose signature and SBOM attestation had already verified.
 
 Artifact sizes from the run's artifacts API: `image` 7,823,295,732 bytes,
 `verify-logs` 892,196, `sbom` 529,472, `publish-logs` 1,405, and
@@ -113,10 +115,9 @@ Run 43052107613 showed the failover was needed: it spent the whole budget on
 same run showed an earlier design error, `Acquire::Retries=5`, which delays
 failover because apt repeats every retry on the same URI.
 
-The failover has not fired in a live run since. Run 43063233928 (`bc83348`)
-fetched from the Azure mirror directly, and this promotion's `image` build did
-the same, so the retry path is proven by stubs and negative proofs, not yet by a
-real outage.
+The failover branch itself is exercised by no run cited here: run 43063233928
+(`bc83348`) and this promotion's `image` build both reached the Azure mirror
+directly, so `tests/test-static.sh` is the only check on that path so far.
 
 ### The boot test missed its own login prompt
 
@@ -166,9 +167,10 @@ anonymously pullable, so a target machine needs no registry credentials.
 
 ## Accepted at promotion
 
-- This digest carries no build-provenance attestation. The workflow at `284942b`
-  attests the SBOM only; the SLSA attestation from #5 is not merged yet, so this
-  is the last promoted digest with signature and SBOM attestation alone.
+- This digest carries no build-provenance attestation, because the run predates
+  #5: the workflow at `284942b` attests the SBOM only. It is therefore the last
+  promoted digest for which a signature and an SBOM attestation are the whole
+  evidence chain.
 - The graphical dogfood is still stale: the last recorded run was 2026-11-10 on
   `e12b116`, before the first-login retry change.
 - The apt failover has not fired against a live outage since it merged.
