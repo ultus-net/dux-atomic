@@ -30,6 +30,7 @@ bash_scripts=(
   build/common.sh
   build/package-lock.sh
   tests/lint.sh
+  tests/test-signing.sh
   tests/test-static.sh
   tests/verify-image.sh
   tests/vm/boot-smoke.sh

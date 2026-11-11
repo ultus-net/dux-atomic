@@ -9,6 +9,11 @@ image := "localhost/dux-atomic:dev"
 check:
     tests/lint.sh
 
+# Signature policy acceptance and rejection on a throwaway local registry.
+# Needs podman, skopeo, cosign and a free 127.0.0.1:5000.
+signing:
+    tests/test-signing.sh
+
 build:
     podman build --layers -t {{image}} .
 
