@@ -282,7 +282,8 @@ workflow=$repo_root/.github/workflows/ci.yml
 # 43033654470 spent 67 minutes in the package install before apt reported
 # "Temporary failure resolving", and publish, verify and promote never ran. The
 # step retries a bounded number of times and lets apt retry each fetch itself.
-if ! grep -qF 'Acquire::Retries=5' "$workflow" ||
+if ! grep -qF 'timeout 600 sudo env DEBIAN_FRONTEND=noninteractive' "$workflow" ||
+   ! grep -qF 'apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30' "$workflow" ||
    ! grep -qF 'for attempt in 1 2 3; do' "$workflow" ||
    ! grep -qF 'retrying in 15s' "$workflow" ||
    ! grep -qF 'apt_retry update' "$workflow" ||
