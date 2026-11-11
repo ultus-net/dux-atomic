@@ -44,12 +44,13 @@ fi
 
 # TCG boots on a shared runner can run at half speed, and udev then misses
 # systemd's 45s device timeout before /boot appears. Raise the timeout on the
-# test disk only, so the shipped image keeps the stock value.
+# test disk only, so the shipped image keeps the stock value. The serial console
+# karg lives here for the same reason: a production install gets no serial getty.
 config_dir=$(mktemp -d)
 trap 'rm -rf "$config_dir"' EXIT
 {
   echo '[customizations.kernel]'
-  echo 'append = "systemd.default_device_timeout_sec=180"'
+  echo 'append = "systemd.default_device_timeout_sec=180 console=ttyS0,115200"'
   if ((with_test_user)); then
     echo '[[customizations.user]]'
     printf 'name = "%s"\n' "$test_user"
