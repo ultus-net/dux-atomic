@@ -201,12 +201,21 @@ carry over to options 2 or 3, and it should not be cited as evidence for them.
 ## Sources
 
 - [S1] Approved design, `docs/superpowers/specs/2026-11-09-dux-atomic-design.md`:
-  hardware table (lines 70-74), the record-the-firmware-state instruction (line
-  78), the migration preflight paragraph (line 80), and Secure Boot constraints
-  (lines 345-348).
-- [S2] `docs/install.md`: install command (lines 27-36), no install fragment
-  (line 38), ISO path (lines 44-59), LUKS section (lines 78-82), Secure Boot
-  section (lines 84-88).
+  the hardware table (lines 71-74), line 78 "Record laptop model, actual dock
+  model, attached USB devices, monitor modes, and Secure Boot state before
+  deployment.", line 80 "Laptop encryption, employer policy, rollback
+  deployment, network enrollment, and firmware requirements are migration
+  preflight checks.", line 345 "Desktop Secure Boot is currently disabled.", line
+  347 "Do not promise that container signing satisfies Secure Boot, or disable
+  laptop Secure Boot to simplify a driver recipe.", and line 348 "Laptop Secure
+  Boot state and employer requirements are deployment gates."
+- [S2] `docs/install.md`: line 33 `bootc install to-disk --wipe --filesystem
+  btrfs`, line 38 "The image carries no `/usr/lib/bootc/install` fragment", line
+  44 the ISO heading with line 46 "`bootc-image-builder` still accepts `--type
+  iso`", line 80 "Upstream recommends setting up encryption independently of
+  bootc", line 82 "Whether the shipped initramfs unlocks a LUKS root is
+  unconfirmed", line 86 "The SBOM carries `shim-x64`, `shim-ia32`, and
+  `grub2-efi-x64`", and line 88 "The desktop has Secure Boot disabled today".
 - [S3] bootc issue #421, "install to-disk with LUKS + TPM broken", updated
   2026-07-10: <https://github.com/bootc-dev/bootc/issues/421>
 - [S4] bootc issues #476, #477, #1329 (open) and #2089 (closed):
