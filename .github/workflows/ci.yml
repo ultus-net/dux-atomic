@@ -244,7 +244,8 @@ jobs:
             : >"$file"
             "$@" >>"$file" 2>&1 || status=$?
             # A survivor can still hold the file open, so bound the read too.
-            timeout 10 cat "$file"
+            # Ignore the cut, or `bash -e` would return 124 and hide a success.
+            timeout 10 cat "$file" || true
             return "$status"
           }
           retry() {
