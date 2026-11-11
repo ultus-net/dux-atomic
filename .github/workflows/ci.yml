@@ -210,6 +210,9 @@ jobs:
           cosign-release: v2.6.5
 
       - name: Sign the digest and attest the SBOM
+        # The commands below are capped, but a descendant that outlives its
+        # timeout can still hold the step open, so the step gets its own bound.
+        timeout-minutes: 40
         run: |
           digest=$(cat "$RUNNER_TEMP/digest")
           # Record the digest before anything can stall, as a check-run
@@ -230,16 +233,18 @@ jobs:
           # hangs. The fast-failure path reaches five attempts; a command whose
           # attempts each hang exhausts the budget in two.
           #
-          # Run 42917390106 then held this step open for 34 minutes, past the
-          # 26 the caps allow, so a descendant outlives the kill and keeps the
-          # step's stdout pipe open. Each command now writes to a file that no
-          # descendant shares with the runner, and the file is printed after.
+          # Run 42917390106 then held this step open for 33 minutes, past the
+          # 26 minutes the caps allow, which points to a descendant that
+          # outlives the kill and keeps the step's stdout pipe open. Each
+          # command now writes to a file that no descendant shares with the
+          # runner, and the step is bounded whatever the cause.
           with_log() {
             local file=$1 status=0
             shift
             : >"$file"
             "$@" >>"$file" 2>&1 || status=$?
-            cat "$file"
+            # A survivor can still hold the file open, so bound the read too.
+            timeout 10 cat "$file"
             return "$status"
           }
           retry() {

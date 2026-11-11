@@ -273,6 +273,10 @@ if ! grep -qF 'with_log() {' "$workflow" ||
    ! grep -qF 'with_log "$RUNNER_TEMP/verify-attestation.log" timeout --kill-after=10 180 cosign verify-attestation' "$workflow"; then
   echo "FAIL ci.yml does not run every signing and verification command with its output in a file" >&2
   failures=$((failures + 1))
+elif ! grep -qF 'timeout 10 cat "$file"' "$workflow" ||
+   ! grep -qF 'return "$status"' "$workflow"; then
+  echo "FAIL with_log does not bound its read or does not keep its command's status" >&2
+  failures=$((failures + 1))
 else
   echo "ok   every signing and verification command writes to its own log file"
 fi
@@ -319,6 +323,21 @@ if bash -c 'source "$1"; retry true' _ "$retry_root/retry.sh" 2>/dev/null; then
 else
   echo "FAIL the retry helper reported failure for a command that succeeded" >&2
   failures=$((failures + 1))
+fi
+
+# with_log must print its command's output and keep its status, or a failed
+# sign would read as success and a stall would show nothing.
+sed -n '/^          with_log() {/,/^          }$/p' "$workflow" | sed 's/^          //' \
+  >"$retry_root/with_log.sh"
+if logged=$(bash -c 'source "$1"; with_log "$2" bash -c "echo printed; exit 3"' _ \
+     "$retry_root/with_log.sh" "$retry_root/out.log" 2>&1); then
+  echo "FAIL with_log reported success for a command that failed" >&2
+  failures=$((failures + 1))
+elif [[ $logged != *printed* ]]; then
+  echo "FAIL with_log did not print its command's output" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   with_log prints its command's output and keeps its failure status"
 fi
 
 # Rekor's public instance rejects the full file inventory, so the filter must
