@@ -284,10 +284,12 @@ workflow=$repo_root/.github/workflows/ci.yml
 # Every job installs through the bounded helper, and no bare apt-get remains.
 installer=$repo_root/build/install-packages.sh
 if [[ ! -x $installer ]] ||
-   ! grep -qF 'timeout 600 sudo env DEBIAN_FRONTEND=noninteractive' "$installer" ||
+   ! grep -qF 'budget=300' "$installer" ||
+   ! grep -qF 'deadline=$((SECONDS + budget))' "$installer" ||
+   ! grep -qF 'cap=$((deadline - SECONDS))' "$installer" ||
+   ! grep -qF 'timeout "$cap" sudo env DEBIAN_FRONTEND=noninteractive' "$installer" ||
    ! grep -qF 'apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30' "$installer" ||
    ! grep -qF 'for attempt in 1 2 3; do' "$installer" ||
-   ! grep -qF 'retrying in 15s' "$installer" ||
    ! grep -qF 'apt_retry install -y "$@"' "$installer" ||
    ! grep -qF 'build/install-packages.sh podman qemu-system-x86 qemu-utils ovmf' "$workflow" ||
    ! grep -qF 'build/install-packages.sh podman skopeo' "$workflow" ||
