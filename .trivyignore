@@ -35,6 +35,7 @@ CVE-2026-78669 exp:2027-02-11
 CVE-2026-97031 exp:2027-02-11
 
 # sysroot/ostree/repo/objects copies of the base Go binaries (podman, grpc, go-jose)
+GHSA-hrxh-6v49-42gf exp:2027-02-11
 CVE-2026-116587 exp:2027-02-11
 CVE-2026-17106 exp:2027-02-11
 CVE-2026-56851 exp:2027-02-11

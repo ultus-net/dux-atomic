@@ -403,10 +403,10 @@ if [[ ! -f $trivyignore ]]; then
   echo "FAIL .trivyignore is missing" >&2
   failures=$((failures + 1))
 else
-  trivy_entries=$(grep -cE '^CVE-' "$trivyignore" || true)
-  trivy_bad=$(grep -nEv '^[[:space:]]*(#.*)?$|^CVE-[0-9]{4}-[0-9]+ exp:[0-9]{4}-[0-9]{2}-[0-9]{2}$' "$trivyignore" || true)
+  trivy_entries=$(grep -cE '^(CVE-[0-9]{4}-[0-9]+|GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}) ' "$trivyignore" || true)
+  trivy_bad=$(grep -nEv '^[[:space:]]*(#.*)?$|^(CVE-[0-9]{4}-[0-9]+|GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}) exp:[0-9]{4}-[0-9]{2}-[0-9]{2}$' "$trivyignore" || true)
   if [[ -n $trivy_bad ]]; then
-    echo "FAIL .trivyignore has a line that is not a comment or '<CVE-id> exp:<date>':"$'\n'"$trivy_bad" >&2
+    echo "FAIL .trivyignore has a line that is not a comment or '<advisory-id> exp:<date>':"$'\n'"$trivy_bad" >&2
     failures=$((failures + 1))
   elif ((trivy_entries == 0)); then
     echo "FAIL .trivyignore has no triaged entries" >&2
