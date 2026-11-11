@@ -24,6 +24,7 @@ Make project-scoped AI development intuitive without claiming immutability prote
 - Home recovery: local btrbk snapshots. These are not off-machine backups.
 - Updates: automatically fetch and stage approved OS releases, activate on the operator's next reboot.
 - Configuration: start with DMS defaults, then port useful Omarchy ergonomics.
+- Hyprland session: deferred until each variant has its own hardware acceptance record, with NVIDIA UAT on the NVIDIA variant. Omarchy reuse means configuration and ergonomics only, never its Arch package or administration layer. See `docs/research/2026-11-10-hyprland-session-assessment.md`.
 - Desktop migration: wipe only after a verified external backup and explicit installation confirmation.
 
 ## Goals and non-goals
