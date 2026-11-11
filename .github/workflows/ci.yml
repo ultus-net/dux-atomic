@@ -191,8 +191,10 @@ jobs:
           retention-days: 3
           compression-level: 0
 
-  # The only job with write token and OIDC identity. It runs no repository code:
-  # it loads the artifact built above and runs the workflow's own commands.
+  # The only job with write token and OIDC identity. It checks out the repository
+  # for the shared package installer and never builds image content: it loads the
+  # artifact built above and pushes it. Run 43082564852 failed this job with exit
+  # 127 because the install step ran with no checkout present (#52).
   publish:
     needs: image
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish || inputs.promote)
@@ -206,6 +208,12 @@ jobs:
       packages: write
       id-token: write
     steps:
+      # The write token is not left in the workspace: the install step needs the
+      # repository only to run the shared package helper (#52).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Download image
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -424,6 +432,12 @@ jobs:
       contents: read
       packages: write
     steps:
+      # Run 43082564852 never reached this job; the same missing checkout failed
+      # publish first. Promotion installs through the shared helper too (#52).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Install skopeo
         run: build/install-packages.sh skopeo
 
