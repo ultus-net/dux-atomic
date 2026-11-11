@@ -223,7 +223,14 @@ common=$repo_root/build/common.sh
 if ! grep -qF 'wait_for "DUX_USER:${test_user}"' "$boot_smoke" ||
    ! grep -qF "wait_for 'DUX_PROBE_END:ok'" "$boot_smoke" ||
    ! grep -qF "wait_for 'DUX_DIAG_END:ok'" "$boot_smoke" ||
-   ! grep -qF 'if ! wait_for "${test_user}@" 60' "$boot_smoke" ||
+   ! awk '
+      /^serial_login\(\) \{/ { in_fn = 1; next }
+      in_fn && /^\}/ { exit }
+      in_fn && /if ! wait_for "\$\{test_user\}@" 60; then/ { wait = 1 }
+      in_fn && /echo "login failed: no shell prompt for \$\{test_user\}" >&2/ { msg = 1 }
+      msg && /return 1/ { ret = 1 }
+      END { exit !(wait && msg && ret) }
+    ' "$boot_smoke" ||
    ! grep -qF 'DUX_SETUP_MARKER' "$boot_smoke" ||
    grep -qF 'wait_for "${test_user}@" 60 || true' "$boot_smoke" ||
    grep -qF "wait_for 'DUX_DIAG_END'" "$boot_smoke" ||
