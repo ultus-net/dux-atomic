@@ -31,8 +31,10 @@ mirrors=${APT_MIRRORS_FILE:-/etc/apt/apt-mirrors.txt}
 budget=300
 deadline=$((SECONDS + budget))
 
-# Comment out the Azure entry only. The rest of the list stays usable, and a
-# list without that entry is left alone.
+# Comment out the Azure entry only. The call is idempotent, the rest of the
+# list stays usable, and a list without that entry is left alone. Never remove
+# another entry: `install` failures also rotate, and dropping
+# archive.ubuntu.com as well would leave the security mirror alone.
 deprioritise_azure_mirror() {
   local file=$1
   [[ -f $file ]] || return 0
@@ -59,9 +61,7 @@ apt_retry() {
     fi
     echo "apt-get $* failed on attempt ${attempt} of 3" >&2
     ((attempt < 3)) || return 1
-    if [[ $1 == update ]]; then
-      deprioritise_azure_mirror "$mirrors"
-    fi
+    deprioritise_azure_mirror "$mirrors"
     sleep 15
   done
   return 1
