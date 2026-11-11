@@ -205,6 +205,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
+      attestations: write
     steps:
       - name: Download image
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -330,6 +331,20 @@ jobs:
           digest=$(cat "$RUNNER_TEMP/digest")
           with_log "$RUNNER_TEMP/attest.log" retry cosign attest --yes --predicate sbom/dux-atomic.spdx.json --type spdxjson "$IMAGE@$digest"
 
+      - name: Attest build provenance
+        # The SBOM attestation says what is inside the image, not who built it.
+        # This binds the pushed digest to this workflow run, so a verifier can
+        # tell the image came from ci.yml on main and not from a rebuild
+        # elsewhere. Storage records stay off, which keeps
+        # `artifact-metadata: write` out of this job.
+        timeout-minutes: 10
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+          create-storage-record: false
+
       - name: Upload publish logs
         # A step that times out keeps no log, so the files upload whatever the
         # outcome. A missing file is not a failure: a step can die before it
@@ -401,6 +416,23 @@ jobs:
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             "$IMAGE@$DIGEST" >"$RUNNER_TEMP/verify-attestation.log" || status=$?
           timeout 10 head -c 20000 "$RUNNER_TEMP/verify-attestation.log" || true
+          exit "$status"
+
+      - name: Verify the provenance
+        # Provenance is read from the registry copy, so verification does not
+        # depend on the attestations API. Pinning the signer workflow rejects an
+        # attestation from any other workflow or repository.
+        timeout-minutes: 8
+        env:
+          DIGEST: ${{ needs.publish.outputs.digest }}
+        run: |
+          status=0
+          timeout --kill-after=10 180 gh attestation verify "oci://$IMAGE@$DIGEST" \
+            --repo ultus-net/dux-atomic \
+            --bundle-from-oci \
+            --signer-workflow ultus-net/dux-atomic/.github/workflows/ci.yml \
+            >"$RUNNER_TEMP/verify-provenance.log" 2>&1 || status=$?
+          timeout 10 head -c 20000 "$RUNNER_TEMP/verify-provenance.log" || true
           exit "$status"
 
       - name: Upload verify logs
