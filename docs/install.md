@@ -79,13 +79,13 @@ Install-time provisioning needs a builder-produced artifact. A legacy `bootc-ima
 
 `cryptsetup` ships, but no encrypted install has been tested here. Upstream recommends setting up encryption independently of bootc, then pointing `bootc install to-filesystem` at the mounted filesystem. It explicitly does not recommend `bootc install to-disk --block-setup tpm2-luks` for new deployments. The legacy Anaconda ISO is the path upstream documents for LUKS during install.
 
-The laptop's encryption preflight is therefore not satisfied by the recommended to-disk command. Whether the shipped initramfs unlocks a LUKS root is unconfirmed, and `--block-setup tpm2-luks` is unconfirmed on this image. Gate: do not wipe the laptop until an encrypted install has been run and recorded.
+The laptop's encryption preflight is therefore not satisfied by the recommended to-disk command. Whether the shipped initramfs unlocks a LUKS root is unconfirmed, and `--block-setup tpm2-luks` is unconfirmed on this image. Gate: do not wipe the laptop until an encrypted install has been run and recorded. The three options, what each one's install test would prove, and what would settle the choice are in [Disk encryption and Secure Boot policy](research/2026-11-12-luks-secureboot-policy.md) (#54).
 
 ## Secure Boot
 
 The SBOM carries `shim-x64`, `shim-ia32`, and `grub2-efi-x64`, so the image contains Fedora's signed boot chain. No boot with Secure Boot enabled has been recorded on either target. The laptop's firmware state is unknown (`docs/superpowers/specs/2026-11-09-dux-atomic-design.md:78`), and this page does not assume the installed system boots with it on. Gate: record the firmware setting before wiping. If it is on, verify the Fedora shim is trusted, or turn Secure Boot off for the install and record that decision.
 
-The desktop has Secure Boot disabled today (`docs/superpowers/specs/2026-11-09-dux-atomic-design.md:73`). The NVIDIA variant's modules are unsigned, so that machine needs Secure Boot off or a signing path, which [#40](https://github.com/ultus-net/dux-atomic/issues/40) covers.
+The desktop has Secure Boot disabled today (`docs/superpowers/specs/2026-11-09-dux-atomic-design.md:73`). The NVIDIA variant's modules are unsigned, so that machine needs Secure Boot off or a signing path, which [#40](https://github.com/ultus-net/dux-atomic/issues/40) covers. The policy options and what each one's install test would prove are in [Disk encryption and Secure Boot policy](research/2026-11-12-luks-secureboot-policy.md) (#54).
 
 ## The desktop
 
