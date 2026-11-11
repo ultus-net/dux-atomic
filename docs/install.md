@@ -56,7 +56,7 @@ sudo podman run --rm --privileged \
   --type iso --rootfs btrfs --output /output
 ```
 
-The build writes an installer ISO under `output`. The ISO is an Anaconda installer, so it can create the first account and set up LUKS during the install. Neither has been exercised on this image.
+The build writes an installer ISO under `output`. Anaconda supports creating the first account and setting up LUKS during the install, but neither has been exercised on this image.
 
 ## The first account
 
