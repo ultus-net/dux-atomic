@@ -368,7 +368,9 @@ elif [[ $(grep -cF 'head -c 20000' <<<"$verify_block") -lt 2 ]] ||
      ! grep -qE 'name: verify-logs$' <<<"$verify_block"; then
   echo "FAIL the verify job does not keep cosign's payload out of the step log, or does not upload the logs on every outcome" >&2
   failures=$((failures + 1))
-elif ! awk '
+elif [[ $(grep -cF -- '- name: Verify the signature' <<<"$verify_block") -ne 1 ]] ||
+     [[ $(grep -cF -- '- name: Verify the attestation' <<<"$verify_block") -ne 1 ]] ||
+     ! awk '
       BEGIN { want="exit \"$status\"" }
       /^[[:space:]]*- name: Verify (the signature|the attestation)$/ {
         if (in_step && last != want) bad=1
