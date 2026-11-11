@@ -280,19 +280,23 @@ workflow=$repo_root/.github/workflows/ci.yml
 
 # A DNS or mirror blip on a hosted runner must not fail a release. Run
 # 43033654470 spent 67 minutes in the package install before apt reported
-# "Temporary failure resolving", and publish, verify and promote never ran. The
-# step retries a bounded number of times and lets apt retry each fetch itself.
-if ! grep -qF 'timeout 600 sudo env DEBIAN_FRONTEND=noninteractive' "$workflow" ||
-   ! grep -qF 'apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30' "$workflow" ||
-   ! grep -qF 'for attempt in 1 2 3; do' "$workflow" ||
-   ! grep -qF 'retrying in 15s' "$workflow" ||
-   ! grep -qF 'apt_retry update' "$workflow" ||
-   ! grep -qF 'apt_retry install -y podman qemu-system-x86 qemu-utils ovmf' "$workflow" ||
-   grep -qF 'sudo apt-get install -y podman qemu-system-x86 qemu-utils ovmf' "$workflow"; then
-  echo "FAIL ci.yml installs the runner packages without a bounded retry for a transient apt failure" >&2
+# "Temporary failure resolving", and publish, verify and promote never ran.
+# Every job installs through the bounded helper, and no bare apt-get remains.
+installer=$repo_root/build/install-packages.sh
+if [[ ! -x $installer ]] ||
+   ! grep -qF 'timeout 600 sudo env DEBIAN_FRONTEND=noninteractive' "$installer" ||
+   ! grep -qF 'apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30' "$installer" ||
+   ! grep -qF 'for attempt in 1 2 3; do' "$installer" ||
+   ! grep -qF 'retrying in 15s' "$installer" ||
+   ! grep -qF 'apt_retry install -y "$@"' "$installer" ||
+   ! grep -qF 'build/install-packages.sh podman qemu-system-x86 qemu-utils ovmf' "$workflow" ||
+   ! grep -qF 'build/install-packages.sh podman skopeo' "$workflow" ||
+   ! grep -qF 'build/install-packages.sh skopeo' "$workflow" ||
+   grep -qF 'apt-get install' "$workflow"; then
+  echo "FAIL ci.yml installs runner packages without the bounded retry helper" >&2
   failures=$((failures + 1))
 else
-  echo "ok   the runner package install retries a transient apt failure"
+  echo "ok   the runner package installs retry a transient apt failure"
 fi
 
 if ! grep -qF 'retry cosign sign --yes "$IMAGE@$digest"' "$workflow" ||

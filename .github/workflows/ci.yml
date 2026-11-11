@@ -48,9 +48,7 @@ jobs:
           persist-credentials: false
 
       - name: Install podman and skopeo
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y podman skopeo
+        run: build/install-packages.sh podman skopeo
 
       # Key-based signing needs the legacy .sig attachment format. containers/image
       # cannot read the cosign v3 bundle format yet (container-libs#388), so this
@@ -88,27 +86,7 @@ jobs:
           swap-storage: true
 
       - name: Install podman and qemu
-        # A transient DNS or mirror failure on a hosted runner must not red a
-        # release: run 43033654470 spent 67 minutes here before apt reported
-        # "Temporary failure resolving". Retry at most three times, cap each
-        # attempt, and let apt retry each fetch itself.
-        run: |
-          set -euo pipefail
-          apt_retry() {
-            local attempt
-            for attempt in 1 2 3; do
-              if timeout 600 sudo env DEBIAN_FRONTEND=noninteractive \
-                  apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 \
-                  -o Acquire::https::Timeout=30 "$@"; then
-                return 0
-              fi
-              echo "apt-get $* failed on attempt ${attempt} of 3; retrying in 15s" >&2
-              sleep 15
-            done
-            return 1
-          }
-          apt_retry update
-          apt_retry install -y podman qemu-system-x86 qemu-utils ovmf
+        run: build/install-packages.sh podman qemu-system-x86 qemu-utils ovmf
 
       - name: Build image
         run: podman build --layers -t localhost/dux-atomic:ci .
@@ -237,9 +215,7 @@ jobs:
           path: sbom
 
       - name: Install podman and skopeo
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y podman skopeo
+        run: build/install-packages.sh podman skopeo
 
       - name: Log in to GHCR
         uses: redhat-actions/podman-login@50c2d9a331bb67c8fdab99b86455fad05e2e3252 # v2.0
@@ -445,9 +421,7 @@ jobs:
       packages: write
     steps:
       - name: Install skopeo
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y skopeo
+        run: build/install-packages.sh skopeo
 
       - name: Log in to GHCR
         uses: redhat-actions/podman-login@50c2d9a331bb67c8fdab99b86455fad05e2e3252 # v2.0
