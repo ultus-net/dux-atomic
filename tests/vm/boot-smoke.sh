@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Boot the candidate qcow2 under QEMU, wait for the greeter, then log in.
 #
-# Needs qemu-system-x86_64 and edk2-ovmf. The image writes kernel and systemd
-# output to ttyS0 through overlay/usr/lib/bootc/kargs.d/, and this script keeps
-# that console bidirectional: it captures the log and types into it.
+# Needs qemu-system-x86_64 and edk2-ovmf. The test disk appends
+# console=ttyS0,115200 through tests/vm/make-disk.sh's kernel customisation, and
+# this script keeps that console bidirectional: it captures the log and types
+# into it.
 #
 # virtio-gpu exposes a DRM render node, so the greeter session starts even
 # without host GL. That does not prove it painted. Set VIRTIO_GL=1 on a host
@@ -82,7 +83,9 @@ else
 fi
 
 # KVM where available; TCG on a hosted runner without /dev/kvm. TCG is slow,
-# so raise BOOT_TIMEOUT for a hosted run.
+# so raise BOOT_TIMEOUT for a hosted run. Run 43068532421 measured 275s of guest
+# time at roughly 4.6x wall-clock slowdown, so a hosted boot needs the better
+# part of half an hour before the login prompt appears.
 accel=${QEMU_ACCEL:-kvm}
 if [[ $accel == kvm && ! -e /dev/kvm ]]; then
   echo "no /dev/kvm; falling back to TCG" >&2
@@ -145,7 +148,11 @@ serial_write() {
 }
 
 serial_login() {
-  if ! wait_for 'login: *$' "$timeout_s"; then
+  # Match the hostname-prefixed prompt, not an end-of-line anchor. Run
+  # 43068532421 showed the console write the prompt and a kernel message on one
+  # line: "fedora login: [  275.126011] clocksource: Watchdog ...". An anchor
+  # at `$` never matched it and the login stage waited out its whole budget.
+  if ! wait_for '^[A-Za-z0-9._-]+ login: ' "$timeout_s"; then
     echo "login failed: no getty prompt on the serial console" >&2
     return 1
   fi
@@ -157,7 +164,9 @@ serial_login() {
   serial_write "$test_password"
   # Wait for the login shell's prompt instead of a fixed sleep. A missing
   # prompt means the login failed, so do not send probes into an unknown state.
-  if ! wait_for "${test_user}@" 20; then
+  # The per-user manager start can outlast 20s under TCG; run 42997688206
+  # missed the prompt by 0.4s, so allow 60s before treating the login as failed.
+  if ! wait_for "${test_user}@" 60; then
     echo "login failed: no shell prompt for ${test_user}" >&2
     return 1
   fi

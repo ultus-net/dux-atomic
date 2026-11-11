@@ -11,6 +11,19 @@ tests/vm/boot-smoke.sh
 
 `make-disk.sh` runs bootc-image-builder as root. The builder image is pinned by digest so a moving `:latest` cannot change the disk; override the pin with `BIB_IMAGE`. It adds one test account (`dux` / `dux-test` by default, override with `TEST_USER` and `TEST_PASSWORD`, skip with `NO_TEST_USER=1`) because the image ships no interactive user. Credentials reject quotes, backslashes, and newlines, which would break the generated TOML. It also sets `systemd.default_device_timeout_sec=180` on the test disk only: a TCG boot can run at half speed and miss the shipped 45s device timeout before `/boot` appears.
 
+### A promoted digest
+
+Test the digest the registry promoted, not the tag, because the tag can move between the pull and the boot:
+
+```bash
+digest=$(skopeo inspect docker://ghcr.io/ultus-net/dux-atomic:latest --format '{{.Digest}}')
+sudo podman pull ghcr.io/ultus-net/dux-atomic@"$digest"
+rm -rf output
+sudo tests/vm/make-disk.sh ghcr.io/ultus-net/dux-atomic@"$digest" output
+```
+
+`make-disk.sh` refuses an image that is not in rootful podman storage, hence the explicit pull. The `skopeo inspect` call is the same one the promotion record uses, so this digest matches the recorded one. `output/` holds only bootc-image-builder output and is gitignored, and `make-disk.sh` does not clear it, so `rm -rf output` drops an earlier candidate's disk that later commands on this page would otherwise boot.
+
 `boot-smoke.sh` boots the qcow2 headless, asserts that `greetd` starts, treats the greeter session line on the serial console as the fast signal, warns when `graphical.target` is not reported, then logs in as that account and asserts the live greeter session through `loginctl`. When the login probe finds no greeter session, it prints process wait channels, the `greetd` unit state, sessions, the `/dev/dri` entries, and failed units to the console, because the unprivileged test account cannot read the journal. It then starts the two first-login units the way `graphical-session-pre.target` does, and checks the niri config, the DMS binds, the dark session seed, the per-user `dms.service` link, the image-level `niri.service` binding, the preset enablement, and the greeter seed.
 
 ```bash
@@ -39,6 +52,14 @@ qemu-system-x86_64 -machine q35,accel=kvm -cpu host -m 4096 -smp 2 -snapshot \
 
 Log in with the test account (`dux` / `dux-test` by default). The DMS bar, the dark background, and the DMS keybinds come from the first-login setup described in [First login](first-login.md).
 
+`.vm/dogfood_login.py` drives that login and asserts the session instead of leaving it to the eye:
+
+```bash
+DOGFOOD_PROBE=7 python3 .vm/dogfood_login.py .vm/dogfood-7 output/qcow2/disk.qcow2
+```
+
+Probe 7 logs in on the serial console, clicks through the greeter's user picker, types the password, then polls `niri.service` and `dms.service` as the user. It exits 0 only when both report `active`, and it writes screenshots to the run directory, so give each candidate its own directory. The driver is local and untracked: `.gitignore` excludes `.vm/`, so a fresh clone has the procedure but not the driver.
+
 The image disables Plymouth (`plymouth.enable=0`), so both the VM and real hardware show the text boot instead of a splash.
 
 ## Signing policy tests
@@ -51,4 +72,4 @@ tests/test-signing.sh
 
 ## CI boot test
 
-GitHub-hosted runners have no `/dev/kvm`, so the boot test runs on QEMU TCG and is headless: it asserts the greeter session and the first-login units, not rendered pixels. The guest still gets a DRM render node from virtio-gpu. The workflow gives the boot 900s and `greetd` 300s to start, and `make-disk.sh` raises the test disk's device timeout to 180s because TCG throughput varies run to run. Run the graphical dogfood locally before promotion. See [CI](ci.md).
+GitHub-hosted runners have no `/dev/kvm`, so the boot test runs on QEMU TCG and is headless: it asserts the greeter session and the first-login units, not rendered pixels. The guest still gets a DRM render node from virtio-gpu. The workflow gives the boot 900s, `greetd` 300s, and the login shell prompt at least 60s to appear, and `make-disk.sh` raises the test disk's device timeout to 180s because TCG throughput varies run to run. Run the graphical dogfood locally before promotion. See [CI](ci.md).

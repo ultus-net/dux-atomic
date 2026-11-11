@@ -217,15 +217,35 @@ if ((condition_failed == 0)); then
 fi
 
 # A regression here is silent: waiting on the echoed command instead of the
-# printf output lets the probe pass before it runs.
+# printf output lets the probe pass before it runs. The login prompt must also
+# not be anchored to end of line: a kernel message can land on the prompt's line
+# (#50). Run 43068532421 printed "fedora login: [ 275.126011] clocksource: ..."
+# and the old end-anchored pattern missed it, burning the whole login budget.
 boot_smoke=$repo_root/tests/vm/boot-smoke.sh
 common=$repo_root/build/common.sh
 if ! grep -qF 'wait_for "DUX_USER:${test_user}"' "$boot_smoke" ||
    ! grep -qF "wait_for 'DUX_PROBE_END:ok'" "$boot_smoke" ||
    ! grep -qF "wait_for 'DUX_DIAG_END:ok'" "$boot_smoke" ||
-   ! grep -qF 'if ! wait_for "${test_user}@" 20' "$boot_smoke" ||
+   ! grep -qF "wait_for '^[A-Za-z0-9._-]+ login: '" "$boot_smoke" ||
+   grep -qF "wait_for 'login: *\$'" "$boot_smoke" ||
+   ! awk '
+      # The operator chose to accept any window of 60s or more (#36), so a
+      # later raise does not red the gate. The wait must still be the prompt
+      # wait in serial_login and must still fail the login.
+      /^serial_login\(\) \{/ { in_fn = 1; next }
+      in_fn && /^\}/ { exit }
+      in_fn && /if[[:space:]]+![[:space:]]+wait_for[[:space:]]+"\$\{test_user\}@"[[:space:]]+[0-9]+;[[:space:]]*then/ {
+        n = $0
+        sub(/.*@[}"]/, "", n)
+        sub(/; then.*/, "", n)
+        wait = (n + 0 >= 60)
+      }
+      in_fn && /echo "login failed: no shell prompt for \$\{test_user\}" >&2/ { msg = 1 }
+      msg && /return 1/ { ret = 1 }
+      END { exit !(wait && msg && ret) }
+    ' "$boot_smoke" ||
    ! grep -qF 'DUX_SETUP_MARKER' "$boot_smoke" ||
-   grep -qF 'wait_for "${test_user}@" 20 || true' "$boot_smoke" ||
+   grep -qE 'wait_for "\$\{test_user\}@" [0-9]+ \|\| true' "$boot_smoke" ||
    grep -qF "wait_for 'DUX_DIAG_END'" "$boot_smoke" ||
    grep -qF "wait_for 'DUX_PROBE_END'" "$boot_smoke"; then
   echo "FAIL boot-smoke waits on an echoed marker instead of printf output" >&2
@@ -241,7 +261,110 @@ else
   echo "ok   the vm login probes and greeter mask fail closed"
 fi
 
+# A hosted TCG boot reached the login prompt after 21 minutes in run 43068532421
+# (#50), so the login wait must consume BOOT_TIMEOUT and CI must budget for it.
+# Lowering either brings back a red release for a slow runner, not a broken image.
+ci_workflow=$repo_root/.github/workflows/ci.yml
+if ! grep -qF "login: ' \"\$timeout_s\"" "$boot_smoke" ||
+   ! awk '
+      # Scope to the boot step: a BOOT_TIMEOUT on another job or step must not
+      # satisfy this. The env block follows the step name, and the next
+      # "- name:" ends the step.
+      /^[[:space:]]*- name: Boot smoke test[[:space:]]*$/ { step = 1; next }
+      step && /^[[:space:]]*- name: / { step = 0 }
+      step && /^[[:space:]]+BOOT_TIMEOUT: / {
+        v = $0; gsub(/[^0-9]/, "", v)
+        if (v + 0 >= 1800) ok = 1
+        step = 0
+      }
+      END { exit !ok }
+    ' "$ci_workflow"; then
+  echo "FAIL ci.yml budgets less than 1800s for the hosted boot, or boot-smoke does not spend BOOT_TIMEOUT on the login prompt" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the hosted boot budget covers a slow TCG login"
+fi
+
+# The serial console is a test-only karg (#39): in the overlay it puts a serial
+# getty on hardware with no serial port. make-disk.sh appends it on the test
+# disk, through the same [customizations.kernel] line as the device timeout.
+overlay=$repo_root/overlay
+make_disk=$repo_root/tests/vm/make-disk.sh
+if grep -rqF 'console=ttyS0' "$overlay"; then
+  echo "FAIL overlay/ ships console=ttyS0; the serial console karg belongs on the test disk only" >&2
+  failures=$((failures + 1))
+elif ! awk '
+      # The karg belongs on the test disk only, so it must sit on the single
+      # [customizations.kernel] append line that boot-smoke.sh boots with (#39).
+      /append = "/ { n++; if (index($0, "console=ttyS0,115200")) karg = 1 }
+      END { exit !(n == 1 && karg) }
+    ' "$make_disk"; then
+  echo "FAIL tests/vm/make-disk.sh does not append console=ttyS0,115200 as the test disk's single kernel append" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the serial console karg comes from the test disk only"
+fi
+
 workflow=$repo_root/.github/workflows/ci.yml
+
+# A DNS or mirror blip on a hosted runner must not fail a release. Run
+# 43033654470 spent 67 minutes in the package install before apt reported
+# "Temporary failure resolving", and publish, verify and promote never ran.
+# Every job installs through the bounded helper, and no bare apt-get remains.
+# apt must also fail over off the Azure mirror: run 43052107613 spent the whole
+# budget on Ign: lines for azure.archive.ubuntu.com and never reached
+# archive.ubuntu.com, the second entry in the runner's mirror list.
+installer=$repo_root/build/install-packages.sh
+if [[ ! -x $installer ]] ||
+   ! grep -qF 'budget=300' "$installer" ||
+   ! grep -qF 'deadline=$((SECONDS + budget))' "$installer" ||
+   ! grep -qF 'cap=$((deadline - SECONDS))' "$installer" ||
+   ! grep -qF 'timeout "$cap" sudo env DEBIAN_FRONTEND=noninteractive' "$installer" ||
+   ! grep -qF 'apt-get -o Acquire::Retries=1 -o Acquire::Retries::Delay=false' "$installer" ||
+   ! grep -qF 'for attempt in 1 2 3; do' "$installer" ||
+   ! grep -qF 'deprioritise_azure_mirror "$mirrors"' "$installer" ||
+   ! grep -qF 'apt_retry install -y "$@"' "$installer" ||
+   ! grep -qF 'build/install-packages.sh podman qemu-system-x86 qemu-utils ovmf' "$workflow" ||
+   ! grep -qF 'build/install-packages.sh podman skopeo' "$workflow" ||
+   ! grep -qF 'build/install-packages.sh skopeo' "$workflow" ||
+   grep -qF 'apt-get install' "$workflow"; then
+  echo "FAIL ci.yml installs runner packages without the bounded retry helper" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the runner package installs retry a transient apt failure"
+fi
+
+# A job that runs the helper needs the repository in its workspace. Run
+# 43082564852 failed publish with exit 127 because the install step ran with no
+# checkout, and promote would have failed the same way one job later (#52).
+# The checkout must also come first: a checkout after the install is too late.
+if ! awk '
+   /^jobs:$/ { injobs = 1; next }
+   injobs && /^[^ ]/ { injobs = 0 }
+   injobs && /^  [A-Za-z_][A-Za-z0-9_-]*:$/ {
+     job = $0
+     sub(/^  /, "", job)
+     sub(/:$/, "", job)
+     checkout = 0
+     next
+   }
+   job != "" && /^[[:space:]]*(- )?uses: actions\/checkout@/ { checkout = 1 }
+   job != "" && /build\/install-packages\.sh/ && !checkout {
+     bad = bad (bad == "" ? "" : " ") job
+   }
+   END {
+     if (bad != "") {
+       printf "jobs run build/install-packages.sh with no checkout before it: %s\n", bad
+       exit 1
+     }
+   }
+ ' "$workflow"; then
+  echo "FAIL a ci.yml job runs the package installer without a checkout before it" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   every job that runs the package installer checks out the repo first"
+fi
+
 if ! grep -qF 'retry cosign sign --yes "$IMAGE@$digest"' "$workflow" ||
    ! grep -qF 'retry cosign attest --yes' "$workflow" ||
    ! grep -qF 'attempt >= max' "$workflow" ||
