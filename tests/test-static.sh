@@ -341,7 +341,7 @@ fi
 if ! awk '
    /^jobs:$/ { injobs = 1; next }
    injobs && /^[^ ]/ { injobs = 0 }
-   injobs && /^  [A-Za-z0-9_-]+:$/ {
+   injobs && /^  [A-Za-z_][A-Za-z0-9_-]*:$/ {
      job = $0
      sub(/^  /, "", job)
      sub(/:$/, "", job)
