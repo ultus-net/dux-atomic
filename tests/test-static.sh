@@ -313,6 +313,34 @@ else
   echo "ok   the signing job pins its actions, holds no write token, and is shellchecked"
 fi
 
+# A hang must name its own step. Each signing step holds one command, verify
+# holds its two calls under one bound, and every one carries its own bound and
+# sources the helper file the first step writes; the logs
+# upload on every outcome, because a timed-out step keeps no log of its own.
+split_ok=1
+for spec in 'Sign the digest:15' 'Attest the SBOM:15' 'Verify the signature and attestation:12'; do
+  step=${spec%%:*}
+  bound=${spec##*:}
+  if ! awk -v step="- name: ${step}" -v bound="timeout-minutes: ${bound}" \
+       'index($0, step){found=1; next} found && index($0, bound){ok=1; exit} found && /- name:/{exit} END{exit !ok}' \
+       "$workflow"; then
+    echo "FAIL ci.yml does not bound '${step}' at ${bound} minutes" >&2
+    failures=$((failures + 1))
+    split_ok=0
+  fi
+done
+if ((split_ok == 1)); then
+  echo "ok   sign, attest, and verify each carry their own bound"
+fi
+if ! awk '/- name: Upload publish logs/{found=1; next} found && /if: always\(\)/{ok=1; exit} found && /- name:/{exit} END{exit !ok}' "$workflow" ||
+   ! grep -qF 'path: ${{ runner.temp }}/*.log' "$workflow" ||
+   [[ $(grep -cF 'source "$RUNNER_TEMP/helpers.sh"' "$workflow") -lt 4 ]]; then
+  echo "FAIL the publish logs do not upload on every outcome, or a signing step does not source the helpers" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the publish logs upload on every outcome and the steps source the helpers"
+fi
+
 # Run the helper itself with scaled constants: greps cannot show that a hang is
 # cut, and the helper is the only thing that stops a stall eating the job.
 retry_root=$(mktemp -d)
@@ -416,6 +444,34 @@ elif ! grep -qF 'jq -c -f build/sbom-packages-only.jq' "$workflow" ||
   failures=$((failures + 1))
 else
   echo "ok   the SBOM filter drops files and their relationships"
+fi
+
+# A report-only scan hides a new finding, and an ignore entry without an expiry
+# hides it forever. Both are regressions the run would otherwise not show.
+trivyignore=$repo_root/.trivyignore
+if [[ ! -f $trivyignore ]]; then
+  echo "FAIL .trivyignore is missing" >&2
+  failures=$((failures + 1))
+else
+  trivy_entries=$(grep -cE '^(CVE-[0-9]{4}-[0-9]+|GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}) ' "$trivyignore" || true)
+  trivy_bad=$(grep -nEv '^[[:space:]]*(#.*)?$|^(CVE-[0-9]{4}-[0-9]+|GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}) exp:[0-9]{4}-[0-9]{2}-[0-9]{2}$' "$trivyignore" || true)
+  if [[ -n $trivy_bad ]]; then
+    echo "FAIL .trivyignore has a line that is not a comment or '<advisory-id> exp:<date>':"$'\n'"$trivy_bad" >&2
+    failures=$((failures + 1))
+  elif ((trivy_entries == 0)); then
+    echo "FAIL .trivyignore has no triaged entries" >&2
+    failures=$((failures + 1))
+  elif ! grep -qF -- '--exit-code 1' "$workflow" ||
+       grep -qF 'continue-on-error: true' "$workflow" ||
+       ! grep -qF -- '--ignorefile .trivyignore' "$workflow"; then
+    echo "FAIL the vulnerability scan does not fail on a new finding or read .trivyignore" >&2
+    failures=$((failures + 1))
+  elif ! awk '/- name: Upload scan report/{found=1; next} found && /if: always\(\)/{ok=1; exit} found && /- name:/{exit} END{exit !ok}' "$workflow"; then
+    echo "FAIL the scan-report upload does not run on failure" >&2
+    failures=$((failures + 1))
+  else
+    echo "ok   the trivy scan is blocking, reads expiring ignores, and keeps the report on failure"
+  fi
 fi
 
 if ((failures > 0)); then
