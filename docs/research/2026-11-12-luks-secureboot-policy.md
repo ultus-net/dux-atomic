@@ -37,7 +37,10 @@ recorded.
 
 ## The three options
 
-| Option | What it costs | What an install test proves | What it leaves unproven |
+The proves column describes a test of that option once it exists. This repo runs
+neither option 2 nor option 3 today, so no part of either has been observed.
+
+| Option | What it costs | What a test of that option would prove | What it leaves unproven |
 | --- | --- | --- | --- |
 | 1. No encryption | Nothing changes from today's command | The install, boot, greeter, and account path already covered | Every LUKS and TPM2 claim. Data at rest is unprotected. |
 | 2. LUKS with TPM2 unlock plus a recovery key | A separate `/boot`, a TPM2 enrolment, a recovery key stored off the machine, re-enrolment after any change that moves the bound PCRs | Automatic unlock on that machine, and the recovery key unlocking when the TPM is absent | The install path cannot produce it today ([#421], [#477], [#1329]), so it needs a pre-step this repo does not have. |
@@ -81,11 +84,12 @@ certificate databases change [S8]. A firmware update or a Secure Boot toggle can
 therefore make a PCR-7-bound key stop unsealing, which is why the recovery key is
 not optional.
 
-A test of this option would prove automatic unlock on the target, the recovery
-key unlocking with the TPM absent, and `/boot` staying unencrypted by design. It
-needs a pre-step that partitions the disk, runs `cryptsetup luksFormat`, enrols
-with `systemd-cryptenroll --tpm2-device=auto --recovery-key`, mounts the result,
-and then runs `bootc install to-filesystem`. Nothing in this repo does that, and
+A test of this option would prove, once the pre-step exists, automatic unlock on
+the target, the recovery key unlocking with the TPM absent, and `/boot` staying
+unencrypted by design. The pre-step itself does not exist: it has to partition
+the disk, run `cryptsetup luksFormat`, enrol with
+`systemd-cryptenroll --tpm2-device=auto --recovery-key`, mount the result, and
+then run `bootc install to-filesystem`. Nothing in this repo does that, and
 `tests/vm/make-disk.sh:82` builds an unencrypted qcow2 [S9].
 
 ### Option 3: LUKS with a passphrase
@@ -130,10 +134,10 @@ this image [S2], so it does not rescue the recommended to-disk path.
 
 ## Secure Boot
 
-One command reports the state. `bootctl status` prints a `Secure Boot:` line and
-a `TPM2 Support:` line, and the man page example shows
-`Secure Boot: disabled (setup)` [S12]. `mokutil --sb-state` prints the Secure
-Boot state alone [S13].
+One command reports the state: `bootctl status`, which prints a `Secure Boot:`
+line and a `TPM2 Support:` line, and whose man page example shows
+`Secure Boot: disabled (setup)` [S12]. `mokutil --sb-state` is the narrower
+alternative when only the Secure Boot state is wanted [S13].
 
 The image carries Fedora's `shim-x64`, `shim-ia32`, and `grub2-efi-x64` [S2], so
 a Secure Boot machine should accept the signed boot chain and signed kernel.
@@ -206,7 +210,10 @@ carry over to options 2 or 3, and it should not be cited as evidence for them.
 - [S3] bootc issue #421, "install to-disk with LUKS + TPM broken", updated
   2026-07-10: <https://github.com/bootc-dev/bootc/issues/421>
 - [S4] bootc issues #476, #477, #1329 (open) and #2089 (closed):
-  <https://github.com/bootc-dev/bootc/issues/476>, `/477`, `/1329`, `/2089`.
+  <https://github.com/bootc-dev/bootc/issues/476>,
+  <https://github.com/bootc-dev/bootc/issues/477>,
+  <https://github.com/bootc-dev/bootc/issues/1329>,
+  <https://github.com/bootc-dev/bootc/issues/2089>.
 - [S5] `tests/vm/boot-smoke.sh:34-53` (plain OVMF pairs only), `:99-109` (no TPM
   device), and `.github/workflows/ci.yml:89` (the packages the image job
   installs).
