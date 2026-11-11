@@ -334,6 +334,37 @@ else
   echo "ok   the runner package installs retry a transient apt failure"
 fi
 
+# A job that runs the helper needs the repository in its workspace. Run
+# 43082564852 failed publish with exit 127 because the install step ran with no
+# checkout, and promote would have failed the same way one job later (#52).
+# The checkout must also come first: a checkout after the install is too late.
+if ! awk '
+   /^jobs:$/ { injobs = 1; next }
+   injobs && /^[^ ]/ { injobs = 0 }
+   injobs && /^  [A-Za-z_][A-Za-z0-9_-]*:$/ {
+     job = $0
+     sub(/^  /, "", job)
+     sub(/:$/, "", job)
+     checkout = 0
+     next
+   }
+   job != "" && /^[[:space:]]*(- )?uses: actions\/checkout@/ { checkout = 1 }
+   job != "" && /build\/install-packages\.sh/ && !checkout {
+     bad = bad (bad == "" ? "" : " ") job
+   }
+   END {
+     if (bad != "") {
+       printf "jobs run build/install-packages.sh with no checkout before it: %s\n", bad
+       exit 1
+     }
+   }
+ ' "$workflow"; then
+  echo "FAIL a ci.yml job runs the package installer without a checkout before it" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   every job that runs the package installer checks out the repo first"
+fi
+
 if ! grep -qF 'retry cosign sign --yes "$IMAGE@$digest"' "$workflow" ||
    ! grep -qF 'retry cosign attest --yes' "$workflow" ||
    ! grep -qF 'attempt >= max' "$workflow" ||
