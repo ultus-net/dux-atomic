@@ -35,7 +35,8 @@ at `d0ff8fd`:
 `verify` ran `cosign verify` and `cosign verify-attestation` in their own job
 with `timeout-minutes: 20`, printed bounded prefixes, and uploaded the
 `verify-logs` artifact (892,180 bytes). Run 43006883112, the previous publish,
-uploaded the same artifact at 891,971 bytes.
+uploaded the same artifact at 891,971 bytes. The upload step is `if: always()`,
+so a verify that reds keeps its log as well.
 
 `promote` ran `skopeo copy --preserve-digests` to `:latest` and then asserted
 `skopeo inspect :latest` equals the publish digest. It is gated on both
