@@ -261,6 +261,19 @@ else
   echo "ok   the publish step caps each attempt and each command's retry budget"
 fi
 
+# A descendant that outlives `timeout` keeps the step's stdout pipe open, so
+# every command must write to a file of its own; a pipe-based wrapper would
+# reintroduce the stall it is meant to prevent.
+if ! grep -qF 'with_log "$RUNNER_TEMP/sign.log" retry cosign sign' "$workflow" ||
+   ! grep -qF 'with_log "$RUNNER_TEMP/attest.log" retry cosign attest' "$workflow" ||
+   ! grep -qF 'with_log "$RUNNER_TEMP/verify.log" timeout --kill-after=10 180 cosign verify' "$workflow" ||
+   ! grep -qF 'with_log "$RUNNER_TEMP/verify-attestation.log" timeout --kill-after=10 180 cosign verify-attestation' "$workflow"; then
+  echo "FAIL ci.yml does not run every signing and verification command with its output in a file" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   every signing and verification command writes to its own log file"
+fi
+
 # The failure path must report failure, and the digest notice must come before
 # anything that can stall.
 if ! awk '/failed after .* attempts in /{found=1} found && /return 1/{ok=1} END{exit !ok}' "$workflow"; then
@@ -303,6 +316,34 @@ if bash -c 'source "$1"; retry true' _ "$retry_root/retry.sh" 2>/dev/null; then
 else
   echo "FAIL the retry helper reported failure for a command that succeeded" >&2
   failures=$((failures + 1))
+fi
+
+# with_log must print its command's output and keep its status, or a failed
+# sign would read as success and a stall would show nothing. Assert and run the
+# extracted helper, not the file, so a duplicate literal elsewhere cannot
+# satisfy the check. No fixture can wedge a log read, so a removed `|| true` is
+# caught by the grep; the `bash -e` run catches a dropped status capture,
+# because errexit would abort before the file is printed.
+sed -n '/^          with_log() {/,/^          }$/p' "$workflow" | sed 's/^          //' \
+  >"$retry_root/with_log.sh"
+if ! grep -qF '"$@" >>"$file" 2>&1 || status=$?' "$retry_root/with_log.sh" ||
+   ! grep -qF 'timeout 10 cat "$file" || true' "$retry_root/with_log.sh" ||
+   ! grep -qF 'return "$status"' "$retry_root/with_log.sh"; then
+  echo "FAIL with_log does not ignore a cut read or does not keep its command's status" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   with_log bounds and ignores a cut read and keeps its command's status"
+fi
+logged=$(bash -ec 'source "$1"; with_log "$2" bash -c "echo printed; exit 3"' _ \
+  "$retry_root/with_log.sh" "$retry_root/out.log" 2>&1) && rc=0 || rc=$?
+if ((rc != 3)); then
+  echo "FAIL with_log under bash -e did not keep its command's exit status (got $rc, expected 3)" >&2
+  failures=$((failures + 1))
+elif [[ $logged != *printed* ]]; then
+  echo "FAIL with_log did not print its command's output" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   with_log under bash -e prints its command's output and keeps its failure status"
 fi
 
 # Rekor's public instance rejects the full file inventory, so the filter must
