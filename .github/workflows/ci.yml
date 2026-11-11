@@ -48,9 +48,7 @@ jobs:
           persist-credentials: false
 
       - name: Install podman and skopeo
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y podman skopeo
+        run: build/install-packages.sh podman skopeo
 
       # Key-based signing needs the legacy .sig attachment format. containers/image
       # cannot read the cosign v3 bundle format yet (container-libs#388), so this
@@ -88,9 +86,7 @@ jobs:
           swap-storage: true
 
       - name: Install podman and qemu
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y podman qemu-system-x86 qemu-utils ovmf
+        run: build/install-packages.sh podman qemu-system-x86 qemu-utils ovmf
 
       - name: Build image
         run: podman build --layers -t localhost/dux-atomic:ci .
@@ -219,9 +215,7 @@ jobs:
           path: sbom
 
       - name: Install podman and skopeo
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y podman skopeo
+        run: build/install-packages.sh podman skopeo
 
       - name: Log in to GHCR
         uses: redhat-actions/podman-login@50c2d9a331bb67c8fdab99b86455fad05e2e3252 # v2.0
@@ -427,9 +421,7 @@ jobs:
       packages: write
     steps:
       - name: Install skopeo
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y skopeo
+        run: build/install-packages.sh skopeo
 
       - name: Log in to GHCR
         uses: redhat-actions/podman-login@50c2d9a331bb67c8fdab99b86455fad05e2e3252 # v2.0

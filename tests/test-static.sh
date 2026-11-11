@@ -277,6 +277,34 @@ else
 fi
 
 workflow=$repo_root/.github/workflows/ci.yml
+
+# A DNS or mirror blip on a hosted runner must not fail a release. Run
+# 43033654470 spent 67 minutes in the package install before apt reported
+# "Temporary failure resolving", and publish, verify and promote never ran.
+# Every job installs through the bounded helper, and no bare apt-get remains.
+# apt must also fail over off the Azure mirror: run 43052107613 spent the whole
+# budget on Ign: lines for azure.archive.ubuntu.com and never reached
+# archive.ubuntu.com, the second entry in the runner's mirror list.
+installer=$repo_root/build/install-packages.sh
+if [[ ! -x $installer ]] ||
+   ! grep -qF 'budget=300' "$installer" ||
+   ! grep -qF 'deadline=$((SECONDS + budget))' "$installer" ||
+   ! grep -qF 'cap=$((deadline - SECONDS))' "$installer" ||
+   ! grep -qF 'timeout "$cap" sudo env DEBIAN_FRONTEND=noninteractive' "$installer" ||
+   ! grep -qF 'apt-get -o Acquire::Retries=1 -o Acquire::Retries::Delay=false' "$installer" ||
+   ! grep -qF 'for attempt in 1 2 3; do' "$installer" ||
+   ! grep -qF 'deprioritise_azure_mirror "$mirrors"' "$installer" ||
+   ! grep -qF 'apt_retry install -y "$@"' "$installer" ||
+   ! grep -qF 'build/install-packages.sh podman qemu-system-x86 qemu-utils ovmf' "$workflow" ||
+   ! grep -qF 'build/install-packages.sh podman skopeo' "$workflow" ||
+   ! grep -qF 'build/install-packages.sh skopeo' "$workflow" ||
+   grep -qF 'apt-get install' "$workflow"; then
+  echo "FAIL ci.yml installs runner packages without the bounded retry helper" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the runner package installs retry a transient apt failure"
+fi
+
 if ! grep -qF 'retry cosign sign --yes "$IMAGE@$digest"' "$workflow" ||
    ! grep -qF 'retry cosign attest --yes' "$workflow" ||
    ! grep -qF 'attempt >= max' "$workflow" ||
