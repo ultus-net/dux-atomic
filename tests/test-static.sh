@@ -319,15 +319,25 @@ fi
 
 # Verification reads the registry and the transparency log on its own, and its
 # stall outlived both a command timeout and a step timeout, so only a job bound
-# ends it. It must hold no OIDC identity, and promotion must wait for it.
+# ends it. It must hold no OIDC identity, and promotion must wait for it. The
+# digest crosses the job boundary as a job output, so a lost output or a renamed
+# step id would leave verification with an empty digest.
+publish_block=$(awk '/^  publish:/{f=1;next} f&&/^  [a-z]/{exit} f' "$workflow")
 verify_block=$(awk '/^  verify:/{f=1;next} f&&/^  [a-z]/{exit} f' "$workflow")
 promote_block=$(awk '/^  promote:/{f=1;next} f&&/^  [a-z]/{exit} f' "$workflow")
-if [[ -z $verify_block ]] ||
+if [[ -z $publish_block ]] ||
+   ! grep -qF 'digest: ${{ steps.push.outputs.digest }}' <<<"$publish_block" ||
+   ! grep -qF 'id: push' <<<"$publish_block" ||
+   ! grep -qF 'echo "digest=$(cat "$RUNNER_TEMP/digest")" >> "$GITHUB_OUTPUT"' <<<"$publish_block"; then
+  echo "FAIL the publish job does not export the pushed digest as a job output" >&2
+  failures=$((failures + 1))
+elif [[ -z $verify_block ]] ||
    ! grep -qF 'cosign verify' <<<"$verify_block" ||
    ! grep -qF 'cosign verify-attestation' <<<"$verify_block" ||
    ! grep -qF 'timeout-minutes: 20' <<<"$verify_block" ||
+   [[ $(grep -cF 'DIGEST: ${{ needs.publish.outputs.digest }}' <<<"$verify_block") -lt 2 ]] ||
    grep -qF 'id-token: write' <<<"$verify_block"; then
-  echo "FAIL the verify job is missing, unbounded, or asks for an OIDC identity" >&2
+  echo "FAIL the verify job is missing, unbounded, does not read the publish digest, or asks for an OIDC identity" >&2
   failures=$((failures + 1))
 elif [[ -z $promote_block ]] ||
      ! grep -qF 'needs: [publish, verify]' <<<"$promote_block" ||
