@@ -123,15 +123,19 @@ jobs:
             "$GITHUB_WORKSPACE/.vm/boot.log"
 
       - name: Vulnerability scan
-        # Report only until the Fedora base findings are triaged (#3).
+        # Blocking: .trivyignore holds the triaged duxlabs Go-binary findings
+        # and every entry expires, so a stale ignore reds the scan (#3).
         # A pinned container avoids the action's unpinned setup-trivy dependency.
         run: |
           podman run --rm -v "$PWD:/src:ro" -w /src \
             docker.io/aquasec/trivy:0.76.2@sha256:6fa071ef8daa2e58b90cbf1710bedca91adbb3bf98693533226f442035b836a6 \
             image --input .cache/image.tar --severity CRITICAL,HIGH \
-            --ignore-unfixed --cache-dir /tmp/trivy --format table > trivy-report.txt
+            --ignore-unfixed --ignorefile .trivyignore --exit-code 1 \
+            --cache-dir /tmp/trivy --format table > trivy-report.txt
 
       - name: Upload scan report
+        # Keep the report when the scan is red; it is the failure evidence.
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: trivy-report

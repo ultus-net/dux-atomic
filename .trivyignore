@@ -1,0 +1,47 @@
+# Triaged trivy findings for the image scan (#3).
+# One finding per line, each with an expiry. An expired entry is reported
+# again, so the scan reds and forces a re-triage instead of hiding drift.
+# The owning binary and the fixed upstream version are named per group.
+
+# usr/bin/cosign-linux-amd64 and usr/bin/dms (golang.org/x/net/html, fixed 0.62.0)
+CVE-2026-78661 exp:2027-02-11
+
+# usr/bin/dsearch, duxlabs COPR Go build (Go stdlib and golang.org/x/net)
+CVE-2026-111943 exp:2027-02-11
+CVE-2026-25679 exp:2027-02-11
+CVE-2026-27137 exp:2027-02-11
+CVE-2026-27145 exp:2027-02-11
+CVE-2026-32280 exp:2027-02-11
+CVE-2026-32281 exp:2027-02-11
+CVE-2026-32283 exp:2027-02-11
+CVE-2026-33810 exp:2027-02-11
+CVE-2026-33811 exp:2027-02-11
+CVE-2026-33814 exp:2027-02-11
+CVE-2026-33818 exp:2027-02-11
+CVE-2026-39820 exp:2027-02-11
+CVE-2026-39821 exp:2027-02-11
+CVE-2026-39822 exp:2027-02-11
+CVE-2026-39836 exp:2027-02-11
+CVE-2026-42499 exp:2027-02-11
+CVE-2026-42504 exp:2027-02-11
+CVE-2026-46600 exp:2027-02-11
+CVE-2026-56853 exp:2027-02-11
+CVE-2026-56858 exp:2027-02-11
+CVE-2026-56859 exp:2027-02-11
+CVE-2026-56860 exp:2027-02-11
+CVE-2026-56862 exp:2027-02-11
+CVE-2026-78667 exp:2027-02-11
+CVE-2026-78669 exp:2027-02-11
+CVE-2026-97031 exp:2027-02-11
+
+# sysroot/ostree/repo/objects copies of the base Go binaries (podman, grpc, go-jose)
+CVE-2026-116587 exp:2027-02-11
+CVE-2026-17106 exp:2027-02-11
+CVE-2026-56851 exp:2027-02-11
+CVE-2026-56852 exp:2027-02-11
+CVE-2026-56854 exp:2027-02-11
+CVE-2026-56864 exp:2027-02-11
+CVE-2026-56865 exp:2027-02-11
+CVE-2026-57231 exp:2027-02-11
+CVE-2026-84304 exp:2027-02-11
+CVE-2026-84445 exp:2027-02-11
