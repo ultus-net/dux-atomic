@@ -291,6 +291,28 @@ else
   echo "ok   the pushed digest is recorded before the first command that can stall"
 fi
 
+# The signing job runs repository test code on a PR, so it holds no write token
+# and pins every action; a floating tag would let that run change under it.
+signing_block=$(awk '/^  signing:/{f=1;next} f&&/^  [a-z]/{exit} f' "$workflow")
+if [[ -z $signing_block ]]; then
+  echo "FAIL ci.yml has no signing job" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'tests/test-signing.sh' <<<"$signing_block"; then
+  echo "FAIL the signing job does not run tests/test-signing.sh" >&2
+  failures=$((failures + 1))
+elif grep -qE '(packages|contents|id-token): write' <<<"$signing_block"; then
+  echo "FAIL the signing job asks for a write token" >&2
+  failures=$((failures + 1))
+elif grep -F 'uses:' <<<"$signing_block" | grep -qvE '@[0-9a-f]{40} '; then
+  echo "FAIL the signing job does not pin an action to a commit SHA" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'tests/test-signing.sh' "$repo_root/tests/lint.sh"; then
+  echo "FAIL tests/lint.sh does not shellcheck tests/test-signing.sh" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the signing job pins its actions, holds no write token, and is shellchecked"
+fi
+
 # Run the helper itself with scaled constants: greps cannot show that a hang is
 # cut, and the helper is the only thing that stops a stall eating the job.
 retry_root=$(mktemp -d)

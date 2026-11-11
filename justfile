@@ -10,7 +10,8 @@ check:
     tests/lint.sh
 
 # Signature policy acceptance and rejection on a throwaway local registry.
-# Needs podman, skopeo, curl and cosign v2, and a free 127.0.0.1:5000.
+# Needs podman, skopeo, curl and cosign v2, and a free 127.0.0.1:5000;
+# set REGISTRY_PORT to use another port.
 signing:
     tests/test-signing.sh
 

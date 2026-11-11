@@ -2,11 +2,12 @@
 # tests/test-signing.sh — prove a containers signature policy accepts a signed
 # image and rejects an unsigned or wrong-key one.
 #
-# Needs podman, skopeo, curl and cosign on PATH, and a free 127.0.0.1:5000. The
-# script runs its own throwaway registry, pulls digest-pinned images, and keeps
-# the fixture keys, policy and registries.d file in a temp dir removed on exit.
-# It never contacts GitHub or any signing service, so it runs offline from CI's
-# identity and needs no OIDC token.
+# Needs podman, skopeo, curl and cosign on PATH, and a free 127.0.0.1:5000;
+# set REGISTRY_PORT to use another port. The script runs its own throwaway
+# registry, pulls digest-pinned images, and keeps the fixture keys, policy and
+# registries.d file in a temp dir removed on exit.
+# It never contacts GitHub or any signing service, so it needs no OIDC token
+# and no network beyond the two image pulls.
 #
 # cosign must be v2, the version CI pins. v3 signs with a bundle format that
 # containers/image cannot read (container-libs#388).
