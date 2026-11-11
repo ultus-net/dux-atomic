@@ -291,6 +291,34 @@ else
   echo "ok   the pushed digest is recorded before the first command that can stall"
 fi
 
+# A hang must name its own step. Each signing step holds one command, verify
+# holds its two calls under one bound, and every one carries its own bound and
+# sources the helper file the first step writes; the logs
+# upload on every outcome, because a timed-out step keeps no log of its own.
+split_ok=1
+for spec in 'Sign the digest:15' 'Attest the SBOM:15' 'Verify the signature and attestation:12'; do
+  step=${spec%%:*}
+  bound=${spec##*:}
+  if ! awk -v step="- name: ${step}" -v bound="timeout-minutes: ${bound}" \
+       'index($0, step){found=1; next} found && index($0, bound){ok=1; exit} found && /- name:/{exit} END{exit !ok}' \
+       "$workflow"; then
+    echo "FAIL ci.yml does not bound '${step}' at ${bound} minutes" >&2
+    failures=$((failures + 1))
+    split_ok=0
+  fi
+done
+if ((split_ok == 1)); then
+  echo "ok   sign, attest, and verify each carry their own bound"
+fi
+if ! awk '/- name: Upload publish logs/{found=1; next} found && /if: always\(\)/{ok=1; exit} found && /- name:/{exit} END{exit !ok}' "$workflow" ||
+   ! grep -qF 'path: ${{ runner.temp }}/*.log' "$workflow" ||
+   [[ $(grep -cF 'source "$RUNNER_TEMP/helpers.sh"' "$workflow") -lt 4 ]]; then
+  echo "FAIL the publish logs do not upload on every outcome, or a signing step does not source the helpers" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the publish logs upload on every outcome and the steps source the helpers"
+fi
+
 # Run the helper itself with scaled constants: greps cannot show that a hang is
 # cut, and the helper is the only thing that stops a stall eating the job.
 retry_root=$(mktemp -d)
