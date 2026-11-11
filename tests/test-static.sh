@@ -256,6 +256,26 @@ else
   echo "ok   the vm login probes and greeter mask fail closed"
 fi
 
+# The serial console is a test-only karg (#39): in the overlay it puts a serial
+# getty on hardware with no serial port. make-disk.sh appends it on the test
+# disk, through the same [customizations.kernel] line as the device timeout.
+overlay=$repo_root/overlay
+make_disk=$repo_root/tests/vm/make-disk.sh
+if grep -rqF 'console=ttyS0' "$overlay"; then
+  echo "FAIL overlay/ ships console=ttyS0; the serial console karg belongs on the test disk only" >&2
+  failures=$((failures + 1))
+elif ! awk '
+      # The karg belongs on the test disk only, so it must sit on the single
+      # [customizations.kernel] append line that boot-smoke.sh boots with (#39).
+      /append = "/ { n++; if (index($0, "console=ttyS0,115200")) karg = 1 }
+      END { exit !(n == 1 && karg) }
+    ' "$make_disk"; then
+  echo "FAIL tests/vm/make-disk.sh does not append console=ttyS0,115200 as the test disk's single kernel append" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the serial console karg comes from the test disk only"
+fi
+
 workflow=$repo_root/.github/workflows/ci.yml
 if ! grep -qF 'retry cosign sign --yes "$IMAGE@$digest"' "$workflow" ||
    ! grep -qF 'retry cosign attest --yes' "$workflow" ||
