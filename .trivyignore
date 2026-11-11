@@ -1,12 +1,16 @@
 # Triaged trivy findings for the image scan (#3).
 # One finding per line, each with an expiry. An expired entry is reported
 # again, so the scan reds and forces a re-triage instead of hiding drift.
-# The owning binary and the fixed upstream version are named per group.
+# Each group names the owning binary, the fixed upstream version the report
+# gives, and the severity trivy's DB reported: every entry below was HIGH in
+# run 42929872025, and the GHSA was HIGH in run 42943934549. An ignored
+# CRITICAL would not be caught by the gate, so never add one here.
 
 # usr/bin/cosign-linux-amd64 and usr/bin/dms (golang.org/x/net/html, fixed 0.62.0)
 CVE-2026-78661 exp:2027-02-11
 
-# usr/bin/dsearch, duxlabs COPR Go build (Go stdlib and golang.org/x/net)
+# usr/bin/dsearch, duxlabs COPR Go build (Go stdlib 1.27.3+, golang.org/x/text
+# 0.41.0, golang.org/x/crypto 0.55.0, golang.org/x/mod 0.40.0, x/net 0.60.0)
 CVE-2026-111943 exp:2027-02-11
 CVE-2026-25679 exp:2027-02-11
 CVE-2026-27137 exp:2027-02-11
@@ -34,7 +38,8 @@ CVE-2026-78667 exp:2027-02-11
 CVE-2026-78669 exp:2027-02-11
 CVE-2026-97031 exp:2027-02-11
 
-# sysroot/ostree/repo/objects copies of the base Go binaries (podman, grpc, go-jose)
+# sysroot/ostree/repo/objects copies of the base Go binaries (podman 6.0.0,
+# grpc 1.83.1 and 1.82.1 for the GHSA, go-jose 4.1.6, moby/go-archive 0.3.0)
 GHSA-hrxh-6v49-42gf exp:2027-02-11
 CVE-2026-116587 exp:2027-02-11
 CVE-2026-17106 exp:2027-02-11

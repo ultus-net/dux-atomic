@@ -412,6 +412,7 @@ else
     echo "FAIL .trivyignore has no triaged entries" >&2
     failures=$((failures + 1))
   elif ! grep -qF -- '--exit-code 1' "$workflow" ||
+       grep -qF 'continue-on-error: true' "$workflow" ||
        ! grep -qF -- '--ignorefile .trivyignore' "$workflow"; then
     echo "FAIL the vulnerability scan does not fail on a new finding or read .trivyignore" >&2
     failures=$((failures + 1))
