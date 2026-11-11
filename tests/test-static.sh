@@ -267,9 +267,15 @@ fi
 ci_workflow=$repo_root/.github/workflows/ci.yml
 if ! grep -qF "login: ' \"\$timeout_s\"" "$boot_smoke" ||
    ! awk '
-      /^[[:space:]]+BOOT_TIMEOUT: / {
+      # Scope to the boot step: a BOOT_TIMEOUT on another job or step must not
+      # satisfy this. The env block follows the step name, and the next
+      # "- name:" ends the step.
+      /^[[:space:]]*- name: Boot smoke test[[:space:]]*$/ { step = 1; next }
+      step && /^[[:space:]]*- name: / { step = 0 }
+      step && /^[[:space:]]+BOOT_TIMEOUT: / {
         v = $0; gsub(/[^0-9]/, "", v)
         if (v + 0 >= 1800) ok = 1
+        step = 0
       }
       END { exit !ok }
     ' "$ci_workflow"; then
