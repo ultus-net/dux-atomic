@@ -15,17 +15,18 @@ repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
   /usr/lib/systemd/system/dux-atomic-greeter-defaults.service \
   /usr/lib/systemd/user/dux-atomic-desktop.service \
   /usr/lib/systemd/user/dux-atomic-dms-defaults.service
-# The Fedora base carries no desktop, so every package the session needs is
-# named in the manifest. A dropped name would otherwise surface as a broken
-# session on first boot, so assert the set here. The manifest names two provides
-# (dms-greeter, xinit), so query by whatprovides rather than by package name.
-for package in niri dms dms-greeter ghostty quickshell \
-  xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-gnome \
-  gnome-keyring accountsservice xwayland-satellite \
-  pipewire wireplumber; do
-  "$runtime" run --rm "$image" rpm -q --whatprovides "$package" \
-    || { echo "FAIL nothing provides $package" >&2; exit 1; }
-done
+# The Fedora base carries no desktop, so every name in the manifest has to
+# resolve in the built image. Query all of them in one call, so a silently
+# dropped name fails here rather than at the first login, and a new manifest
+# entry is covered without touching this script. Two entries are provides
+# (dms-greeter, xinit), so query by whatprovides rather than package name.
+packages=$(grep -Ev '^[[:space:]]*(#.*)?$' "$repo_root/manifests/packages-common.txt")
+# shellcheck disable=SC2086 # Word splitting is intended: the manifest is one name per line.
+if ! "$runtime" run --rm "$image" rpm -q --whatprovides $packages >/dev/null; then
+  "$runtime" run --rm "$image" rpm -q --whatprovides $packages >&2 || true
+  echo "FAIL a name from manifests/packages-common.txt does not resolve in the image" >&2
+  exit 1
+fi
 # The Fedora base enables sshd.service, and this image documents that a fresh
 # install has no console or SSH login. A base bump must not restore it.
 state=$("$runtime" run --rm "$image" systemctl is-enabled sshd.service 2>&1 || true)
@@ -39,17 +40,10 @@ fi
   'org.freedesktop.impl.portal.FileChooser=gtk;' \
   /etc/xdg-desktop-portal/niri-portals.conf \
   || { echo "FAIL the file-chooser portal override is missing or wrong" >&2; exit 1; }
-# Steam pulls the 32-bit graphics stack; assert the client and its Vulkan driver.
-"$runtime" run --rm "$image" rpm -q steam \
-  || { echo "FAIL steam is not installed" >&2; exit 1; }
+# Steam pulls the 32-bit graphics stack through its own dependencies, so this
+# driver is not a manifest name and needs its own assertion.
 "$runtime" run --rm "$image" rpm -q mesa-vulkan-drivers.i686 \
   || { echo "FAIL the 32-bit mesa Vulkan driver is not installed" >&2; exit 1; }
-# The rest of the gaming group is named explicitly, so a base change that drops
-# one of them fails here instead of at the first game launch.
-for package in gamescope mangohud steam-devices; do
-  "$runtime" run --rm "$image" rpm -q "$package" \
-    || { echo "FAIL $package is not installed" >&2; exit 1; }
-done
 # The lock records the third-party packages the manifest names. Fedora packages
 # move with the updates repository on every build, so only other vendors are
 # compared; a drift there is a third-party rebuild and needs a lock update.
