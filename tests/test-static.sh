@@ -380,6 +380,25 @@ elif [[ $(grep -cF 'head -c 20000' <<<"$verify_block") -lt 2 ]] ||
      ! grep -qE 'name: verify-logs$' <<<"$verify_block"; then
   echo "FAIL the verify job does not keep cosign's payload out of the step log, or does not upload the logs on every outcome" >&2
   failures=$((failures + 1))
+elif [[ $(grep -cF -- '- name: Verify the signature' <<<"$verify_block") -ne 1 ]] ||
+     [[ $(grep -cF -- '- name: Verify the attestation' <<<"$verify_block") -ne 1 ]] ||
+     ! awk '
+      BEGIN { want="exit \"$status\"" }
+      /^[[:space:]]*- name: Verify (the signature|the attestation)$/ {
+        if (in_step && last != want) bad=1
+        in_step=1; last=""; next
+      }
+      in_step && /^[[:space:]]*- name:/ {
+        if (last != want) bad=1
+        in_step=0
+      }
+      in_step && NF { last=$0; sub(/^[[:space:]]+/, "", last) }
+      END {
+        if (in_step && last != want) bad=1
+        exit bad
+      }' <<<"$verify_block"; then
+  echo "FAIL ci.yml does not end both verify steps with exit \"\$status\", so a failed cosign check could report green" >&2
+  failures=$((failures + 1))
 elif [[ -z $promote_block ]] ||
      ! grep -qF 'needs: [publish, verify]' <<<"$promote_block" ||
      ! grep -qF 'if: inputs.promote' <<<"$promote_block"; then
