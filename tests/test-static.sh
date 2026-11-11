@@ -311,7 +311,7 @@ if ((split_ok == 1)); then
 fi
 if ! awk '/- name: Upload publish logs/{found=1; next} found && /if: always\(\)/{ok=1; exit} found && /- name:/{exit} END{exit !ok}' "$workflow" ||
    ! grep -qF 'path: ${{ runner.temp }}/*.log' "$workflow" ||
-   ! grep -qF 'source "$RUNNER_TEMP/helpers.sh"' "$workflow"; then
+   [[ $(grep -cF 'source "$RUNNER_TEMP/helpers.sh"' "$workflow") -lt 4 ]]; then
   echo "FAIL the publish logs do not upload on every outcome, or a signing step does not source the helpers" >&2
   failures=$((failures + 1))
 else

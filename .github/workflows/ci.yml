@@ -204,10 +204,13 @@ jobs:
           podman tag localhost/dux-atomic:ci "$IMAGE:$SHA_TAG"
           podman push --digestfile "$RUNNER_TEMP/digest" "$IMAGE:$SHA_TAG"
 
-      - name: Install cosign
-        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
-        with:
-          cosign-release: v2.6.5
+      - name: Record the pushed digest
+        # Before any network action after the push, as a check-run annotation.
+        # A job that times out keeps no log, and this line is the only record
+        # the digest gets.
+        run: |
+          digest=$(cat "$RUNNER_TEMP/digest")
+          echo "::notice::pushed $IMAGE@$digest"
 
       - name: Write the publish helpers
         # A step's own timeout did not stop a hanging command: run 42933898962
@@ -258,20 +261,16 @@ jobs:
           declare -F with_log >/dev/null
           declare -F retry >/dev/null
 
-      - name: Record the pushed digest
-        # Before anything can stall, as a check-run annotation. A job that
-        # times out keeps no log, and this line is the only record the digest
-        # gets.
-        run: |
-          digest=$(cat "$RUNNER_TEMP/digest")
-          echo "::notice::pushed $IMAGE@$digest"
+      - name: Install cosign
+        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+        with:
+          cosign-release: v2.6.5
 
       - name: Sign the digest
         # Each attempt is capped and each command has a wall-clock budget, so
         # the step is bounded even when every call hangs. The fast-failure path
         # reaches five attempts; a command whose attempts each hang exhausts
-        # the budget in two. Each command retries on its own, so a failed
-        # attestation never signs the digest twice.
+        # the budget in two.
         timeout-minutes: 15
         run: |
           source "$RUNNER_TEMP/helpers.sh"
