@@ -3,7 +3,7 @@
 [![ci](https://github.com/ultus-net/dux-atomic/actions/workflows/ci.yml/badge.svg)](https://github.com/ultus-net/dux-atomic/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A planned Fedora bootc developer and gaming workstation for two machines, built on Universal Blue's `base-main`.
+A planned Fedora bootc developer and gaming workstation for two machines, built on Fedora's own bootc image so Secure Boot needs no per-machine enrollment.
 
 ![The Dux desktop at first login: the DMS bar and Welcome dialog on a niri session](docs/assets/dux-desktop.png)
 
@@ -13,7 +13,7 @@ The build definition follows the Universal Blue image-template. Every green push
 
 | Area | State |
 | --- | --- |
-| Base image | Universal Blue `base-main`, Fedora 45, pinned by digest, with Dependabot watching for a bump |
+| Base image | Fedora `fedora-bootc:45`, pinned by digest, with Dependabot watching for a bump. Fedora signs the kernel, so Secure Boot needs no enrollment |
 | Generic x86_64 image | Builds, boots to the greeter in a VM, and provisions the desktop on first login |
 | Desktop | niri, Dux Modular Shell, Dux Greeter, Ghostty, and an Xfce X11 fallback |
 | Applications | Steam ships in the image. Lutris follows after the gaming dogfood. Zed, Bitwarden, Obsidian, Zen Browser, Discord, and Spotify arrive from Flathub at first login; OpenCode stays a dotfiles-owned CLI |

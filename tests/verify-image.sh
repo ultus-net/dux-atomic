@@ -15,6 +15,30 @@ repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
   /usr/lib/systemd/system/dux-atomic-greeter-defaults.service \
   /usr/lib/systemd/user/dux-atomic-desktop.service \
   /usr/lib/systemd/user/dux-atomic-dms-defaults.service
+# The Fedora base carries no desktop, so every package the session needs is
+# named in the manifest. A dropped name would otherwise surface as a broken
+# session on first boot, so assert the set here. The manifest names two provides
+# (dms-greeter, xinit), so query by whatprovides rather than by package name.
+for package in niri dms dms-greeter ghostty quickshell \
+  xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-gnome \
+  gnome-keyring accountsservice xwayland-satellite \
+  pipewire wireplumber; do
+  "$runtime" run --rm "$image" rpm -q --whatprovides "$package" \
+    || { echo "FAIL nothing provides $package" >&2; exit 1; }
+done
+# The Fedora base enables sshd.service, and this image documents that a fresh
+# install has no console or SSH login. A base bump must not restore it.
+state=$("$runtime" run --rm "$image" systemctl is-enabled sshd.service 2>&1 || true)
+if [[ $state != disabled ]]; then
+  echo "FAIL sshd.service is '${state}', expected disabled" >&2
+  exit 1
+fi
+# xdg-desktop-portal reads /etc before /usr/share, so the override is what
+# routes FileChooser to gtk instead of nautilus, which this image does not ship.
+"$runtime" run --rm "$image" grep -qx \
+  'org.freedesktop.impl.portal.FileChooser=gtk;' \
+  /etc/xdg-desktop-portal/niri-portals.conf \
+  || { echo "FAIL the file-chooser portal override is missing or wrong" >&2; exit 1; }
 # Steam pulls the 32-bit graphics stack; assert the client and its Vulkan driver.
 "$runtime" run --rm "$image" rpm -q steam \
   || { echo "FAIL steam is not installed" >&2; exit 1; }

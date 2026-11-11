@@ -3,6 +3,12 @@
 # Layout follows the Universal Blue image-template
 # (https://github.com/ublue-os/image-template): a ctx stage exposes the build
 # scripts to one RUN, and a build script performs the installs.
+#
+# The base is Fedora's own bootc image rather than a Universal Blue desktop
+# image. Fedora signs the kernel and its modules, so a Secure Boot machine
+# trusts the whole chain with no per-machine MOK enrollment, and the base
+# carries no desktop environment to strip (#59). Every desktop package the
+# image needs is named in manifests/packages-common.txt.
 
 # Allow build scripts to be referenced without being copied into the final image.
 FROM scratch AS ctx
@@ -14,7 +20,7 @@ COPY overlay /overlay
 # literal rather than an ARG: Dependabot reads a file whose name matches
 # containerfile|dockerfile, and never expands an ARG into FROM.
 # tests/test-static.sh asserts the tag+digest form.
-FROM ghcr.io/ublue-os/base-main:45@sha256:444e9e37ea581e76829772ae2a42edfdbacdd0cbc7a27085a4ed0f3d6e1336c7
+FROM quay.io/fedora/fedora-bootc:45@sha256:6860cf4cb2fd88521256fe7efaeff5f7e301edb45a3308c338f7a47d05bfe4c4
 
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache \
