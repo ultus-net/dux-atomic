@@ -291,8 +291,9 @@ else
   echo "ok   the pushed digest is recorded before the first command that can stall"
 fi
 
-# A hang must name its own step. Each network step holds one command, carries
-# its own bound, and sources the helper file the first step writes; the logs
+# A hang must name its own step. Each signing step holds one command, verify
+# holds its two calls under one bound, and every one carries its own bound and
+# sources the helper file the first step writes; the logs
 # upload on every outcome, because a timed-out step keeps no log of its own.
 split_ok=1
 for spec in 'Sign the digest:15' 'Attest the SBOM:15' 'Verify the signature and attestation:12'; do
