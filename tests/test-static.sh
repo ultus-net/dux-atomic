@@ -495,7 +495,7 @@ elif [[ $(grep -cF -- '- name: Verify the signature' <<<"$verify_block") -ne 1 ]
      [[ $(grep -cF -- '- name: Verify the attestation' <<<"$verify_block") -ne 1 ]] ||
      ! awk '
       BEGIN { want="exit \"$status\"" }
-      /^[[:space:]]*- name: Verify (the signature|the attestation)$/ {
+      /^[[:space:]]*- name: Verify (the signature|the attestation|the provenance)$/ {
         if (in_step && last != want) bad=1
         in_step=1; last=""; next
       }
@@ -517,6 +517,35 @@ elif [[ -z $promote_block ]] ||
   failures=$((failures + 1))
 else
   echo "ok   verification has its own job bound and promotion waits for it"
+fi
+
+# Provenance is a claim about the build, and the SBOM attestation is a claim
+# about the contents, so the image needs both. The attestation must name the
+# pushed digest; an attestation of the tag would say nothing about the image
+# that shipped. Verification reads the registry copy and pins the signer, so an
+# attestation from another workflow or repository cannot satisfy it (#5).
+attest_line=$(grep -nF '      - name: Attest build provenance' <<<"$publish_block" | head -1 | cut -d: -f1)
+push_line=$(grep -nF '      - name: Push the commit tag' <<<"$publish_block" | head -1 | cut -d: -f1)
+if [[ -z $attest_line || -z $push_line || $attest_line -le $push_line ]]; then
+  echo "FAIL ci.yml attests provenance before it has pushed a digest to attest" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'attestations: write' <<<"$publish_block" ||
+   ! grep -qF 'uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2' <<<"$publish_block" ||
+   ! grep -qF 'subject-name: ${{ env.IMAGE }}' <<<"$publish_block" ||
+   ! grep -qF 'subject-digest: ${{ steps.push.outputs.digest }}' <<<"$publish_block" ||
+   ! grep -qF 'push-to-registry: true' <<<"$publish_block" ||
+   ! grep -qF 'create-storage-record: false' <<<"$publish_block"; then
+  echo "FAIL ci.yml does not attest build provenance for the pushed digest, or asks for a permission the step does not need" >&2
+  failures=$((failures + 1))
+elif [[ -z $verify_block ]] ||
+     ! grep -qF 'gh attestation verify "oci://$IMAGE@$DIGEST"' <<<"$verify_block" ||
+     ! grep -qF -- '--bundle-from-oci' <<<"$verify_block" ||
+     ! grep -qF -- '--cert-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main"' <<<"$verify_block" ||
+     ! grep -qF '>"$RUNNER_TEMP/verify-provenance.log" 2>&1 || status=$?' <<<"$verify_block"; then
+  echo "FAIL ci.yml does not verify the provenance of the digest it published" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the pushed digest carries build provenance and verify pins the signer identity"
 fi
 
 # Run the helper itself with scaled constants: greps cannot show that a hang is
