@@ -266,16 +266,11 @@ fi
 # reintroduce the stall it is meant to prevent.
 if ! grep -qF 'with_log() {' "$workflow" ||
    ! grep -qF '"$@" >>"$file" 2>&1 || status=$?' "$workflow" ||
-   ! grep -qF 'cat "$file"' "$workflow" ||
    ! grep -qF 'with_log "$RUNNER_TEMP/sign.log" retry cosign sign' "$workflow" ||
    ! grep -qF 'with_log "$RUNNER_TEMP/attest.log" retry cosign attest' "$workflow" ||
    ! grep -qF 'with_log "$RUNNER_TEMP/verify.log" timeout --kill-after=10 180 cosign verify' "$workflow" ||
    ! grep -qF 'with_log "$RUNNER_TEMP/verify-attestation.log" timeout --kill-after=10 180 cosign verify-attestation' "$workflow"; then
   echo "FAIL ci.yml does not run every signing and verification command with its output in a file" >&2
-  failures=$((failures + 1))
-elif ! grep -qF 'timeout 10 cat "$file" || true' "$workflow" ||
-   ! grep -qF 'return "$status"' "$workflow"; then
-  echo "FAIL with_log does not bound its read, ignore the cut, or keep its command's status" >&2
   failures=$((failures + 1))
 else
   echo "ok   every signing and verification command writes to its own log file"
@@ -326,19 +321,29 @@ else
 fi
 
 # with_log must print its command's output and keep its status, or a failed
-# sign would read as success and a stall would show nothing.
+# sign would read as success and a stall would show nothing. Assert and run the
+# extracted helper, not the file, so a duplicate literal elsewhere cannot
+# satisfy the check. The runtime call uses `bash -e` because that is how the
+# step runs: a cut `cat` must not abort before the status is returned.
 sed -n '/^          with_log() {/,/^          }$/p' "$workflow" | sed 's/^          //' \
   >"$retry_root/with_log.sh"
-logged=$(bash -c 'source "$1"; with_log "$2" bash -c "echo printed; exit 3"' _ \
+if ! grep -qF 'timeout 10 cat "$file" || true' "$retry_root/with_log.sh" ||
+   ! grep -qF 'return "$status"' "$retry_root/with_log.sh"; then
+  echo "FAIL with_log does not ignore a cut read or does not keep its command's status" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   with_log bounds and ignores a cut read and keeps its command's status"
+fi
+logged=$(bash -ec 'source "$1"; with_log "$2" bash -c "echo printed; exit 3"' _ \
   "$retry_root/with_log.sh" "$retry_root/out.log" 2>&1) && rc=0 || rc=$?
 if ((rc != 3)); then
-  echo "FAIL with_log did not keep its command's exit status (got $rc, expected 3)" >&2
+  echo "FAIL with_log under bash -e did not keep its command's exit status (got $rc, expected 3)" >&2
   failures=$((failures + 1))
 elif [[ $logged != *printed* ]]; then
   echo "FAIL with_log did not print its command's output" >&2
   failures=$((failures + 1))
 else
-  echo "ok   with_log prints its command's output and keeps its failure status"
+  echo "ok   with_log under bash -e prints its command's output and keeps its failure status"
 fi
 
 # Rekor's public instance rejects the full file inventory, so the filter must
