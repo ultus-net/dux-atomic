@@ -425,18 +425,20 @@ jobs:
           exit "$status"
 
       - name: Verify the provenance
-        # Provenance is read from the registry copy, so verification does not
-        # depend on the attestations API. Pinning the signer workflow rejects an
-        # attestation from any other workflow or repository.
+        # Provenance is read from the registry copy of a public package, so
+        # verification does not depend on the attestations API. The identity is
+        # the one the signature steps pin, so another workflow, repository or
+        # branch cannot satisfy it. `gh` ships with the ubuntu-24.04 image.
         timeout-minutes: 8
         env:
           DIGEST: ${{ needs.publish.outputs.digest }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           status=0
           timeout --kill-after=10 180 gh attestation verify "oci://$IMAGE@$DIGEST" \
             --repo ultus-net/dux-atomic \
             --bundle-from-oci \
-            --signer-workflow ultus-net/dux-atomic/.github/workflows/ci.yml \
+            --cert-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
             >"$RUNNER_TEMP/verify-provenance.log" 2>&1 || status=$?
           timeout 10 head -c 20000 "$RUNNER_TEMP/verify-provenance.log" || true
           exit "$status"
