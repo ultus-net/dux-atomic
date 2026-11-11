@@ -204,40 +204,23 @@ jobs:
           podman tag localhost/dux-atomic:ci "$IMAGE:$SHA_TAG"
           podman push --digestfile "$RUNNER_TEMP/digest" "$IMAGE:$SHA_TAG"
 
-      - name: Install cosign
-        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
-        with:
-          cosign-release: v2.6.5
-
-      - name: Sign the digest and attest the SBOM
-        # The commands below are capped, but a descendant that outlives its
-        # timeout can still hold the step open, so the step gets its own bound.
-        timeout-minutes: 40
+      - name: Record the pushed digest
+        # Before any network action after the push, as a check-run annotation.
+        # A job that times out keeps no log, and this line is the only record
+        # the digest gets.
         run: |
           digest=$(cat "$RUNNER_TEMP/digest")
-          # Record the digest before anything can stall, as a check-run
-          # annotation. A job that times out keeps no log, and the annotation
-          # is what survives to say which digest was pushed.
           echo "::notice::pushed $IMAGE@$digest"
-          # Rekor's public instance answered 502 for this image's attestation
-          # body at about 86 MB, which the SBOM step now prevents by stripping
-          # the file inventory. The retry stays for genuine 5xx and network
-          # failures, and cosign gives up after its own four attempts. Each
-          # command retries on its own, so a failed attestation does not sign
-          # the digest twice.
-          #
-          # Run 42827200322 stalled in this step for 51 minutes, hit the
-          # 60-minute job timeout, and lost its log, so nothing could say
-          # which call hung. Each attempt is capped and each command has a
-          # wall-clock budget, so the step is bounded even when every call
-          # hangs. The fast-failure path reaches five attempts; a command whose
-          # attempts each hang exhausts the budget in two.
-          #
-          # Run 42917390106 then held this step open for 33 minutes, past the
-          # 26 minutes the caps allow, which points to a descendant that
-          # outlives the kill and keeps the step's stdout pipe open. Each
-          # command now writes to a file that no descendant shares with the
-          # runner, and the step is bounded whatever the cause.
+
+      - name: Write the publish helpers
+        # A step's own timeout did not stop a hanging command: run 42933898962
+        # was cancelled by the job's 60-minute cap without firing the step's
+        # 40-minute bound, and run 42943634705 was still running 51 minutes in.
+        # Neither kept a log. One command per step names the hang, so the
+        # helpers move to a file each signing step sources.
+        # The heredoc is quoted, so `$@` and `$SECONDS` reach the file intact.
+        run: |
+          cat >"$RUNNER_TEMP/helpers.sh" <<'HELPERS'
           with_log() {
             local file=$1 status=0
             shift
@@ -271,10 +254,47 @@ jobs:
             echo "failed after ${attempt} attempts in $((SECONDS - started))s: $*" >&2
             return 1
           }
+          HELPERS
+          # Fail here, not inside a signing step, if the body was cut short.
+          bash -n "$RUNNER_TEMP/helpers.sh"
+          source "$RUNNER_TEMP/helpers.sh"
+          declare -F with_log >/dev/null
+          declare -F retry >/dev/null
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+        with:
+          cosign-release: v2.6.5
+
+      - name: Sign the digest
+        # Each attempt is capped and each command has a wall-clock budget, so
+        # the step is bounded even when every call hangs. The fast-failure path
+        # reaches five attempts; a command whose attempts each hang exhausts
+        # the budget in two.
+        timeout-minutes: 15
+        run: |
+          source "$RUNNER_TEMP/helpers.sh"
+          digest=$(cat "$RUNNER_TEMP/digest")
           with_log "$RUNNER_TEMP/sign.log" retry cosign sign --yes "$IMAGE@$digest"
+
+      - name: Attest the SBOM
+        # Rekor's public instance answered 502 for this image's attestation
+        # body at about 86 MB, which the SBOM step now prevents by stripping
+        # the file inventory. The retry stays for genuine 5xx and network
+        # failures, and cosign gives up after its own four attempts.
+        timeout-minutes: 15
+        run: |
+          source "$RUNNER_TEMP/helpers.sh"
+          digest=$(cat "$RUNNER_TEMP/digest")
           with_log "$RUNNER_TEMP/attest.log" retry cosign attest --yes --predicate sbom/dux-atomic.spdx.json --type spdxjson "$IMAGE@$digest"
-          # Verification is single-shot, but it reads the same network path as
-          # the signing above, so it gets the same cap.
+
+      - name: Verify the signature and attestation
+        # Verification is single-shot, but it reads the same network path as
+        # the signing above, so it gets the same cap.
+        timeout-minutes: 12
+        run: |
+          source "$RUNNER_TEMP/helpers.sh"
+          digest=$(cat "$RUNNER_TEMP/digest")
           with_log "$RUNNER_TEMP/verify.log" timeout --kill-after=10 180 cosign verify \
             --certificate-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
@@ -297,3 +317,15 @@ jobs:
             echo "latest resolves to $live, expected $digest" >&2
             exit 1
           fi
+
+      - name: Upload publish logs
+        # A step that times out keeps no log, so the files upload whatever the
+        # outcome. A missing file is not a failure: a step can die before it
+        # writes one.
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: publish-logs
+          path: ${{ runner.temp }}/*.log
+          if-no-files-found: ignore
+          retention-days: 14
