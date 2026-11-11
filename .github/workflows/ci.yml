@@ -428,13 +428,16 @@ jobs:
         # Provenance is read from the registry copy of a public package, so
         # verification does not depend on the attestations API. The identity is
         # the one the signature steps pin, so another workflow, repository or
-        # branch cannot satisfy it. `gh` ships with the ubuntu-24.04 image.
+        # branch cannot satisfy it. The step names a missing CLI or token
+        # instead of failing inside the verification command.
         timeout-minutes: 8
         env:
           DIGEST: ${{ needs.publish.outputs.digest }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           status=0
+          command -v gh >/dev/null || { echo "gh is not on PATH" >&2; exit 1; }
+          [[ -n $GH_TOKEN ]] || { echo "GH_TOKEN is empty" >&2; exit 1; }
           timeout --kill-after=10 180 gh attestation verify "oci://$IMAGE@$DIGEST" \
             --repo ultus-net/dux-atomic \
             --bundle-from-oci \
