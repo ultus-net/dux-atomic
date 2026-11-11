@@ -264,9 +264,7 @@ fi
 # A descendant that outlives `timeout` keeps the step's stdout pipe open, so
 # every command must write to a file of its own; a pipe-based wrapper would
 # reintroduce the stall it is meant to prevent.
-if ! grep -qF 'with_log() {' "$workflow" ||
-   ! grep -qF '"$@" >>"$file" 2>&1 || status=$?' "$workflow" ||
-   ! grep -qF 'with_log "$RUNNER_TEMP/sign.log" retry cosign sign' "$workflow" ||
+if ! grep -qF 'with_log "$RUNNER_TEMP/sign.log" retry cosign sign' "$workflow" ||
    ! grep -qF 'with_log "$RUNNER_TEMP/attest.log" retry cosign attest' "$workflow" ||
    ! grep -qF 'with_log "$RUNNER_TEMP/verify.log" timeout --kill-after=10 180 cosign verify' "$workflow" ||
    ! grep -qF 'with_log "$RUNNER_TEMP/verify-attestation.log" timeout --kill-after=10 180 cosign verify-attestation' "$workflow"; then
@@ -323,11 +321,13 @@ fi
 # with_log must print its command's output and keep its status, or a failed
 # sign would read as success and a stall would show nothing. Assert and run the
 # extracted helper, not the file, so a duplicate literal elsewhere cannot
-# satisfy the check. The runtime call uses `bash -e` because that is how the
-# step runs: a cut `cat` must not abort before the status is returned.
+# satisfy the check. No fixture can wedge a log read, so a removed `|| true` is
+# caught by the grep; the `bash -e` run catches a dropped status capture,
+# because errexit would abort before the file is printed.
 sed -n '/^          with_log() {/,/^          }$/p' "$workflow" | sed 's/^          //' \
   >"$retry_root/with_log.sh"
-if ! grep -qF 'timeout 10 cat "$file" || true' "$retry_root/with_log.sh" ||
+if ! grep -qF '"$@" >>"$file" 2>&1 || status=$?' "$retry_root/with_log.sh" ||
+   ! grep -qF 'timeout 10 cat "$file" || true' "$retry_root/with_log.sh" ||
    ! grep -qF 'return "$status"' "$retry_root/with_log.sh"; then
   echo "FAIL with_log does not ignore a cut read or does not keep its command's status" >&2
   failures=$((failures + 1))
