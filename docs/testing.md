@@ -41,6 +41,14 @@ Log in with the test account (`dux` / `dux-test` by default). The DMS bar, the d
 
 The image disables Plymouth (`plymouth.enable=0`), so both the VM and real hardware show the text boot instead of a splash.
 
+## Signing policy tests
+
+`tests/test-signing.sh` proves the signature policy itself, not GitHub's identity. It needs `podman`, `skopeo`, `curl`, and cosign v2 on `PATH`, plus a free `127.0.0.1:5000`; set `REGISTRY_PORT` when that port is taken. It runs a throwaway `registry:2`, pushes two payload tags with different digests, signs one with a fixture keypair in a temp dir, and asserts four cases through `skopeo copy --policy`: a signed tag and a signed digest are accepted, an unsigned tag is rejected for the missing signature, and a signature from a key the policy does not trust is rejected for the failed verification. It writes nothing outside the temp dir and never contacts GitHub or a signing service, so it runs offline in CI's `signing` job.
+
+```bash
+tests/test-signing.sh
+```
+
 ## CI boot test
 
 GitHub-hosted runners have no `/dev/kvm`, so the boot test runs on QEMU TCG and is headless: it asserts the greeter session and the first-login units, not rendered pixels. The guest still gets a DRM render node from virtio-gpu. The workflow gives the boot 900s and `greetd` 300s to start, and `make-disk.sh` raises the test disk's device timeout to 180s because TCG throughput varies run to run. Run the graphical dogfood locally before promotion. See [CI](ci.md).

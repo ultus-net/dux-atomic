@@ -36,7 +36,8 @@ payload_image=${PAYLOAD_IMAGE:-docker.io/library/hello-world:latest@sha256:c567b
 # REGISTRY_PORT lets a host that already owns 5000 run the suite elsewhere.
 registry_port=${REGISTRY_PORT:-5000}
 repo=127.0.0.1:${registry_port}/dux-atomic-signing
-registry_name=dux-atomic-signing-registry
+# The name carries the port, so two local runs on different ports do not collide.
+registry_name=dux-atomic-signing-registry-${registry_port}
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/dux-atomic-signing.XXXXXX")
 
 cleanup() {
