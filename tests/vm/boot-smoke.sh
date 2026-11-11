@@ -157,7 +157,9 @@ serial_login() {
   serial_write "$test_password"
   # Wait for the login shell's prompt instead of a fixed sleep. A missing
   # prompt means the login failed, so do not send probes into an unknown state.
-  if ! wait_for "${test_user}@" 20; then
+  # The per-user manager start can outlast 20s under TCG; run 42997688206
+  # missed the prompt by 0.4s, so allow 60s before treating the login as failed.
+  if ! wait_for "${test_user}@" 60; then
     echo "login failed: no shell prompt for ${test_user}" >&2
     return 1
   fi

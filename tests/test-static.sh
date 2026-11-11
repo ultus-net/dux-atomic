@@ -223,9 +223,9 @@ common=$repo_root/build/common.sh
 if ! grep -qF 'wait_for "DUX_USER:${test_user}"' "$boot_smoke" ||
    ! grep -qF "wait_for 'DUX_PROBE_END:ok'" "$boot_smoke" ||
    ! grep -qF "wait_for 'DUX_DIAG_END:ok'" "$boot_smoke" ||
-   ! grep -qF 'if ! wait_for "${test_user}@" 20' "$boot_smoke" ||
+   ! grep -qF 'if ! wait_for "${test_user}@" 60' "$boot_smoke" ||
    ! grep -qF 'DUX_SETUP_MARKER' "$boot_smoke" ||
-   grep -qF 'wait_for "${test_user}@" 20 || true' "$boot_smoke" ||
+   grep -qF 'wait_for "${test_user}@" 60 || true' "$boot_smoke" ||
    grep -qF "wait_for 'DUX_DIAG_END'" "$boot_smoke" ||
    grep -qF "wait_for 'DUX_PROBE_END'" "$boot_smoke"; then
   echo "FAIL boot-smoke waits on an echoed marker instead of printf output" >&2
