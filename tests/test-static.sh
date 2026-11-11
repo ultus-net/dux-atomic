@@ -262,16 +262,15 @@ else
 fi
 
 # A descendant that outlives `timeout` keeps the step's stdout pipe open, so
-# every command must write to a file of its own; a pipe-based wrapper would
-# reintroduce the stall it is meant to prevent.
+# every signing command must write to a file of its own; a pipe-based wrapper
+# would reintroduce the stall it is meant to prevent. Verification moved to its
+# own job, because its stall survived both a command timeout and a step timeout.
 if ! grep -qF 'with_log "$RUNNER_TEMP/sign.log" retry cosign sign' "$workflow" ||
-   ! grep -qF 'with_log "$RUNNER_TEMP/attest.log" retry cosign attest' "$workflow" ||
-   ! grep -qF 'with_log "$RUNNER_TEMP/verify.log" timeout --kill-after=10 180 cosign verify' "$workflow" ||
-   ! grep -qF 'with_log "$RUNNER_TEMP/verify-attestation.log" timeout --kill-after=10 180 cosign verify-attestation' "$workflow"; then
-  echo "FAIL ci.yml does not run every signing and verification command with its output in a file" >&2
+   ! grep -qF 'with_log "$RUNNER_TEMP/attest.log" retry cosign attest' "$workflow"; then
+  echo "FAIL ci.yml does not run every signing command with its output in a file" >&2
   failures=$((failures + 1))
 else
-  echo "ok   every signing and verification command writes to its own log file"
+  echo "ok   every signing command writes to its own log file"
 fi
 
 # The failure path must report failure, and the digest notice must come before
@@ -313,12 +312,11 @@ else
   echo "ok   the signing job pins its actions, holds no write token, and is shellchecked"
 fi
 
-# A hang must name its own step. Each signing step holds one command, verify
-# holds its two calls under one bound, and every one carries its own bound and
-# sources the helper file the first step writes; the logs
-# upload on every outcome, because a timed-out step keeps no log of its own.
+# A hang must name its own step. Each signing step holds one command and the
+# verification job holds its own bound; the logs upload on every outcome,
+# because a timed-out step keeps no log of its own.
 split_ok=1
-for spec in 'Sign the digest:15' 'Attest the SBOM:15' 'Verify the signature and attestation:12'; do
+for spec in 'Sign the digest:15' 'Attest the SBOM:15'; do
   step=${spec%%:*}
   bound=${spec##*:}
   if ! awk -v step="- name: ${step}" -v bound="timeout-minutes: ${bound}" \
@@ -330,15 +328,46 @@ for spec in 'Sign the digest:15' 'Attest the SBOM:15' 'Verify the signature and 
   fi
 done
 if ((split_ok == 1)); then
-  echo "ok   sign, attest, and verify each carry their own bound"
+  echo "ok   sign and attest each carry their own bound"
 fi
 if ! awk '/- name: Upload publish logs/{found=1; next} found && /if: always\(\)/{ok=1; exit} found && /- name:/{exit} END{exit !ok}' "$workflow" ||
    ! grep -qF 'path: ${{ runner.temp }}/*.log' "$workflow" ||
-   [[ $(grep -cF 'source "$RUNNER_TEMP/helpers.sh"' "$workflow") -lt 4 ]]; then
+   [[ $(grep -cF 'source "$RUNNER_TEMP/helpers.sh"' "$workflow") -lt 3 ]]; then
   echo "FAIL the publish logs do not upload on every outcome, or a signing step does not source the helpers" >&2
   failures=$((failures + 1))
 else
-  echo "ok   the publish logs upload on every outcome and the steps source the helpers"
+  echo "ok   the publish logs upload on every outcome and the signing steps source the helpers"
+fi
+
+# Verification reads the registry and the transparency log on its own, and its
+# stall outlived both a command timeout and a step timeout, so only a job bound
+# ends it. It must hold no OIDC identity, and promotion must wait for it. The
+# digest crosses the job boundary as a job output, so a lost output or a renamed
+# step id would leave verification with an empty digest.
+publish_block=$(awk '/^  publish:/{f=1;next} f&&/^  [a-z]/{exit} f' "$workflow")
+verify_block=$(awk '/^  verify:/{f=1;next} f&&/^  [a-z]/{exit} f' "$workflow")
+promote_block=$(awk '/^  promote:/{f=1;next} f&&/^  [a-z]/{exit} f' "$workflow")
+if [[ -z $publish_block ]] ||
+   ! grep -qF 'digest: ${{ steps.push.outputs.digest }}' <<<"$publish_block" ||
+   ! grep -qF 'id: push' <<<"$publish_block" ||
+   ! grep -qF 'echo "digest=$(cat "$RUNNER_TEMP/digest")" >> "$GITHUB_OUTPUT"' <<<"$publish_block"; then
+  echo "FAIL the publish job does not export the pushed digest as a job output" >&2
+  failures=$((failures + 1))
+elif [[ -z $verify_block ]] ||
+   ! grep -qF 'cosign verify' <<<"$verify_block" ||
+   ! grep -qF 'cosign verify-attestation' <<<"$verify_block" ||
+   ! grep -qF 'timeout-minutes: 20' <<<"$verify_block" ||
+   [[ $(grep -cF 'DIGEST: ${{ needs.publish.outputs.digest }}' <<<"$verify_block") -lt 2 ]] ||
+   grep -qF 'id-token: write' <<<"$verify_block"; then
+  echo "FAIL the verify job is missing, unbounded, does not read the publish digest, or asks for an OIDC identity" >&2
+  failures=$((failures + 1))
+elif [[ -z $promote_block ]] ||
+     ! grep -qF 'needs: [publish, verify]' <<<"$promote_block" ||
+     ! grep -qF 'if: inputs.promote' <<<"$promote_block"; then
+  echo "FAIL promotion is missing, or it can run before verification passes" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   verification has its own job bound and promotion waits for it"
 fi
 
 # Run the helper itself with scaled constants: greps cannot show that a hang is
