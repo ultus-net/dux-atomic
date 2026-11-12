@@ -85,7 +85,7 @@ Secure Boot needs no per-machine enrollment on this image. The chain is Fedora's
 
 No boot with Secure Boot enabled has been recorded on either target. Record `mokutil --sb-state` per machine before the install, then record the boot result after it. The desktop has Secure Boot disabled today (`docs/superpowers/specs/2026-11-09-dux-atomic-design.md:73`); enabling it should need no enrollment step, but that is unproven until one boot is recorded.
 
-Lenovo ThinkPad (P, T, X) firmware needs "Allow Microsoft 3rd party UEFI CA" enabled, because Fedora's shim is signed through that CA. That is a firmware setting, not an enrollment.
+Fedora's shim is signed through Microsoft's third-party UEFI CA, so the firmware must trust that CA. Most machines ship with it enabled. Some Lenovo ThinkPad models ship with it off, and there the firmware setting has to be turned on once; that is a trust setting in firmware, not a key enrolled in the MOK list, and it survives upgrades without repeating. A Secure Boot violation at first boot on those machines points at this setting before anything else.
 
 The desktop's NVIDIA modules are unsigned, so that machine needs Secure Boot off or a locally signed module, which [#40](https://github.com/ultus-net/dux-atomic/issues/40) covers. The evidence, the base swap that removed the old enrollment path, and the signature check worth adding are in [Disk encryption and Secure Boot policy](research/2026-11-12-luks-secureboot-policy.md) (#54).
 

@@ -80,9 +80,10 @@ or a locally signed module, which is [#40], not a regression.
   runs yet.
 - The VM test has neither Secure Boot nor a TPM (`tests/vm/boot-smoke.sh:99-109`,
   `.github/workflows/ci.yml:89`), so no CI job can reach firmware state.
-- A ThinkPad (P, T, X) needs "Allow Microsoft 3rd party UEFI CA" enabled before
-  Secure Boot will accept Fedora's shim. That is a firmware setting, not an
-  enrollment, and it is the one manual step left on those machines.
+- Some Lenovo ThinkPad firmware ships with "Allow Microsoft 3rd party UEFI CA"
+  off, and Fedora's shim is signed through that CA. Turning it on is a firmware
+  trust setting, not a key enrolled in the MOK list, and it is the only manual
+  step left on those machines.
 
 ## Checks worth adding
 
