@@ -1,6 +1,6 @@
 # Install
 
-The published image installs to a physical disk with `bootc install to-disk` from a Fedora live environment. That path needs no install media artifact, which matters because this repo builds only a qcow2 for the VM test (`tests/vm/make-disk.sh:81`). Read the gates before wiping either target: the laptop's LUKS and Secure Boot state are unresolved, and the desktop needs the NVIDIA variant from [#40](https://github.com/ultus-net/dux-atomic/issues/40).
+The published image installs to a physical disk with `bootc install to-disk` from a Fedora live environment. That path needs no install media artifact, which matters because this repo builds only a qcow2 for the VM test (`tests/vm/make-disk.sh:81`). Read the gates before wiping either target: neither machine gets an encrypted root by policy (#54), the laptop's Secure Boot state is unrecorded, and the desktop needs the NVIDIA variant from [#40](https://github.com/ultus-net/dux-atomic/issues/40).
 
 ## What the image provides
 
@@ -77,15 +77,17 @@ Install-time provisioning needs a builder-produced artifact. A legacy `bootc-ima
 
 ## LUKS
 
-`cryptsetup` ships, but no encrypted install has been tested here. Upstream recommends setting up encryption independently of bootc, then pointing `bootc install to-filesystem` at the mounted filesystem. It explicitly does not recommend `bootc install to-disk --block-setup tpm2-luks` for new deployments. The legacy Anaconda ISO is the path upstream documents for LUKS during install.
-
-The laptop's encryption preflight is therefore not satisfied by the recommended to-disk command. Whether the shipped initramfs unlocks a LUKS root is unconfirmed, and `--block-setup tpm2-luks` is unconfirmed on this image. Gate: do not wipe the laptop until an encrypted install has been run and recorded. The three options, what each one's install test would prove, and what would settle the choice are in [Disk encryption and Secure Boot policy](research/2026-11-12-luks-secureboot-policy.md) (#54).
+No target is installed with an encrypted root. That is the recorded policy, not an omission: the decision, what it accepts, and the upstream reasons a LUKS install is not a small change are in [Disk encryption and Secure Boot policy](research/2026-11-12-luks-secureboot-policy.md) (#54). `cryptsetup` ships, but no encrypted install has been tested here.
 
 ## Secure Boot
 
-The SBOM carries `shim-x64`, `shim-ia32`, and `grub2-efi-x64`, so the image contains Fedora's signed boot chain. No boot with Secure Boot enabled has been recorded on either target. The laptop's firmware state is unknown (`docs/superpowers/specs/2026-11-09-dux-atomic-design.md:78`), and this page does not assume the installed system boots with it on. Gate: record the firmware setting before wiping. If it is on, verify the Fedora shim is trusted, or turn Secure Boot off for the install and record that decision.
+Secure Boot needs no per-machine enrollment on this image. The chain is Fedora's end to end: `shim-x64` and `grub2-efi-x64` are Fedora-signed, and the pinned base keeps Fedora's kernel, whose signature is issued by `CN=fedoraca, OU=Fedora Secure Boot CA 20200709` with subject `CN=kernel-signer`. In-tree modules are signed by `Fedora kernel signing key`, so they load from the kernel's builtin keyring. Verified on the built image on 2026-11-12: the kernel's PE certificate table holds that PKCS#7 signature, and `modinfo -F signer` reports the Fedora key for `nf_tables.ko.xz` and `nouveau.ko.xz`.
 
-The desktop has Secure Boot disabled today (`docs/superpowers/specs/2026-11-09-dux-atomic-design.md:73`). The NVIDIA variant's modules are unsigned, so that machine needs Secure Boot off or a signing path, which [#40](https://github.com/ultus-net/dux-atomic/issues/40) covers. The policy options and what each one's install test would prove are in [Disk encryption and Secure Boot policy](research/2026-11-12-luks-secureboot-policy.md) (#54).
+No boot with Secure Boot enabled has been recorded on either target. Record `mokutil --sb-state` per machine before the install, then record the boot result after it. The desktop has Secure Boot disabled today (`docs/superpowers/specs/2026-11-09-dux-atomic-design.md:73`); enabling it should need no enrollment step, but that is unproven until one boot is recorded.
+
+Lenovo ThinkPad (P, T, X) firmware needs "Allow Microsoft 3rd party UEFI CA" enabled, because Fedora's shim is signed through that CA. That is a firmware setting, not an enrollment.
+
+The desktop's NVIDIA modules are unsigned, so that machine needs Secure Boot off or a locally signed module, which [#40](https://github.com/ultus-net/dux-atomic/issues/40) covers. The evidence, the base swap that removed the old enrollment path, and the signature check worth adding are in [Disk encryption and Secure Boot policy](research/2026-11-12-luks-secureboot-policy.md) (#54).
 
 ## The desktop
 

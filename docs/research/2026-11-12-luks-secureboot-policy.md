@@ -1,258 +1,119 @@
 # Disk encryption and Secure Boot policy (issue #54)
 
-Status: record of options for an operator decision, not a decision. Cutoff
-2026-11-12. Everything below is read-only research: no code, manifest,
-installer, or workflow changed. Commands that need target hardware are written
-out rather than run.
+Status: decision record. Cutoff 2026-11-12. The operator decided both policies
+on that date. The base swap in #59 is what makes the Secure Boot half true, and
+this record's pull request changes no code, manifest, installer, or workflow.
 
-## Outcome
+## Decisions
 
-Neither policy can be settled from CI. The install path this repo documents,
-`bootc install to-disk` from a privileged container, cannot produce a LUKS root
-with a fallback unlock. Upstream tracks that path as broken ([#421]) and tracks
-install-time passphrase and recovery-key enrolment as open work ([#477],
-[#1329]). Upstream recommends setting encryption up independently of bootc and
-pointing `bootc install to-filesystem` at the mounted filesystem, and that is
-the only path that can carry a recovery key today.
+- **Disk encryption: none.** Neither target gets an encrypted root. The install
+  command stays `bootc install to-disk --wipe --filesystem btrfs`, and every
+  green install result so far is that path.
+- **Secure Boot: nothing to enroll.** The image boots on a Secure Boot machine
+  with no per-machine step, because the pinned base keeps Fedora's own signed
+  kernel and Fedora's shim already trusts it. There is no MOK enrollment, no
+  local key, and no signing pipeline to maintain.
 
-Secure Boot state is unknown on the laptop, no boot with it enabled has been
-recorded on either target, and the VM test has neither Secure Boot nor a TPM.
-The approved design forbids turning Secure Boot off on the laptop to simplify a
-recipe [S1], so that machine cannot be installed on until its firmware state is
-recorded.
+The first decision needs no evidence: an unencrypted install is what the
+repository already does. The second is measured below, because it rests on the
+base chosen in #59.
 
-## What is known and what is not
+## The chain is Fedora's end to end
 
-| Item | State | Source |
-| --- | --- | --- |
-| Laptop encryption requirement | Unrecorded, named a migration preflight check | [S1] |
-| Laptop Secure Boot state | Unknown | [S1] |
-| Desktop Secure Boot state | Disabled today | [S1] |
-| Installing the laptop with Secure Boot off | Forbidden by the design | [S1] |
-| A boot with Secure Boot enabled | Never recorded | [S2] |
-| An encrypted install on this image | Never run | [S2] |
-| The shipped initramfs unlocking a LUKS root | Unknown, no test asserts it | [S2] |
-| A LUKS install with a recovery key | Not available upstream | [S3], [S4], [S7] |
-| Secure Boot and TPM in the VM test | Neither present | [S5] |
+Firmware verifies the Fedora shim, the shim verifies Fedora's GRUB, and GRUB
+verifies a kernel that Fedora's Secure Boot signer issued. Every link is a
+Fedora package, so a normal Fedora trust configuration accepts the image with no
+enrollment prompt.
 
-## The three options
+Measured on the image built from this branch's base on 2026-11-12:
 
-The proves column describes a test of that option once it exists. This repo runs
-neither option 2 nor option 3 today, so no part of either has been observed.
+| Fact | Observation |
+| --- | --- |
+| Packages are Fedora's | `rpm -q` reports vendor `Fedora Project` for `kernel-core-7.3.3-300.fc45`, `shim-x64-16.1`, and `grub2-efi-x64-2.12-83.fc45` |
+| Kernel is signed | `/usr/lib/modules/7.3.3-300.fc45.x86_64/vmlinuz` carries a PE certificate table of 1896 bytes holding a PKCS#7 signature (revision `0x200`, certificate type `0x2`) |
+| Who signed it | `openssl pkcs7 -print_certs` on that signature prints subject `CN=kernel-signer, OU=bkernel01 kernel, OU=Fedora Secure Boot Signer, O=Red Hat, Inc.` and issuer `CN=fedoraca, OU=Fedora Secure Boot CA 20200709, O=Red Hat, Inc.` |
+| Modules are signed | `modinfo -F signer` prints `Fedora kernel signing key` for `nf_tables.ko.xz` and `nouveau.ko.xz` |
+| No Universal Blue key | `/etc/pki/akmods/certs/` does not exist in the image, and `mokutil-0.7.2-7.fc45` is installed for querying firmware state |
 
-| Option | What it costs | What a test of that option would prove | What it leaves unproven |
-| --- | --- | --- | --- |
-| 1. No encryption | Nothing changes from today's command | The install, boot, greeter, and account path already covered | Every LUKS and TPM2 claim. Data at rest is unprotected. |
-| 2. LUKS with TPM2 unlock plus a recovery key | A separate `/boot`, a TPM2 enrolment, a recovery key stored off the machine, re-enrolment after any change that moves the bound PCRs | Automatic unlock on that machine, and the recovery key unlocking when the TPM is absent | The install path cannot produce it today ([#421], [#477], [#1329]), so it needs a pre-step this repo does not have. |
-| 3. LUKS with a passphrase | One prompt per boot, and a passphrase recovery story | Encryption, and a fallback that does not depend on the TPM | Automatic unlock. The prompt replaces the TPM rather than adding to it. |
+The kernel loads `Fedora kernel signing key`-signed modules from its builtin
+keyring, which is why the in-tree module set needs no MOK entry either.
 
-### Option 1: no encryption
+## What the previous base forced
 
-Today's command is `bootc install to-disk --wipe --filesystem btrfs` against
-`:latest` [S2]. It writes the discoverable root partition, injects
-`root=UUID=<uuid>`, and creates no `/boot` partition, which the installer only
-creates for LUKS [S6]. Every green result the repo has so far is this option.
+Universal Blue's `base-main` replaces Fedora's kernel with one Universal Blue
+signs: `ublue-os/main/build_files/install.sh:46` (`# Use Signed Kernel and
+Versionlock`) bind-mounts `/kernel-rpms` built from `ghcr.io/ublue-os/akmods`,
+and `ublue-os/akmods/certs/public_key.der` is the matching key (self-signed,
+`CN=ublue kernel`, sha256
+`4e5c68474cb133fd8984d9599762cece9100c3e6cd8a9709aeaabd85dd9e70d1`). Firmware
+does not carry that key, so every machine had to enroll it in its MOK list
+before first boot, with a first-boot MOTD warning and an installer hook in
+support of that one step.
 
-### Option 2: LUKS with TPM2 unlock plus a recovery key
+Choosing a base that keeps Fedora's kernel deletes that whole path: no
+enrollment command in `docs/install.md`, no certificate to distribute, no hook
+to maintain. That is the trade #59 made, and this record depends on it.
 
-`bootc install to-disk --block-setup tpm2-luks` exists, and `tpm2-luks` is one
-of the two accepted values [S6]. It creates a separate `/boot` because GRUB
-cannot read an encrypted `/boot` [S7]. Upstream still tells new deployments to
-use `install to-filesystem` for anything more complex than a plain root,
-LUKS included [S6], and to set encryption up independently of bootc [S7].
+The cost is unchanged by the base: an akmod compiled at boot carries no
+distribution signature on any base, so the NVIDIA variant needs Secure Boot off
+or a locally signed module, which is [#40], not a regression.
 
-Three open upstream issues decide this option:
+## What the no-encryption decision means
 
-- [#421] reports a `tpm2-luks` install that reboots into `systemd-cryptsetup`
-  failing with `Current policy digest does not match stored policy digest,
-  cancelling TPM2 authentication attempt.` and `No passphrase or recovery key
-  registered`, then drops to a dracut rescue shell. The report calls the
-  missing failover credential a bug in the install path, not a PCR problem.
-- [#477] tracks configurable password and recovery keys on a LUKS volume, and
-  [#1329] tracks a LUKS password at install time. Both are open, so the
-  recovery key that makes TPM2 unlock safe is exactly the part the install path
-  does not enrol.
-- [#476] tracks configurable PCRs. [#2089], closed, records the deadlock seen
-  when install-time LUKS runs inside a container's IPC namespace, which is the
-  shape of this repo's install command [S2].
+- One unencrypted btrfs root, no separate `/boot`, no unlock prompt, no recovery
+  key. That is the layout `bootc install to-disk` produces by default.
+- Data at rest on either machine is unprotected. That is accepted for both
+  targets and recorded here so a later reader does not treat it as an oversight.
+- No LUKS test exists or is planned. The upstream reasons a LUKS install is not
+  a small change are unchanged: `--block-setup tpm2-luks` is tracked as broken
+  ([#421]) with install-time passphrases and recovery keys still open ([#477],
+  [#1329]), and upstream recommends setting encryption up independently of bootc
+  and pointing `bootc install to-filesystem` at the mounted filesystem. If the
+  policy changes, that is the route to evaluate, not the to-disk flag.
 
-The PCR binding matters beyond the installer. `systemd-cryptenroll` documents
-that `--tpm2-pcrs=` binds to no PCRs when the option is absent, that volumes are
-generally bound to some combination of PCRs 7, 11, and 14, and that PCR 7 is
-Secure Boot state, which changes when Secure Boot is toggled or the firmware
-certificate databases change [S8]. A firmware update or a Secure Boot toggle can
-therefore make a PCR-7-bound key stop unsealing, which is why the recovery key is
-not optional.
+## What this does not prove
 
-A test of this option would prove, once the pre-step exists, automatic unlock on
-the target, the recovery key unlocking with the TPM absent, and `/boot` staying
-unencrypted by design. The pre-step itself does not exist: it has to partition
-the disk, run `cryptsetup luksFormat`, enrol with
-`systemd-cryptenroll --tpm2-device=auto --recovery-key`, mount the result, and
-then run `bootc install to-filesystem`. Nothing in this repo does that, and
-`tests/vm/make-disk.sh:82` builds an unencrypted qcow2 [S9].
+- No boot of this image with Secure Boot enabled has been recorded on either
+  machine. The signature is measured from the image, not from firmware.
+- No script checks the kernel signature. A base bump could ship an unsigned
+  kernel and CI would stay green; the checks below would catch it, and neither
+  runs yet.
+- The VM test has neither Secure Boot nor a TPM (`tests/vm/boot-smoke.sh:99-109`,
+  `.github/workflows/ci.yml:89`), so no CI job can reach firmware state.
+- A ThinkPad (P, T, X) needs "Allow Microsoft 3rd party UEFI CA" enabled before
+  Secure Boot will accept Fedora's shim. That is a firmware setting, not an
+  enrollment, and it is the one manual step left on those machines.
 
-### Option 3: LUKS with a passphrase
+## Checks worth adding
 
-The same pre-step, minus the TPM2 enrolment, with the passphrase set by
-`cryptsetup luksAddKey` or `systemd-cryptenroll --password` [S8]. It needs no TPM
-and survives a firmware update, because the fallback is the primary credential.
-The cost is one prompt per boot, and that prompt is a console prompt: the only
-kernel argument the image adds is `plymouth.enable=0` [S10], so there is no
-splash to draw an unlock dialog.
-
-Anaconda's kickstart `--encrypted` option is upstream's documented route for
-LUKS during an install [S7]. The Anaconda ISO path is unbuilt and unconfirmed on
-this image [S2], so it does not rescue the recommended to-disk path.
-
-## What a LUKS root changes for this image
-
-- **Root discovery.** The image ships shim and GRUB, not systemd-boot [S2].
-  `bootc install to-disk` injects `root=UUID=<uuid>` by default, and discoverable
-  partition auto-discovery needs a bootloader that implements the Boot Loader
-  Interface, which systemd-boot always does and GRUB only with newer builds that
-  include the `bli` module [S6]. With LUKS, upstream expects either discoverable
-  partitions or a `root=` plus `luks.uuid` pair [S7]. Which of those this
-  image's GRUB produces is unverified.
-- **Initramfs.** Unlocking needs the crypt module and `systemd-cryptsetup` in the
-  initramfs, and TPM2 unlocking also needs `tpm2-tss` there [S3]. The image
-  carries no dracut configuration and no bootc install fragment [S2], so this
-  depends on the base image. One command settles it on a booted candidate:
-
-  ```bash
-  lsinitrd -m "/boot/initramfs-$(uname -r).img" | grep -E '^(crypt|tpm2-tss)$'
-  ```
-
-  `lsinitrd -m` lists the dracut modules inside the image [S11].
-- **Day-2 updates.** `bootc upgrade` operates on the mounted root filesystem with
-  LUKS underneath included [S7], so updates need no special handling.
-  `--target-imgref` still names `:latest` [S2], so an encrypted install keeps the
-  promoted channel.
-- **Ownership.** The encryption setup belongs to whoever builds and maintains the
-  image or installer, not to bootc [S7]. A reinstall repeats the pre-step, and a
-  lost recovery key is data loss rather than a support case.
-
-## Secure Boot
-
-One command reports the state: `bootctl status`, which prints a `Secure Boot:`
-line and a `TPM2 Support:` line, and whose man page example shows
-`Secure Boot: disabled (setup)` [S12]. `mokutil --sb-state` is the narrower
-alternative when only the Secure Boot state is wanted [S13].
-
-The image carries Fedora's `shim-x64`, `shim-ia32`, and `grub2-efi-x64` [S2], so
-a Secure Boot machine should accept the signed boot chain and signed kernel.
-That is an expectation from the package list, not a recorded boot.
-
-Three constraints apply:
-
-- The design forbids disabling laptop Secure Boot to simplify a recipe, and
-  forbids claiming that container signing satisfies Secure Boot [S1]. A cosign
-  signature on the image says nothing about the firmware trust chain.
-- The desktop has Secure Boot disabled today, and the NVIDIA variant needs the
-  Universal Blue MOK key enrolled before a Secure Boot desktop can load the
-  driver. The mechanics and the enrolment path are in the variant plan, section
-  4 [S14], and are not repeated here.
-- Laptop Secure Boot state and employer requirements are deployment gates [S1],
-  so the state is an input to the LUKS decision as well: it decides what a
-  future PCR-7 change means.
-
-## What CI can and cannot prove
-
-| Check | Today | What it would need |
-| --- | --- | --- |
-| UEFI boot, greeter, serial login | Covered on plain OVMF, no Secure Boot, no TPM [S5] | Nothing |
-| Boot with Secure Boot enabled | Not covered | A Secure Boot OVMF firmware and a firmware key database, or hardware. `tests/vm/boot-smoke.sh:34-53` searches only the plain OVMF pairs |
-| TPM2 unlock | Not covered | An emulated TPM in the VM. CI installs `podman qemu-system-x86 qemu-utils ovmf` and no TPM emulator [S5], and `tests/vm/boot-smoke.sh:99-109` passes no TPM device |
-| LUKS unlock at all | Not covered | An encrypted disk. The builder is invoked with `--type qcow2 --rootfs btrfs` [S9], and the bootc migration doc documents no LUKS option |
-| The recovery key unlocking | Not covered | The above plus a scripted answer to the prompt |
-| A PCR change leaving the system bootable | Not covered | Two enrolments across a firmware or Secure Boot change, on hardware |
-
-A green install test that reaches the greeter proves option 1 only. It does not
-carry over to options 2 or 3, and it should not be cited as evidence for them.
-
-## What would settle this
-
-1. Record the firmware state on both machines with `bootctl status`, plus the
-   laptop model, dock, and employer encryption requirement the design asks for
-   [S1].
-2. Decide whether the laptop requires encryption at rest. Employer policy
-   decides that, not this repo.
-3. If option 2 or 3 is chosen, write the pre-step as a documented procedure and
-   try it first on the desktop, where Secure Boot is already off.
-4. Settle the initramfs question in the same run with `lsinitrd`, before
-   trusting any unlock result.
-5. Then write the install procedure into `docs/install.md` and record the
-   observed result under `docs/research/`.
-
-## Unconfirmed
-
-- Whether the shipped initramfs contains the crypt module and
-  `systemd-cryptsetup`.
-- Whether `tpm2-tss` is in the image and in its initramfs.
-- Which PCRs `--block-setup tpm2-luks` binds, and whether it still fails the way
-  [#421] reports on bootc 1.17.1.
-- Whether this image's GRUB gives bootc the Boot Loader Interface that
-  discoverable partition auto-discovery needs.
-- Whether `bootc-image-builder` can produce an encrypted disk artifact. The
-  bootc migration doc documents no such option [S9].
-- Whether the laptop's firmware, dock, or employer policy adds a requirement
-  beyond the two policies above.
+- Read the kernel's PE certificate table in `tests/verify-image.sh`, failing
+  when the signature is absent. It needs no certificate pinning and would have
+  caught the Universal Blue kernel on the old base.
+- Bluefin's `sbverify --cert` variant (`ublue-os/bluefin/Justfile:520-563`) is
+  the stricter form; it needs the Fedora CA certificate pinned in the repo.
 
 ## Sources
 
-- [S1] Approved design, `docs/superpowers/specs/2026-11-09-dux-atomic-design.md`:
-  the hardware table (lines 71-74), line 78 "Record laptop model, actual dock
-  model, attached USB devices, monitor modes, and Secure Boot state before
-  deployment.", line 80 "Laptop encryption, employer policy, rollback
-  deployment, network enrollment, and firmware requirements are migration
-  preflight checks.", line 345 "Desktop Secure Boot is currently disabled.", line
-  347 "Do not promise that container signing satisfies Secure Boot, or disable
-  laptop Secure Boot to simplify a driver recipe.", and line 348 "Laptop Secure
-  Boot state and employer requirements are deployment gates."
-- [S2] `docs/install.md`: line 33 `bootc install to-disk --wipe --filesystem
-  btrfs`, line 38 "The image carries no `/usr/lib/bootc/install` fragment", line
-  44 the ISO heading with line 46 "`bootc-image-builder` still accepts `--type
-  iso`", line 80 "Upstream recommends setting up encryption independently of
-  bootc", line 82 "Whether the shipped initramfs unlocks a LUKS root is
-  unconfirmed", line 86 "The SBOM carries `shim-x64`, `shim-ia32`, and
-  `grub2-efi-x64`", and line 88 "The desktop has Secure Boot disabled today".
-- [S3] bootc issue #421, "install to-disk with LUKS + TPM broken", updated
-  2026-07-10: <https://github.com/bootc-dev/bootc/issues/421>
-- [S4] bootc issues #476, #477, #1329 (open) and #2089 (closed):
-  <https://github.com/bootc-dev/bootc/issues/476>,
-  <https://github.com/bootc-dev/bootc/issues/477>,
-  <https://github.com/bootc-dev/bootc/issues/1329>,
-  <https://github.com/bootc-dev/bootc/issues/2089>.
-- [S5] `tests/vm/boot-smoke.sh:34-53` (plain OVMF pairs only), `:99-109` (no TPM
-  device), and `.github/workflows/ci.yml:89` (the packages the image job
-  installs).
-- [S6] `bootc install to-disk` man page: `--block-setup` values, the `/boot`
-  partition created only for LUKS, root discovery modes, and the `bli`
-  requirement for GRUB:
-  <https://bootc.dev/bootc/man/bootc-install-to-disk.8.html>
-- [S7] "Disk encryption (e.g. LUKS)": the independent-setup recommendation, the
-  `/boot` requirement for `tpm2-luks`, installer ownership of the setup, the
-  `root=` plus `luks.uuid` guidance, and the `install to-filesystem` scope:
-  <https://bootc.dev/bootc/bootc-filesystem-encryption.7.html>
-- [S8] `systemd-cryptenroll` man page, systemd 262: `--tpm2-pcrs=` default, the
-  PCR table with PCR 7 as Secure Boot state, `--recovery-key`, `--password`, and
-  the key roll-over limitation:
-  <https://www.freedesktop.org/software/systemd/man/latest/systemd-cryptenroll.html>
-- [S9] `tests/vm/make-disk.sh:82`, and the bootc migration doc, which documents
-  no LUKS option:
-  <https://github.com/osbuild/image-builder/blob/main/doc/20-advanced/20-bootc/50-migration.md>
-- [S10] `overlay/usr/lib/bootc/kargs.d/20-plymouth.toml`, the only kernel
-  argument the image adds.
-- [S11] `lsinitrd` man page, `-m` and the image argument:
-  <https://github.com/dracut-ng/dracut-ng/blob/main/man/lsinitrd.1.adoc>
-- [S12] `bootctl` man page, `status` and its output example:
-  <https://www.freedesktop.org/software/systemd/man/latest/bootctl.html>
-- [S13] `mokutil` man page, `--sb-state`:
-  <https://manpages.ubuntu.com/manpages/noble/man1/mokutil.1.html>
-- [S14] `docs/research/2026-11-12-nvidia-variant-plan.md`, section 4.
+- [S1] This repository's `Containerfile` and `manifests/packages-common.lock`,
+  read 2026-11-12: the base pin, the Fedora vendor of the kernel, shim, and GRUB
+  packages, and the absence of `/etc/pki/akmods/certs/`.
+- [S2] `ublue-os/main/build_files/install.sh:46` and `ublue-os/akmods/certs/public_key.der`,
+  read 2026-11-12: the replaced kernel and the key it is signed with,
+  sha256 `4e5c68474cb133fd8984d9599762cece9100c3e6cd8a9709aeaabd85dd9e70d1`:
+  <https://github.com/ublue-os/main/blob/main/build_files/install.sh>,
+  <https://github.com/ublue-os/akmods/blob/main/certs/public_key.der>
+- [S3] `ublue-os/bluefin/Justfile:520-563`, the `sbverify --cert` check:
+  <https://github.com/ublue-os/bluefin/blob/main/Justfile>
+- [S4] Repository facts: `docs/install.md` for the install command,
+  `tests/vm/boot-smoke.sh:99-109` (no TPM device), `.github/workflows/ci.yml:89`
+  (no TPM emulator), `docs/superpowers/specs/2026-11-09-dux-atomic-design.md:73`
+  (desktop Secure Boot disabled) and `:78` (record the firmware state before
+  deployment).
+- [S5] bootc issue #421, "install to-disk with LUKS + TPM broken", updated
+  2026-07-10, and issues #477 and #1329:
+  <https://github.com/bootc-dev/bootc/issues/421>
 
 [#421]: https://github.com/bootc-dev/bootc/issues/421
-[#476]: https://github.com/bootc-dev/bootc/issues/476
 [#477]: https://github.com/bootc-dev/bootc/issues/477
 [#1329]: https://github.com/bootc-dev/bootc/issues/1329
-[#2089]: https://github.com/bootc-dev/bootc/issues/2089
+[#40]: https://github.com/ultus-net/dux-atomic/issues/40
