@@ -37,8 +37,10 @@ fi
 # Secure Boot needs no per-machine enrollment only while the base keeps Fedora's
 # kernel and modules. The signature is the whole difference between that base
 # and a base that ships its own signed kernel, so check the issuer here (#65).
-"$runtime" run --rm -v "$repo_root:/mnt:ro" "$image" \
-  bash /mnt/tests/verify-kernel-signature.sh
+# The repository mounts at /opt because /mnt is a symlink in this base and an
+# older crun cannot create a bind mount over it (run 43174150389).
+"$runtime" run --rm -v "$repo_root:/opt:ro" "$image" \
+  bash /opt/tests/verify-kernel-signature.sh
 # xdg-desktop-portal reads /etc before /usr/share, so the override is what
 # routes FileChooser to gtk instead of nautilus, which this image does not ship.
 "$runtime" run --rm "$image" grep -qx \
