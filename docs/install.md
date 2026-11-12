@@ -87,6 +87,17 @@ No boot with Secure Boot enabled has been recorded on either target. Record `mok
 
 Fedora's shim is signed through Microsoft's third-party UEFI CA, so the firmware must trust that CA. Most machines ship with it enabled. Some Lenovo ThinkPad models ship with it off, and there the firmware setting has to be turned on once; that is a trust setting in firmware, not a key enrolled in the MOK list, and it survives upgrades without repeating. A Secure Boot violation at first boot on those machines points at this setting before anything else.
 
+### Order on a fresh target
+
+No target has run this order yet. It exists so the first install produces the evidence, and each step records what it observed.
+
+1. Record the firmware state from the live environment with `mokutil --sb-state`, and keep the output beside the install result.
+2. Turn Secure Boot off, run the install above, and boot through to the account you create.
+3. Record `bootc status` and the digest the target booted.
+4. Enable Secure Boot in firmware, boot again, and record the result.
+
+Installing with Secure Boot off first separates a firmware refusal, which stops the boot before the kernel loads, from a defect in the image, which shows up after it. The disk does not depend on the answer: the install writes no key, so the same image boots either way.
+
 The desktop's NVIDIA modules are unsigned, so that machine needs Secure Boot off or a locally signed module, which [#40](https://github.com/ultus-net/dux-atomic/issues/40) covers. The evidence, the base swap that removed the old enrollment path, and the signature check worth adding are in [Disk encryption and Secure Boot policy](research/2026-11-12-luks-secureboot-policy.md) (#54).
 
 ## The desktop
