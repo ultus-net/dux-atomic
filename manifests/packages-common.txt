@@ -1,15 +1,80 @@
 # packages-common.txt — one package per line, installed as root in the image.
-# Comments group entries.
+# Comments group entries, and the group comment names the reason the group is
+# here. The queue that ships these is Fedora's bootc image, so a package the
+# session needs at runtime has to be named: the base carries no desktop.
 
-# Wayland session
+# Compositor, shell, greeter and terminal
 niri
-
-# Dux shell and greeter (COPR duxlabs/dms, duxlabs/dux-repo)
 dms
 dms-greeter
-
-# Terminal
+quickshell
 ghostty
+
+# Dux applications the installer treats as optional dependencies
+dux-search
+dux-calendar
+dux-files
+matugen
+
+# Wayland portals, keyring, policy agent and session services
+xdg-desktop-portal
+xdg-desktop-portal-gtk
+xdg-desktop-portal-gnome
+gnome-keyring
+xfce-polkit
+accountsservice
+upower
+rtkit
+playerctl
+xdg-user-dirs
+xdg-utils
+dconf
+hicolor-icon-theme
+adwaita-icon-theme
+adwaita-cursor-theme
+
+# Audio: PipeWire and the ALSA/CONFIGFS firmware the laptop's codec needs
+pipewire
+pipewire-alsa
+pipewire-pulseaudio
+pipewire-utils
+wireplumber
+alsa-utils
+alsa-ucm
+alsa-sof-firmware
+
+# Hardware, power and the day-2 update timer the base presets
+bluez
+NetworkManager-wifi
+wpa_supplicant
+iwlwifi-mvm-firmware
+firewalld
+power-profiles-daemon
+zram-generator-defaults
+brightnessctl
+
+# Graphics stack and media codecs for the session
+mesa-dri-drivers
+mesa-vulkan-drivers
+vulkan-loader
+xwayland-satellite
+xorg-x11-server-Xwayland
+libva-intel-media-driver
+gstreamer1-plugins-good
+gstreamer1-plugin-libav
+google-noto-color-emoji-fonts
+
+# Terminal tools, containers and Flatpak
+tmux
+htop
+git
+just
+fzf
+distrobox
+wl-clipboard
+flatpak
+rsync
+zip
 
 # Xfce X11 fallback
 xfce4-session
