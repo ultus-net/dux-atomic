@@ -4,10 +4,10 @@ The published image installs to a physical disk with `bootc install to-disk` fro
 
 ## What the image provides
 
-- x86_64 UEFI boot through Fedora's `shim-x64`, `shim-ia32`, and `grub2-efi-x64`.
+- x86_64 UEFI boot through Fedora's `shim-x64` and `grub2-efi-x64`. The image carries no 32-bit UEFI loader (`shim-ia32`, `grub2-efi-ia32` are absent), which matters only on 32-bit UEFI firmware.
 - `bootc` 1.17.1, `podman`, `cryptsetup`, `btrfs-progs`, and systemd 262.
 - No login account and no password. Root is locked (`root:*` in `/etc/shadow`) and `sshd` is disabled, so a fresh install has no console or SSH login.
-- No NVIDIA kernel driver. `nvidia-gpu-firmware` and `nvidia-container-toolkit` are present, but neither is a display driver.
+- No NVIDIA kernel driver. `nvidia-gpu-firmware` ships, which is firmware data rather than a driver, and `nvidia-container-toolkit` is not installed.
 - Anonymous pull from GHCR, so no registry login is needed.
 
 ## Install media
