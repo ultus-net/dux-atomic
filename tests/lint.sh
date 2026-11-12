@@ -34,6 +34,7 @@ bash_scripts=(
   tests/test-signing.sh
   tests/test-static.sh
   tests/verify-image.sh
+  tests/verify-kernel-signature.sh
   tests/vm/boot-smoke.sh
   tests/vm/make-disk.sh
 )

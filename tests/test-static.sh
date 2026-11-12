@@ -93,6 +93,22 @@ else
   echo "ok   the lock is written atomically, drift is separated from a failed measurement, and +git builds are dropped on both sides"
 fi
 
+# Secure Boot needs no per-machine enrollment only while the base keeps Fedora's
+# signed kernel, and the image job is the only place that can see it (#65). Pin
+# the call and the issuer: the old base shipped a signed kernel too, so the
+# presence of a signature alone would not have caught the swap.
+kernel_check=$repo_root/tests/verify-kernel-signature.sh
+if [[ ! -f $repo_root/tests/pe-signature.py ]] ||
+   ! grep -qF 'tests/verify-kernel-signature.sh' "$repo_root/tests/verify-image.sh" ||
+   ! grep -qF 'exactly one certificate' "$kernel_check" ||
+   ! grep -qF 'CN=fedoraca' "$kernel_check" ||
+   ! grep -qF 'CN=kernel-signer' "$kernel_check"; then
+  echo "FAIL nothing checks that the image's kernel is signed by Fedora, so a base bump could break Secure Boot silently" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the image job checks that the kernel is signed by Fedora"
+fi
+
 desktop_unit=$repo_root/overlay/usr/lib/systemd/user/dux-atomic-desktop.service
 defaults_unit=$repo_root/overlay/usr/lib/systemd/user/dux-atomic-dms-defaults.service
 user_preset=$repo_root/overlay/usr/lib/systemd/user-preset/01-dux-atomic.preset
