@@ -331,11 +331,20 @@ jobs:
         # body at about 86 MB, which the SBOM step now prevents by stripping
         # the file inventory. The retry stays for genuine 5xx and network
         # failures, and cosign gives up after its own four attempts.
+        #
+        # --new-bundle-format is required as soon as a Sigstore bundle
+        # references the digest. cosign verify-attestation switches to bundle
+        # mode when it finds one (`cosign.GetBundles` in cmd/cosign/cli/
+        # verify/verify_attestation.go), and in that mode it ignores the legacy
+        # tag attachment this command writes by default. Run 43106659542
+        # failed verify in 12s that way: it found only the SLSA provenance
+        # bundle from the step below and reported "none of the attestations
+        # matched the predicate type: spdxjson".
         timeout-minutes: 15
         run: |
           source "$RUNNER_TEMP/helpers.sh"
           digest=$(cat "$RUNNER_TEMP/digest")
-          with_log "$RUNNER_TEMP/attest.log" retry cosign attest --yes --predicate sbom/dux-atomic.spdx.json --type spdxjson "$IMAGE@$digest"
+          with_log "$RUNNER_TEMP/attest.log" retry cosign attest --yes --new-bundle-format --predicate sbom/dux-atomic.spdx.json --type spdxjson "$IMAGE@$digest"
 
       - name: Attest build provenance
         # The SBOM attestation says what is inside the image, not who built it.
