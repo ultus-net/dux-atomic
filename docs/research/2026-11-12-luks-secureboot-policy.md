@@ -75,9 +75,10 @@ or a locally signed module, which is [#40], not a regression.
 
 - No boot of this image with Secure Boot enabled has been recorded on either
   machine. The signature is measured from the image, not from firmware.
-- No script checks the kernel signature. A base bump could ship an unsigned
-  kernel and CI would stay green; the checks below would catch it, and neither
-  runs yet.
+- The `image` job reads the kernel's certificate table and fails unless the
+  issuer is `CN=fedoraca` (`tests/verify-kernel-signature.sh`, #65), so a base
+  bump cannot ship an unsigned kernel unnoticed. That reads the image, not
+  firmware, and a module built outside the kernel tree is still unsigned.
 - The VM test has neither Secure Boot nor a TPM (`tests/vm/boot-smoke.sh:99-109`,
   `.github/workflows/ci.yml:89`), so no CI job can reach firmware state.
 - Some Lenovo ThinkPad firmware ships with "Allow Microsoft 3rd party UEFI CA"
@@ -85,13 +86,17 @@ or a locally signed module, which is [#40], not a regression.
   trust setting, not a key enrolled in the MOK list, and it is the only manual
   step left on those machines.
 
-## Checks worth adding
+## Checks
 
-- Read the kernel's PE certificate table in `tests/verify-image.sh`, failing
-  when the signature is absent. It needs no certificate pinning and would have
-  caught the Universal Blue kernel on the old base.
+The first check landed in #65. The second is still an option.
+
+- `tests/verify-kernel-signature.sh` walks the kernel's PE certificate table and
+  fails unless the issuer is `CN=fedoraca`, which is what separates this base's
+  kernel from a base that ships its own. `tests/test-static.sh` pins the call, so
+  an edit cannot drop it silently.
 - Bluefin's `sbverify --cert` variant (`ublue-os/bluefin/Justfile:520-563`) is
-  the stricter form; it needs the Fedora CA certificate pinned in the repo.
+  the stricter form: it verifies the signature against the Fedora CA instead of
+  reading the issuer string, and it needs that certificate pinned in the repo.
 
 ## Sources
 

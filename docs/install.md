@@ -98,7 +98,7 @@ No target has run this order yet. It exists so the first install produces the ev
 
 Installing with Secure Boot off first separates a firmware refusal, which stops the boot before the kernel loads, from a defect in the image, which shows up after it. The disk does not depend on the answer: the install writes no key, so the same image boots either way.
 
-The desktop's NVIDIA modules are unsigned, so that machine needs Secure Boot off or a locally signed module, which [#40](https://github.com/ultus-net/dux-atomic/issues/40) covers. The evidence, the base swap that removed the old enrollment path, and the signature check worth adding are in [Disk encryption and Secure Boot policy](research/2026-11-12-luks-secureboot-policy.md) (#54).
+The desktop's NVIDIA modules are unsigned, so that machine needs Secure Boot off or a locally signed module, which [#40](https://github.com/ultus-net/dux-atomic/issues/40) covers. The `image` job checks the kernel's signature on every build (`tests/verify-kernel-signature.sh`), so a base that stopped shipping Fedora's kernel would red CI rather than fail at first boot. The evidence, the base swap that removed the old enrollment path, and the remaining check are in [Disk encryption and Secure Boot policy](research/2026-11-12-luks-secureboot-policy.md) (#54).
 
 ## The desktop
 
