@@ -537,6 +537,13 @@ elif ! grep -qF 'attestations: write' <<<"$publish_block" ||
    ! grep -qF 'create-storage-record: false' <<<"$publish_block"; then
   echo "FAIL ci.yml does not attest build provenance for the pushed digest, or asks for a permission the step does not need" >&2
   failures=$((failures + 1))
+elif ! grep -qF 'retry cosign attest --yes --new-bundle-format' <<<"$publish_block" ||
+     ! grep -qF -- '--predicate sbom/dux-atomic.spdx.json --type spdxjson' <<<"$publish_block"; then
+  # A legacy tag attachment becomes invisible once any Sigstore bundle
+  # references the digest, because cosign then verifies in bundle mode only.
+  # Run 43106659542 failed verify that way after the provenance bundle landed.
+  echo "FAIL ci.yml attests the SBOM without --new-bundle-format, so the provenance bundle hides it from cosign verify-attestation" >&2
+  failures=$((failures + 1))
 elif [[ -z $verify_block ]] ||
      ! grep -qF 'gh attestation verify "oci://$IMAGE@$DIGEST"' <<<"$verify_block" ||
      ! grep -qF -- '--bundle-from-oci' <<<"$verify_block" ||
