@@ -4,14 +4,70 @@
 # packages move with the updates repository on every build.
 # A +git build tracks an upstream branch, so it cannot be pinned and is
 # left out of this file and the comparison; the VM boot test covers it.
+NetworkManager-wifi-1:1.58.1-3.fc45.x86_64	Fedora Project
+accountsservice-26.27.3-2.fc45.x86_64	Fedora Project
+adwaita-cursor-theme-51.0-1.fc45.noarch	Fedora Project
+adwaita-icon-theme-51.0-1.fc45.noarch	Fedora Project
+alsa-sof-firmware-2026.09.2-1.fc45.noarch	Fedora Project
+alsa-ucm-1.2.16.1-2.fc45.noarch	Fedora Project
+alsa-utils-1.2.16-2.fc45.x86_64	Fedora Project
+bluez-5.88-1.fc45.x86_64	Fedora Project
+brightnessctl-0.5.1-17.fc45.x86_64	Fedora Project
+dconf-51.0-1.fc45.i686	Fedora Project
+dconf-51.0-1.fc45.x86_64	Fedora Project
+distrobox-1.8.2.5-2.fc45.noarch	Fedora Project
 dms-2.1.2-1.fc45.x86_64	Fedora Copr - user duxlabs
+dux-calendar-2.1.2-1.fc45.x86_64	Fedora Copr - user duxlabs
+dux-files-2.1.2-1.fc45.x86_64	Fedora Copr - user duxlabs
+dux-search-2.1.1-1.fc45.x86_64	Fedora Copr - user duxlabs
+firewalld-2.5.2-1.fc45.noarch	Fedora Project
+flatpak-1.19.0^really1.18.4-1.fc45.x86_64	Fedora Project
+fzf-0.74.5-1.fc45.x86_64	Fedora Project
 gamescope-3.16.29-1.fc45.x86_64	Fedora Project
 ghostty-1.4.0-3.fc45.x86_64	Fedora Copr - user duxlabs
+git-2.56.0-1.fc45.x86_64	Fedora Project
+gnome-keyring-51.1-1.fc45.x86_64	Fedora Project
+google-noto-color-emoji-fonts-20260921-1.fc45.noarch	Fedora Project
+gstreamer1-plugin-libav-1:1.28.9-1.fc45.x86_64	negativo17.org
+gstreamer1-plugins-good-1.28.9-1.fc45.x86_64	Fedora Project
+hicolor-icon-theme-0.18-6.fc45.noarch	Fedora Project
+htop-3.5.3-1.fc45.x86_64	Fedora Project
+iwlwifi-mvm-firmware-20261019-1.fc45.noarch	Fedora Project
+just-1.59.0-1.fc45.x86_64	Fedora Project
+libva-intel-media-driver-1:26.4.0-1.fc45.x86_64	negativo17.org
 mangohud-0.8.3~rc1-4.fc45.i686	Fedora Project
 mangohud-0.8.3~rc1-4.fc45.x86_64	Fedora Project
+matugen-4.2.0-1.fc45.x86_64	Fedora Copr - user duxlabs
+mesa-dri-drivers-1:26.2.6-1.fc45.i686	negativo17.org
+mesa-dri-drivers-1:26.2.6-1.fc45.x86_64	negativo17.org
+mesa-vulkan-drivers-1:26.2.6-1.fc45.i686	negativo17.org
+mesa-vulkan-drivers-1:26.2.6-1.fc45.x86_64	negativo17.org
 niri-26.04-2.fc45.x86_64	Fedora Project
+pipewire-1.6.11-1.fc45.i686	Fedora Project
+pipewire-1.6.11-1.fc45.x86_64	Fedora Project
+pipewire-alsa-1.6.11-1.fc45.x86_64	Fedora Project
+pipewire-pulseaudio-1.6.11-1.fc45.x86_64	Fedora Project
+pipewire-utils-1.6.11-1.fc45.x86_64	Fedora Project
+playerctl-2.4.1-13.fc45.x86_64	Fedora Project
+power-profiles-daemon-0.30-4.fc45.x86_64	Fedora Project
+quickshell-0.3.2-2.fc45.x86_64	Fedora Copr - user duxlabs
+rsync-3.5.2-2.fc45.x86_64	Fedora Project
+rtkit-0.14-2.fc45.x86_64	Fedora Project
 steam-1.0.0.87-4.fc45.x86_64	negativo17.org
 steam-devices-1.0.0.101^git20260625.22ec85e-2.fc45.noarch	Fedora Project
+tmux-3.8-2.fc45.x86_64	Fedora Project
+upower-1.91.5-1.fc45.x86_64	Fedora Project
+vulkan-loader-1.4.350.0-2.fc45.i686	Fedora Project
+vulkan-loader-1.4.350.0-2.fc45.x86_64	Fedora Project
+wireplumber-0.5.19-1.fc45.x86_64	Fedora Project
+wl-clipboard-2.3.0-2.fc45.x86_64	Fedora Project
+wpa_supplicant-1:2.11-13.fc45.x86_64	Fedora Project
+xdg-desktop-portal-1.22.1-2.fc45.x86_64	Fedora Project
+xdg-desktop-portal-gnome-51.0-2.fc45.x86_64	Fedora Project
+xdg-desktop-portal-gtk-1.15.3-6.fc45.x86_64	Fedora Project
+xdg-user-dirs-0.20-2.fc45.x86_64	Fedora Project
+xdg-utils-1.2.1-6.fc45.noarch	Fedora Project
+xfce-polkit-0.3-18.fc45.x86_64	Fedora Project
 xfce4-notifyd-0.9.7-5.fc45.x86_64	Fedora Project
 xfce4-panel-4.20.8-4.fc45.x86_64	Fedora Project
 xfce4-power-manager-4.20.1-2.fc45.x86_64	Fedora Project
@@ -19,4 +75,8 @@ xfce4-screensaver-4.20.2-2.fc45.x86_64	Fedora Project
 xfce4-session-4.20.4-2.fc45.x86_64	Fedora Project
 xfwm4-4.20.0-5.fc45.x86_64	Fedora Project
 xorg-x11-server-Xorg-21.1.25-2.fc45.x86_64	Fedora Project
+xorg-x11-server-Xwayland-24.1.14-2.fc45.x86_64	Fedora Project
 xorg-x11-xinit-1.4.3-6.fc45.x86_64	Fedora Project
+xwayland-satellite-0.8.3-1.fc45.x86_64	Fedora Project
+zip-3.0-46.fc45.x86_64	Fedora Project
+zram-generator-defaults-1.2.1-6.fc45.noarch	Fedora Project

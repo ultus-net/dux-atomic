@@ -14,17 +14,20 @@ if [[ ! -f $repo_root/Containerfile ]]; then
 elif grep -q 'ARG BASE_IMAGE' "$repo_root/Containerfile"; then
   echo "FAIL Containerfile still declares BASE_IMAGE; Dependabot cannot expand an ARG into FROM" >&2
   failures=$((failures + 1))
-elif base=$(grep -E '^FROM ghcr\.io/ublue-os/base-main:[0-9]+@sha256:[0-9a-f]{64}$' "$repo_root/Containerfile"); then
-  base_total=$(grep -cE '^FROM ghcr\.io/ublue-os/' "$repo_root/Containerfile")
-  base_pinned=$(grep -cE '^FROM ghcr\.io/ublue-os/base-main:[0-9]+@sha256:[0-9a-f]{64}$' "$repo_root/Containerfile")
-  if ((base_total != base_pinned)); then
-    echo "FAIL Containerfile has ${base_total} ublue base FROM lines but only ${base_pinned} pinned" >&2
+elif base=$(grep -E '^FROM quay\.io/fedora/fedora-bootc:[0-9]+@sha256:[0-9a-f]{64}$' "$repo_root/Containerfile"); then
+  # A later variant stage (the NVIDIA image in #40) may add another base, so
+  # every FROM must be either scratch or a tag+digest pin, not just the first.
+  base_total=$(grep -cE '^FROM ' "$repo_root/Containerfile" || true)
+  base_scratch=$(grep -cE '^FROM scratch( AS [A-Za-z0-9_.-]+)?$' "$repo_root/Containerfile" || true)
+  base_pinned=$(grep -cE '^FROM [^ ]+:[^ ]+@sha256:[0-9a-f]{64}$' "$repo_root/Containerfile" || true)
+  if ((base_total != base_scratch + base_pinned)); then
+    echo "FAIL Containerfile has ${base_total} FROM lines but ${base_scratch} scratch and ${base_pinned} tag+digest pins" >&2
     failures=$((failures + 1))
   else
     echo "ok   Containerfile pins the base by tag and digest (${base#FROM })"
   fi
 else
-  echo "FAIL Containerfile does not pin the base as FROM ghcr.io/ublue-os/base-main:<tag>@sha256:<digest>" >&2
+  echo "FAIL Containerfile does not pin the base as FROM quay.io/fedora/fedora-bootc:<tag>@sha256:<digest>" >&2
   failures=$((failures + 1))
 fi
 

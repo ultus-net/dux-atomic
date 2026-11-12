@@ -6,10 +6,20 @@ set -ouex pipefail
 
 cp -avf /ctx/overlay/. /
 
+# The Fedora base ships dnf5 without its plugins, and `copr` is a plugin
+# subcommand. Install it before any repository work.
+dnf5 install -y dnf5-plugins
+
 # Dux shell and greeter come from duxlabs. duxlabs/dms pulls duxlabs/dux-repo,
 # which also carries ghostty and quickshell.
 dnf5 -y copr enable duxlabs/dms
 dnf5 -y copr enable duxlabs/dux-repo
+
+# Steam ships only from negativo17's multimedia repository, which the Fedora
+# base does not carry. Keep the priority the Universal Blue base used.
+curl --retry 3 -fsSLo /etc/yum.repos.d/fedora-multimedia.repo \
+  https://negativo17.org/repos/fedora-multimedia.repo
+sed -i '/^\[fedora-multimedia\]$/a priority=90' /etc/yum.repos.d/fedora-multimedia.repo
 
 manifest=/ctx/manifests/packages-common.txt
 if [[ ! -r $manifest ]]; then
@@ -34,6 +44,16 @@ if [[ -n $packages ]]; then
 else
   echo "no packages in manifests/packages-common.txt yet"
 fi
+
+# Fedora's base enables sshd.service. This image documents that a fresh install
+# has no console or SSH login, so keep the unit disabled.
+systemctl disable sshd.service
+
+# The Universal Blue base shipped the Flathub remote, and the Dux documentation
+# installs user applications from it. Seed the same remote here.
+install -d /etc/flatpak/remotes.d
+curl --retry 3 -fsSLo /etc/flatpak/remotes.d/flathub.flatpakrepo \
+  https://dl.flathub.org/repo/flathub.flatpakrepo
 
 # A new account gets the Dux desktop on its first graphical login. A user
 # preset enables both units, and the image-level niri.service.wants link keeps
@@ -135,7 +155,9 @@ test "$(stat -c %U:%G "$check_root/var/lib/greeter")" = "greeter:greeter" || {
   exit 1
 }
 
-# Leave no third-party repo enabled in the final image.
+# Leave the COPRs disabled in the final image. The negativo17 multimedia repo
+# stays enabled on purpose: Steam's day-2 dependencies resolve from it, and the
+# Universal Blue base shipped it enabled too.
 dnf5 -y copr disable duxlabs/dms
 dnf5 -y copr disable duxlabs/dux-repo
 
