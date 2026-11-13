@@ -17,6 +17,7 @@ The build definition follows the Universal Blue image-template. Every green push
 | Generic x86_64 image | Builds, boots to the greeter in a VM, and provisions the desktop on first login |
 | Desktop | niri, Dux Modular Shell, Dux Greeter, Ghostty, and an Xfce X11 fallback |
 | Applications | Steam ships in the image. Lutris follows after the gaming dogfood. Zed, Bitwarden, Obsidian, Zen Browser, Discord, and Spotify arrive from Flathub at first login; OpenCode stays a dotfiles-owned CLI |
+| Developer and sysadmin tooling | The image ships a C toolchain, Node with npm, btop, and a diagnostics set. Homebrew owns the shell niceties, and a pinned container owns the cloud CLIs ([detail](docs/developer-tooling.md)) |
 | NVIDIA variant | Planned, not built |
 | Configuration | The existing [dotfiles repository](https://github.com/ultus-net/dotfiles) remains authoritative |
 | Publishing | CI signs every published digest with cosign keyless OIDC and attests the SBOM. `:latest` moves only on a manual promotion |
@@ -49,7 +50,9 @@ The image ships no interactive user. A real install creates the operator account
 - [Install](docs/install.md)
 - [First login](docs/first-login.md)
 - [Applications](docs/applications.md)
+- [Developer and sysadmin tooling](docs/developer-tooling.md)
 - [Testing](docs/testing.md)
 - [CI and publishing](docs/ci.md)
 - [Known gaps before promotion](docs/known-gaps.md)
+- [Roadmap](docs/superpowers/plans/2026-11-14-tooling-and-platform-roadmap.md)
 - [Approved design](docs/superpowers/specs/2026-11-09-dux-atomic-design.md)

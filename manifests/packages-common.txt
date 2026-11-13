@@ -67,6 +67,7 @@ google-noto-color-emoji-fonts
 # Terminal tools, containers and Flatpak
 tmux
 htop
+btop
 git
 just
 fzf
@@ -75,6 +76,36 @@ wl-clipboard
 flatpak
 rsync
 zip
+
+# Build toolchain Homebrew bootstraps against, plus Node for the dotfiles npm
+# globals. Fedora splits npm out of nodejs, and nodejs is 22.23.1.
+gcc
+gcc-c++
+make
+patch
+zlib-ng-compat-devel
+bzip2-devel
+nodejs
+nodejs-npm
+
+# Sysadmin diagnostics: the tools a broken machine still needs, before any
+# user-space package manager exists.
+lsof
+strace
+tcpdump
+nmap
+nmap-ncat
+mtr
+tree
+ncdu
+wget2
+smartmontools
+lm_sensors
+pciutils
+usbutils
+dmidecode
+sysstat
+7zip
 
 # Xfce X11 fallback
 xfce4-session
