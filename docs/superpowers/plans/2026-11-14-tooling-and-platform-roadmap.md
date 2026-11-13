@@ -32,9 +32,9 @@ Status: active. Supersedes the unstarted tasks in `2026-11-09-dux-atomic-candida
 | Desktop | niri, DMS, greeter, Ghostty, Xfce fallback; first login provisions the DMS session | `docs/first-login.md` |
 | Developer tooling | In review on `feature/dev-sysadmin-tooling`: compiler, Node 22 with npm, btop, diagnostics set, Node contract in `tests/verify-image.sh` | #67 |
 | Gaming | Steam in the image; no game launched from a built image; Lutris not shipped | #69, `docs/known-gaps.md` |
-| NVIDIA variant | Planned, not built; #40 planned it and closed | #70 |
+| NVIDIA variant | Planned, not built; #40 planned it and closed | #72 |
 | Agent isolation | Not built | #71 |
-| Home snapshots | Not built | #72 |
+| Home snapshots | Not built | #68 |
 | Publication | Signed digest, SBOM and provenance attested, `:latest` moves on manual promotion | #63, `docs/ci.md` |
 | Secure Boot | Policy decided, no boot with it enabled recorded | `docs/known-gaps.md` |
 
@@ -45,13 +45,13 @@ The sequence is dependency order, not priority. Tasks 1 to 3 unblock an honest p
 | # | Work item | Depends on | Done when |
 | --- | --- | --- | --- |
 | 1 | #67 Developer and sysadmin tooling | none | `image` job green, lock regenerated, PR merged |
-| 2 | #68 Prove the dotfiles bootstrap | 1 | A booted image runs the dotfiles stage 20: npm globals install, `brew` starts, a distrobox container is created |
+| 2 | #70 Prove the dotfiles bootstrap | 1 | A booted image runs the dotfiles stage 20: npm globals install, `brew` starts, a distrobox container is created |
 | 3 | #4 Containers signing policy | none | A shipped policy or a recorded release-key decision, with accept and reject fixtures |
 | 4 | #20 Lock every third-party package | 1 | A transitive third-party rebuild reds the gate, not just a manifest name |
 | 5 | #69 Gaming dogfood, then Lutris | hardware | One game launched from a built image, then Lutris shipped with an assertion |
-| 6 | #70 NVIDIA variant | 5 | Its own digest-pinned `FROM`, a built digest, and a recorded akmod signing policy |
+| 6 | #72 NVIDIA variant | 5 | Its own digest-pinned `FROM`, a built digest, and a recorded akmod signing policy |
 | 7 | #71 Project-scoped agent container | 2 | A scripted rootless profile with only the project mounted, and a test that reds on a forbidden mount |
-| 8 | #72 Local home snapshots | a btrfs install | A btrbk config, an enabled timer, and a restore drill |
+| 8 | #68 Local home snapshots | a btrfs install | A btrbk config, an enabled timer, and a restore drill |
 | 9 | Promotion gate | 3, 4, 5 | Secure Boot boot recorded on hardware, graphical dogfood recorded, `:latest` promoted |
 
 ## Task 1: land the developer tooling layer (#67)
@@ -67,7 +67,7 @@ Files: `manifests/packages-common.txt`, `manifests/packages-common.lock`, `tests
 
 Acceptance: the hosted `image` job is green, the lock carries the new Fedora NEVRAs, and the PR merges with `Fixes #67`.
 
-## Task 2: prove the dotfiles bootstrap (#68)
+## Task 2: prove the dotfiles bootstrap (#70)
 
 Files: `tests/vm/boot-smoke.sh`, `docs/research/<date>-dotfiles-bootstrap.md`, `docs/developer-tooling.md`.
 
@@ -108,7 +108,7 @@ Files: `manifests/packages-common.txt`, `tests/verify-image.sh`, `docs/applicati
 
 Acceptance: the dogfood record exists and Lutris ships behind a green assertion, or the item closes with the failure finding.
 
-## Task 6: build the NVIDIA variant (#70)
+## Task 6: build the NVIDIA variant (#72)
 
 Files: `Containerfile.nvidia`, `manifests/packages-nvidia.txt`, `build/nvidia.sh`, `.github/workflows/ci.yml`, `tests/test-static.sh`, `docs/known-gaps.md`.
 
@@ -128,7 +128,7 @@ Files: `build/agent-run.sh`, `tests/test-agent-run.sh`, `docs/developer-tooling.
 
 Acceptance: an agent works in the container and the test proves the host surface stays out of it.
 
-## Task 8: local home snapshots (#72)
+## Task 8: local home snapshots (#68)
 
 Files: `overlay/etc/btrbk/btrbk.conf`, `overlay/usr/lib/systemd/system/btrbk.timer`, `tests/verify-image.sh`, `docs/install.md`.
 
