@@ -1,107 +1,85 @@
 # manifests/packages-common.lock - regenerate with 'just lock'
-# One line per resolved NEVRA: <nevra> TAB <vendor>.
-# tests/verify-image.sh compares the non-Fedora lines, because Fedora
-# packages move with the updates repository on every build.
-# A +git build tracks an upstream branch, so it cannot be pinned and is
-# left out of this file and the comparison; the VM boot test covers it.
-7zip-26.04-1.fc45.x86_64	Fedora Project
-NetworkManager-wifi-1:1.58.1-3.fc45.x86_64	Fedora Project
-accountsservice-26.27.3-2.fc45.x86_64	Fedora Project
-adwaita-cursor-theme-51.0-1.fc45.noarch	Fedora Project
-adwaita-icon-theme-51.0-1.fc45.noarch	Fedora Project
-alsa-sof-firmware-2026.09.2-1.fc45.noarch	Fedora Project
-alsa-ucm-1.2.16.1-2.fc45.noarch	Fedora Project
-alsa-utils-1.2.16-2.fc45.x86_64	Fedora Project
-bluez-5.88-1.fc45.x86_64	Fedora Project
-brightnessctl-0.5.1-17.fc45.x86_64	Fedora Project
-btop-1.4.7-2.fc45.x86_64	Fedora Project
-bzip2-devel-1.0.8-24.fc45.x86_64	Fedora Project
-dconf-51.0-1.fc45.i686	Fedora Project
-dconf-51.0-1.fc45.x86_64	Fedora Project
-distrobox-1.8.2.5-2.fc45.noarch	Fedora Project
-dmidecode-1:3.7-2.fc45.x86_64	Fedora Project
-dms-2.1.2-1.fc45.x86_64	Fedora Copr - user duxlabs
-dux-calendar-2.1.2-1.fc45.x86_64	Fedora Copr - user duxlabs
-dux-files-2.1.2-1.fc45.x86_64	Fedora Copr - user duxlabs
-dux-search-2.1.1-1.fc45.x86_64	Fedora Copr - user duxlabs
-firewalld-2.5.2-1.fc45.noarch	Fedora Project
-flatpak-1.19.0^really1.18.4-1.fc45.x86_64	Fedora Project
-fzf-0.74.5-1.fc45.x86_64	Fedora Project
-gamescope-3.16.29-1.fc45.x86_64	Fedora Project
-gcc-16.2.1-3.fc45.x86_64	Fedora Project
-gcc-c++-16.2.1-3.fc45.x86_64	Fedora Project
-ghostty-1.4.0-3.fc45.x86_64	Fedora Copr - user duxlabs
-git-2.56.1-1.fc45.x86_64	Fedora Project
-gnome-keyring-51.1-1.fc45.x86_64	Fedora Project
-google-noto-color-emoji-fonts-20260921-1.fc45.noarch	Fedora Project
-gstreamer1-plugin-libav-1:1.28.9-1.fc45.x86_64	negativo17.org
-gstreamer1-plugins-good-1.28.9-1.fc45.x86_64	Fedora Project
-hicolor-icon-theme-0.18-6.fc45.noarch	Fedora Project
-htop-3.5.3-1.fc45.x86_64	Fedora Project
-iwlwifi-mvm-firmware-20261019-1.fc45.noarch	Fedora Project
-just-1.59.0-1.fc45.x86_64	Fedora Project
-libva-intel-media-driver-1:26.4.0-1.fc45.x86_64	negativo17.org
-lm_sensors-3.6.0-25.fc45.x86_64	Fedora Project
-lsof-4.99.6-2.fc45.x86_64	Fedora Project
-make-1:4.4.1-13.fc45.x86_64	Fedora Project
-mangohud-0.8.3~rc1-4.fc45.i686	Fedora Project
-mangohud-0.8.3~rc1-4.fc45.x86_64	Fedora Project
-matugen-4.2.0-1.fc45.x86_64	Fedora Copr - user duxlabs
-mesa-dri-drivers-1:26.2.6-1.fc45.i686	negativo17.org
-mesa-dri-drivers-1:26.2.6-1.fc45.x86_64	negativo17.org
-mesa-vulkan-drivers-1:26.2.6-1.fc45.i686	negativo17.org
-mesa-vulkan-drivers-1:26.2.6-1.fc45.x86_64	negativo17.org
-mtr-2:0.96-2.fc45.x86_64	Fedora Project
-ncdu-2.11.1-1.fc45.x86_64	Fedora Project
-niri-26.04-2.fc45.x86_64	Fedora Project
-nmap-4:7.92-12.fc45.x86_64	Fedora Project
-nmap-ncat-4:7.92-12.fc45.x86_64	Fedora Project
-nodejs-1:22.23.1-4.fc45.x86_64	Fedora Project
-nodejs-npm-2:10.9.8-1.22.23.1.4.fc45.x86_64	Fedora Project
-patch-2.8-6.fc45.x86_64	Fedora Project
-pciutils-3.15.0-2.fc45.x86_64	Fedora Project
-pipewire-1.6.11-1.fc45.i686	Fedora Project
-pipewire-1.6.11-1.fc45.x86_64	Fedora Project
-pipewire-alsa-1.6.11-1.fc45.x86_64	Fedora Project
-pipewire-pulseaudio-1.6.11-1.fc45.x86_64	Fedora Project
-pipewire-utils-1.6.11-1.fc45.x86_64	Fedora Project
-playerctl-2.4.1-13.fc45.x86_64	Fedora Project
-power-profiles-daemon-0.30-4.fc45.x86_64	Fedora Project
-quickshell-0.3.2-4.fc45.x86_64	Fedora Copr - user duxlabs
-rsync-3.5.2-2.fc45.x86_64	Fedora Project
-rtkit-0.14-2.fc45.x86_64	Fedora Project
-smartmontools-1:7.5-11.fc45.x86_64	Fedora Project
-steam-1.0.0.87-4.fc45.x86_64	negativo17.org
-steam-devices-1.0.0.101^git20260625.22ec85e-2.fc45.noarch	Fedora Project
-strace-7.3-1.fc45.x86_64	Fedora Project
-sysstat-12.7.9-3.fc45.x86_64	Fedora Project
-tcpdump-14:4.99.6-5.fc45.x86_64	Fedora Project
-tmux-3.8-2.fc45.x86_64	Fedora Project
-tree-2.3.1-2.fc45.x86_64	Fedora Project
-upower-1.91.5-1.fc45.x86_64	Fedora Project
-usbutils-019-3.fc45.x86_64	Fedora Project
-vulkan-loader-1.4.350.0-2.fc45.i686	Fedora Project
-vulkan-loader-1.4.350.0-2.fc45.x86_64	Fedora Project
-wget2-2.3.0-3.fc45.x86_64	Fedora Project
-wireplumber-0.5.19-1.fc45.x86_64	Fedora Project
-wl-clipboard-2.3.0-2.fc45.x86_64	Fedora Project
-wpa_supplicant-1:2.11-13.fc45.x86_64	Fedora Project
-xdg-desktop-portal-1.22.1-2.fc45.x86_64	Fedora Project
-xdg-desktop-portal-gnome-51.0-2.fc45.x86_64	Fedora Project
-xdg-desktop-portal-gtk-1.15.3-6.fc45.x86_64	Fedora Project
-xdg-user-dirs-0.20-2.fc45.x86_64	Fedora Project
-xdg-utils-1.2.1-6.fc45.noarch	Fedora Project
-xfce-polkit-0.3-18.fc45.x86_64	Fedora Project
-xfce4-notifyd-0.9.7-5.fc45.x86_64	Fedora Project
-xfce4-panel-4.20.8-4.fc45.x86_64	Fedora Project
-xfce4-power-manager-4.20.1-2.fc45.x86_64	Fedora Project
-xfce4-screensaver-4.20.2-2.fc45.x86_64	Fedora Project
-xfce4-session-4.20.4-2.fc45.x86_64	Fedora Project
-xfwm4-4.20.0-5.fc45.x86_64	Fedora Project
-xorg-x11-server-Xorg-21.1.26-1.fc45.x86_64	Fedora Project
-xorg-x11-server-Xwayland-24.1.15-1.fc45.x86_64	Fedora Project
-xorg-x11-xinit-1.4.3-6.fc45.x86_64	Fedora Project
-xwayland-satellite-0.8.3-1.fc45.x86_64	Fedora Project
-zip-3.0-46.fc45.x86_64	Fedora Project
-zlib-ng-compat-devel-2.3.3-6.fc45.x86_64	Fedora Project
-zram-generator-defaults-1.2.1-6.fc45.noarch	Fedora Project
+# One line per resolved NEVRA: <nevra> TAB <from_repo>.
+# Records every package whose origin repository is not a Fedora repository.
+# Excludes empty/@System/unknown/local-path origins, and excludes +git NEVRAs.
+LCEVCdec-0:4.3.1-1.fc45.i686	fedora-multimedia
+LCEVCdec-0:4.3.1-1.fc45.x86_64	fedora-multimedia
+cpptrace-0:1.0.4-4.fc45.x86_64	coprdep:copr.fedorainfracloud.org:duxlabs:dux-repo
+davs2-libs-0:1.7^20220903gitb41cf11-7.fc45.i686	fedora-multimedia
+davs2-libs-0:1.7^20220903gitb41cf11-7.fc45.x86_64	fedora-multimedia
+dms-0:2.1.2-1.fc45.x86_64	copr:copr.fedorainfracloud.org:duxlabs:dms
+dms-cli-0:2.1.2-1.fc45.x86_64	copr:copr.fedorainfracloud.org:duxlabs:dms
+dux-calendar-0:2.1.2-1.fc45.x86_64	coprdep:copr.fedorainfracloud.org:duxlabs:dux-repo
+dux-files-0:2.1.2-1.fc45.x86_64	coprdep:copr.fedorainfracloud.org:duxlabs:dux-repo
+dux-qt-base-git-0:0.4.5^946.git7734c4c-1.fc45.x86_64	coprdep:copr.fedorainfracloud.org:duxlabs:dux-repo
+dux-search-0:2.1.1-1.fc45.x86_64	coprdep:copr.fedorainfracloud.org:duxlabs:dux-repo
+ghostty-0:1.4.0-3.fc45.x86_64	coprdep:copr.fedorainfracloud.org:duxlabs:dux-repo
+gstreamer1-plugin-libav-1:1.28.9-1.fc45.x86_64	fedora-multimedia
+gstreamer1-plugins-bad-1:1.28.9-1.fc45.x86_64	fedora-multimedia
+intel-gmmlib-1:22.10.2-1.fc45.x86_64	fedora-multimedia
+intel-mediasdk-1:23.2.2-2.fc45.x86_64	fedora-multimedia
+kvazaar-libs-0:2.3.2-1.fc45.i686	fedora-multimedia
+kvazaar-libs-0:2.3.2-1.fc45.x86_64	fedora-multimedia
+libavcodec-1:9.0.2-2.fc45.i686	fedora-multimedia
+libavcodec-1:9.0.2-2.fc45.x86_64	fedora-multimedia
+libavfilter-1:9.0.2-2.fc45.x86_64	fedora-multimedia
+libavformat-1:9.0.2-2.fc45.x86_64	fedora-multimedia
+libavutil-1:9.0.2-2.fc45.i686	fedora-multimedia
+libavutil-1:9.0.2-2.fc45.x86_64	fedora-multimedia
+libdca-0:0.0.7-2.fc45.x86_64	fedora-multimedia
+libde265-0:1.1.3-1.fc45.i686	fedora-multimedia
+libde265-0:1.1.3-1.fc45.x86_64	fedora-multimedia
+libfdk-aac-1:3.0.0-1.fc45.i686	fedora-multimedia
+libfdk-aac-1:3.0.0-1.fc45.x86_64	fedora-multimedia
+libfreeaptx-0:0.2.2-2.fc45.x86_64	fedora-multimedia
+libheif-1:1.23.7-1.fc45.i686	fedora-multimedia
+libheif-1:1.23.7-1.fc45.x86_64	fedora-multimedia
+libquirc-0:1.2^20250520git927d680-1.fc45.x86_64	fedora-multimedia
+libswresample-1:9.0.2-2.fc45.i686	fedora-multimedia
+libswresample-1:9.0.2-2.fc45.x86_64	fedora-multimedia
+libswscale-1:9.0.2-2.fc45.x86_64	fedora-multimedia
+libva-1:2.24.1-1.fc45.i686	fedora-multimedia
+libva-1:2.24.1-1.fc45.x86_64	fedora-multimedia
+libva-intel-media-driver-1:26.4.0-1.fc45.x86_64	fedora-multimedia
+libvo-aacenc-0:0.1.3-3.fc45.x86_64	fedora-multimedia
+libxavs-0:0.1.55~20110821svnr55-3.fc45.i686	fedora-multimedia
+libxavs-0:0.1.55~20110821svnr55-3.fc45.x86_64	fedora-multimedia
+matugen-0:4.2.0-1.fc45.x86_64	coprdep:copr.fedorainfracloud.org:duxlabs:dux-repo
+mesa-dri-drivers-1:26.2.6-1.fc45.i686	fedora-multimedia
+mesa-dri-drivers-1:26.2.6-1.fc45.x86_64	fedora-multimedia
+mesa-filesystem-1:26.2.6-1.fc45.i686	fedora-multimedia
+mesa-filesystem-1:26.2.6-1.fc45.x86_64	fedora-multimedia
+mesa-libEGL-1:26.2.6-1.fc45.i686	fedora-multimedia
+mesa-libEGL-1:26.2.6-1.fc45.x86_64	fedora-multimedia
+mesa-libGL-1:26.2.6-1.fc45.i686	fedora-multimedia
+mesa-libGL-1:26.2.6-1.fc45.x86_64	fedora-multimedia
+mesa-libgbm-1:26.2.6-1.fc45.i686	fedora-multimedia
+mesa-libgbm-1:26.2.6-1.fc45.x86_64	fedora-multimedia
+mesa-vulkan-drivers-1:26.2.6-1.fc45.i686	fedora-multimedia
+mesa-vulkan-drivers-1:26.2.6-1.fc45.x86_64	fedora-multimedia
+mjpegtools-libs-0:2.2.1-2.fc45.x86_64	fedora-multimedia
+mpeghdec-0:4.0.1-2.fc45.i686	fedora-multimedia
+mpeghdec-0:4.0.1-2.fc45.x86_64	fedora-multimedia
+openh264-1:2.6.0-1.fc45.i686	fedora-multimedia
+openh264-1:2.6.0-1.fc45.x86_64	fedora-multimedia
+quickshell-0:0.3.2-4.fc45.x86_64	coprdep:copr.fedorainfracloud.org:duxlabs:dux-repo
+steam-0:1.0.0.87-4.fc45.x86_64	fedora-multimedia
+svt-jpeg-xs-0:0.10.0~20260918git9aa0285-1.fc45.x86_64	fedora-multimedia
+uavs3d-libs-0:1.2.0~20251213git0e20d2c-8.fc45.i686	fedora-multimedia
+uavs3d-libs-0:1.2.0~20251213git0e20d2c-8.fc45.x86_64	fedora-multimedia
+uvg266-libs-0:0.8.1-1.fc45.i686	fedora-multimedia
+uvg266-libs-0:0.8.1-1.fc45.x86_64	fedora-multimedia
+vvdec-libs-0:3.2.1-1.fc45.i686	fedora-multimedia
+vvdec-libs-0:3.2.1-1.fc45.x86_64	fedora-multimedia
+vvenc-libs-0:1.14.0-1.fc45.i686	fedora-multimedia
+vvenc-libs-0:1.14.0-1.fc45.x86_64	fedora-multimedia
+x264-libs-1:0.165-39.20250910git0480cb0.fc45.i686	fedora-multimedia
+x264-libs-1:0.165-39.20250910git0480cb0.fc45.x86_64	fedora-multimedia
+x265-libs-1:4.3-1.fc45.i686	fedora-multimedia
+x265-libs-1:4.3-1.fc45.x86_64	fedora-multimedia
+xavs2-libs-0:1.4-2.fc45.i686	fedora-multimedia
+xavs2-libs-0:1.4-2.fc45.x86_64	fedora-multimedia
+xevd-libs-1:0.8.0-1.fc45.i686	fedora-multimedia
+xevd-libs-1:0.8.0-1.fc45.x86_64	fedora-multimedia
+xeve-libs-1:0.7.1-1.fc45.i686	fedora-multimedia
+xeve-libs-1:0.7.1-1.fc45.x86_64	fedora-multimedia
