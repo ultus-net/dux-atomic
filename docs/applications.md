@@ -1,6 +1,6 @@
 # Applications
 
-The image ships the applications that need the operating system: Steam and its graphics stack. User GUI apps come from Flathub at first login, installed by the [dotfiles repository](https://github.com/ultus-net/dotfiles), so they update on their own cadence and stay out of the OS image.
+The image ships the applications that need the operating system: Steam and its graphics stack. User GUI apps come from Flathub at first login, installed by the [dotfiles repository](https://github.com/ultus-net/dotfiles), so they update on their own cadence and stay out of the OS image. Terminal, developer, and sysadmin tools follow a separate split, recorded in [Developer and sysadmin tooling](developer-tooling.md).
 
 ## Delivery split
 

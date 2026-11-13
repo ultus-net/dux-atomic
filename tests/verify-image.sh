@@ -51,6 +51,21 @@ fi
 # driver is not a manifest name and needs its own assertion.
 "$runtime" run --rm "$image" rpm -q mesa-vulkan-drivers.i686 \
   || { echo "FAIL the 32-bit mesa Vulkan driver is not installed" >&2; exit 1; }
+# The dotfiles bootstrap installs its npm globals only when npm exists, and it
+# needs Node's TypeScript type stripping, on by default from 22.18. Fedora
+# splits npm into its own package, so both the runtime and npm are checked (#67).
+node_version=$("$runtime" run --rm "$image" node --version) \
+  || { echo "FAIL node is not runnable in the image" >&2; exit 1; }
+node_semver=${node_version#v}
+node_major=${node_semver%%.*}
+node_minor=${node_semver#*.}
+node_minor=${node_minor%%.*}
+if (( node_major < 22 || (node_major == 22 && node_minor < 18) )); then
+  echo "FAIL node ${node_version} predates the 22.18 the dotfiles require" >&2
+  exit 1
+fi
+"$runtime" run --rm "$image" npm --version >/dev/null \
+  || { echo "FAIL npm is not runnable in the image" >&2; exit 1; }
 # The lock records the third-party packages the manifest names. Fedora packages
 # move with the updates repository on every build, so only other vendors are
 # compared; a drift there is a third-party rebuild and needs a lock update.

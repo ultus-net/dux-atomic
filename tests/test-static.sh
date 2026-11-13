@@ -109,6 +109,21 @@ else
   echo "ok   the image job checks that the kernel is signed by Fedora"
 fi
 
+# The dotfiles install their npm globals only when npm exists, and TypeScript
+# type stripping needs Node 22.18 (#67). Pin both probes and the 22.18 floor, so
+# a later edit cannot drop the contract or the packages behind it quietly.
+if ! grep -qF 'node --version' "$repo_root/tests/verify-image.sh" ||
+   ! grep -qF 'npm --version' "$repo_root/tests/verify-image.sh" ||
+   ! grep -qF 'node_minor < 18' "$repo_root/tests/verify-image.sh" ||
+   ! grep -qF 'node_major < 22' "$repo_root/tests/verify-image.sh" ||
+   ! grep -qx 'nodejs' "$manifest" ||
+   ! grep -qx 'nodejs-npm' "$manifest"; then
+  echo "FAIL the image does not prove Node 22.18 and npm run, so the dotfiles npm globals could be skipped at first login" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the image proves Node 22.18 and npm run for the dotfiles npm globals"
+fi
+
 desktop_unit=$repo_root/overlay/usr/lib/systemd/user/dux-atomic-desktop.service
 defaults_unit=$repo_root/overlay/usr/lib/systemd/user/dux-atomic-dms-defaults.service
 user_preset=$repo_root/overlay/usr/lib/systemd/user-preset/01-dux-atomic.preset

@@ -20,7 +20,7 @@ COPY overlay /overlay
 # literal rather than an ARG: Dependabot reads a file whose name matches
 # containerfile|dockerfile, and never expands an ARG into FROM.
 # tests/test-static.sh asserts the tag+digest form.
-FROM quay.io/fedora/fedora-bootc:45@sha256:6860cf4cb2fd88521256fe7efaeff5f7e301edb45a3308c338f7a47d05bfe4c4
+FROM quay.io/fedora/fedora-bootc:45@sha256:42259b1db41a7f792a19cfd28e0c66e3e415392109a7d7095f292ad1e2a56453
 
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache \
