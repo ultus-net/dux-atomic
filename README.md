@@ -56,3 +56,4 @@ The image ships no interactive user. A real install creates the operator account
 - [Known gaps before promotion](docs/known-gaps.md)
 - [Roadmap](docs/superpowers/plans/2026-11-14-tooling-and-platform-roadmap.md)
 - [Approved design](docs/superpowers/specs/2026-11-09-dux-atomic-design.md)
+- [Agent container profile](docs/agent-container.md)
