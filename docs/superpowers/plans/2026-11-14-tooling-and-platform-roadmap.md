@@ -61,9 +61,9 @@ Files: `manifests/packages-common.txt`, `manifests/packages-common.lock`, `tests
 - [x] Add the compiler, Node, and diagnostics groups to the manifest.
 - [x] Add the Node and npm probes to `tests/verify-image.sh`, pinned by `tests/test-static.sh`.
 - [x] Record the image, Homebrew, container, and Flathub split in `docs/developer-tooling.md`.
-- [ ] Build the image and run `tests/verify-image.sh` against it.
-- [ ] Regenerate `manifests/packages-common.lock`.
-- [ ] Open the PR and wait for a green hosted `image` job.
+ - [x] Build the image and run `tests/verify-image.sh` against it.
+ - [x] Regenerate `manifests/packages-common.lock`.
+ - [x] Open the PR and wait for a green hosted `image` job.
 
 Acceptance: the hosted `image` job is green, the lock carries the new Fedora NEVRAs, and the PR merges with `Fixes #67`.
 
@@ -71,10 +71,10 @@ Acceptance: the hosted `image` job is green, the lock carries the new Fedora NEV
 
 Files: `tests/vm/boot-smoke.sh`, `docs/research/<date>-dotfiles-bootstrap.md`, `docs/developer-tooling.md`.
 
-- [ ] Boot a built image and create a test account.
-- [ ] Run the dotfiles `install/bootstrap.sh --only 20` as that account.
-- [ ] Assert `npm ls -g` lists `opencode-ai`, `brew --version` answers, and `distrobox list` answers.
-- [ ] Record the run and the exact package versions in a research file.
+ - [ ] Boot a built image and create a test account. (tracked in docs/research/2026-11-14-dotfiles-bootstrap.md)
+ - [ ] Run the dotfiles `install/bootstrap.sh --only 20` as that account. (tracked in docs/research/2026-11-14-dotfiles-bootstrap.md)
+ - [ ] Assert `npm ls -g` lists `opencode-ai`, `brew --version` answers, and `distrobox list` answers. (tracked in docs/research/2026-11-14-dotfiles-bootstrap.md)
+ - [ ] Record the run and the exact package versions in a research file. (tracked in docs/research/2026-11-14-dotfiles-bootstrap.md)
 
 Acceptance: the dotfiles' own installer completes on this image without a manual fix, or the fix lands in the dotfiles repository and this item records the hand-off.
 
@@ -82,9 +82,9 @@ Acceptance: the dotfiles' own installer completes on this image without a manual
 
 Files: `overlay/etc/containers/policy.json`, `tests/test-signing.sh`, `docs/known-gaps.md`, `CHANGELOG.md`.
 
-- [ ] Decide the trust root: a release key referenced by `keyPath`, or a recorded decision to ship no policy.
-- [ ] Write the policy and the rotation note.
-- [ ] Extend `tests/test-signing.sh` with an accept and a reject against the shipped policy.
+ - [ ] Decide the trust root: a release key referenced by `keyPath`, or a recorded decision to ship no policy. (tracked in issue #4 and docs/known-gaps.md)
+ - [ ] Write the policy and the rotation note. (tracked in issue #4 and docs/known-gaps.md)
+ - [ ] Extend `tests/test-signing.sh` with an accept and a reject against the shipped policy. (tracked in issue #4 and docs/known-gaps.md)
 
 Acceptance: a host either verifies the image it pulls or the repository records why it cannot, with a test for whichever answer ships.
 
@@ -92,9 +92,9 @@ Acceptance: a host either verifies the image it pulls or the repository records 
 
 Files: `build/package-lock.sh`, `tests/verify-image.sh`, `tests/test-static.sh`, `docs/build.md`, `docs/known-gaps.md`.
 
-- [ ] Enumerate transitive packages from a non-Fedora vendor, not only manifest names.
-- [ ] Add a fixture proving a transitive rebuild reds the gate.
-- [ ] Record the `+git` exception and the vendor-string limit in `docs/build.md`.
+ - [x] Enumerate transitive packages from a non-Fedora vendor, not only manifest names.
+ - [x] Add a fixture proving a transitive rebuild reds the gate.
+ - [x] Record the `+git` exception and the vendor-string limit in `docs/build.md`.
 
 Acceptance: a rebuild of a package the manifest pulls in transitively fails the image job.
 
@@ -102,9 +102,9 @@ Acceptance: a rebuild of a package the manifest pulls in transitively fails the 
 
 Files: `manifests/packages-common.txt`, `tests/verify-image.sh`, `docs/applications.md`, `docs/research/`.
 
-- [ ] Launch one game from a built image on the gaming machine and record it.
-- [ ] Add `lutris` to the gaming group only after the run passes.
-- [ ] Assert `lutris` beside the Steam packages in `tests/verify-image.sh`.
+ - [ ] Launch one game from a built image on the gaming machine and record it. (tracked in docs/known-gaps.md)
+ - [ ] Add `lutris` to the gaming group only after the run passes. (tracked in docs/known-gaps.md)
+ - [ ] Assert `lutris` beside the Steam packages in `tests/verify-image.sh`. (tracked in docs/known-gaps.md)
 
 Acceptance: the dogfood record exists and Lutris ships behind a green assertion, or the item closes with the failure finding.
 
@@ -113,8 +113,8 @@ Acceptance: the dogfood record exists and Lutris ships behind a green assertion,
 Files: `Containerfile.nvidia`, `manifests/packages-nvidia.txt`, `build/nvidia.sh`, `.github/workflows/ci.yml`, `tests/test-static.sh`, `docs/known-gaps.md`.
 
 - [x] Pin the variant `FROM` by tag and digest and extend the static gate to it.
-- [ ] Decide the module path: a vendor-signed module from a repository, or a documented unsigned-module exception.
-- [ ] Build the variant and publish it under its own tag.
+ - [ ] Decide the module path: a vendor-signed module from a repository, or a documented unsigned-module exception. (tracked in docs/known-gaps.md and #72)
+ - [ ] Build the variant and publish it under its own tag. (tracked in docs/known-gaps.md and #72)
 
 Acceptance: the variant builds from its own pin, the module policy is recorded, and no Secure Boot claim is made until a boot is recorded.
 
@@ -122,9 +122,9 @@ Acceptance: the variant builds from its own pin, the module policy is recorded, 
 
 Files: `build/agent-run.sh`, `tests/test-agent-run.sh`, `docs/developer-tooling.md`.
 
-- [ ] Write the `podman run` profile: the project mounted writable, a separate home and cache, no host home, SSH directory, agent socket, or Podman socket.
-- [ ] Add a test that reds when any forbidden mount appears.
-- [ ] Record a run on a built image.
+ - [ ] Write the `podman run` profile: the project mounted writable, a separate home and cache, no host home, SSH directory, agent socket, or Podman socket. (tracked in docs/research/2026-11-14-agent-container.md)
+ - [ ] Add a test that reds when any forbidden mount appears. (tracked in docs/research/2026-11-14-agent-container.md)
+ - [ ] Record a run on a built image. (tracked in docs/research/2026-11-14-agent-container.md)
 
 Acceptance: an agent works in the container and the test proves the host surface stays out of it.
 
@@ -132,17 +132,17 @@ Acceptance: an agent works in the container and the test proves the host surface
 
 Files: `overlay/etc/btrbk/btrbk.conf`, `overlay/usr/lib/systemd/system/btrbk.timer`, `tests/verify-image.sh`, `docs/install.md`.
 
-- [ ] Write the btrbk configuration for the home subvolume.
-- [ ] Enable the timer and assert it in the image job.
-- [ ] Write and run the restore drill.
+ - [ ] Write the btrbk configuration for the home subvolume. (tracked in docs/known-gaps.md)
+ - [ ] Enable the timer and assert it in the image job. (tracked in docs/known-gaps.md)
+ - [ ] Write and run the restore drill. (tracked in docs/known-gaps.md)
 
 Acceptance: the timer is enabled, the config names the home subvolume, and the drill is recorded.
 
 ## Task 9: promotion gate
 
-- [ ] Boot the promoted digest with Secure Boot enabled on each target and record `mokutil --sb-state`.
-- [ ] Run the graphical dogfood on the promoted digest.
-- [ ] Promote `:latest` and record the registry digests.
+ - [ ] Boot the promoted digest with Secure Boot enabled on each target and record `mokutil --sb-state`. (tracked in docs/known-gaps.md)
+ - [ ] Run the graphical dogfood on the promoted digest. (tracked in docs/known-gaps.md)
+ - [ ] Promote `:latest` and record the registry digests. (tracked in docs/known-gaps.md)
 
 Acceptance: `docs/install.md` and `docs/known-gaps.md` state what the promoted digest was proven to do, and nothing more.
 
