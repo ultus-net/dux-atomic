@@ -30,9 +30,9 @@ $ build/agent-container.sh localhost/dux-atomic:dev "$PWD/.scratch/agent-demo" -
 /tmp/agent-cache
 /work
 total 4
-drwxr-xr-x 1 csh  csh  16 Nov 14 00:02 .
-drwxr-xr-x 1 root root 32 Nov 14 00:06 ..
--rw-r--r-- 1 csh  csh   6 Nov 14 00:02 file.txt
+drwxr-xr-x 1 csh  csh  16 Nov 14 00:22 .
+drwxr-xr-x 1 root root 32 Nov 14 00:22 ..
+-rw-r--r-- 1 csh  csh   6 Nov 14 00:22 file.txt
 csh
 NO_HOST_HOME
 NO_SSH_DIR
@@ -58,12 +58,12 @@ escape-hatch allowlist.
 ```
 $ AGENT_CONTAINER_EXTRA="--detach --name agent-probe" build/agent-container.sh \
     localhost/dux-atomic:dev "$PWD/.scratch/agent-demo" -- /bin/sleep 60
-6562825146e0a4071c0556842a03dd6aafe6fa4590b76957d6f2ff375bd87634
-Temp kept: /tmp/opencode/agent-container.8nmr
+b546d49b02109c4b335b0a81b8842daf182cc19eb03b888f333e651b0d892d56
+Temp kept: /tmp/dux-atomic-agent.5fFyOP
 $ podman inspect agent-probe --format '{{range .Mounts}}HOST={{.Source}} -> CONTAINER={{.Destination}} RW={{.RW}}{{"\n"}}{{end}}'
 HOST=<worktree>/.scratch/agent-demo -> CONTAINER=/work RW=true
-HOST=/tmp/opencode/agent-container.8nmr/home/agent -> CONTAINER=/home/agent RW=true
-HOST=/tmp/opencode/agent-container.8nmr/tmp/agent-cache -> CONTAINER=/tmp/agent-cache RW=true
+HOST=/tmp/dux-atomic-agent.5fFyOP/home/agent -> CONTAINER=/home/agent RW=true
+HOST=/tmp/dux-atomic-agent.5fFyOP/tmp/agent-cache -> CONTAINER=/tmp/agent-cache RW=true
 $ podman inspect agent-probe --format 'PRIVILEGED={{.HostConfig.Privileged}} NETWORK={{.HostConfig.NetworkMode}} PID={{.HostConfig.PidMode}} USERNS={{.HostConfig.UsernsMode}}'
 PRIVILEGED=false NETWORK=pasta PID=private USERNS=private
 $ podman rm -f agent-probe
@@ -73,21 +73,28 @@ Three mounts, all writable, all deliberate: the project at `/work`, and the
 temporary home and cache. No host home, no SSH directory, no socket. The network
 is `pasta`, which is rootless Podman's default, not the host namespace.
 
+## The temporary tree follows TMPDIR
+
+The first version of the script asked `mktemp` for a directory under
+`/tmp/opencode`, a path that exists on this host and not on a CI runner. The
+hosted `static` job redded for that alone: `mktemp: failed to create directory
+via template '/tmp/opencode/agent-container.XXXX': No such file or directory`.
+The profile now uses `${TMPDIR:-/tmp}/dux-atomic-agent.XXXXXX`.
+
 A detached container keeps reading its mounted home after the script exits, so
 that run prints the temporary tree instead of deleting it. A foreground run
 deletes it:
 
 ```
-$ ls -d /tmp/opencode/agent-container.* | wc -l
-13
+$ ls -d /tmp/dux-atomic-agent.* 2>/dev/null | wc -l
+0
 $ build/agent-container.sh localhost/dux-atomic:dev "$PWD/.scratch/agent-demo" -- /bin/true
-$ ls -d /tmp/opencode/agent-container.* | wc -l
-13
+$ ls -d /tmp/dux-atomic-agent.* 2>/dev/null | wc -l
+0
 ```
 
-The count is unchanged, so the foreground run left nothing behind. The 13
-directories are debris from earlier runs of an earlier version of the script,
-which `exec`ed Podman and so never reached its own cleanup.
+The count is unchanged, so the foreground run left nothing behind. The detached
+run above is the one directory present at the end of this record.
 
 ## What this record does not prove
 

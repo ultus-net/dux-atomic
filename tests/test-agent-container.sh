@@ -88,4 +88,15 @@ for g in "${green_cases[@]}"; do
   echo "OK: allowlist extra '$g' accepted" >&2
 done
 
+# The temporary home must follow TMPDIR. A hardcoded path breaks on any host
+# that does not have it, which is how the first version failed in CI.
+export AGENT_CONTAINER_EXTRA=
+tmp_parent=$tmp_proj/tmpdir
+mkdir -p "$tmp_parent"
+out=$(TMPDIR=$tmp_parent "$script" localhost/dux-atomic:dev "$tmp_proj" -- /bin/true 2>&1) \
+  || (echo "FAIL: dry run under a custom TMPDIR failed: $out" >&2; exit 1)
+echo "$out" | grep -qF "$tmp_parent/dux-atomic-agent." \
+  || (echo "FAIL: the temporary home ignores TMPDIR: $out" >&2; exit 1)
+echo "OK: the temporary home follows TMPDIR" >&2
+
 echo "agent-container tests passed"

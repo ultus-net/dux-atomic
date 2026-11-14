@@ -4,7 +4,7 @@ This page describes the disposable, project-scoped, rootless Podman profile used
 
 Key points
 - The container mounts only the project directory, writable, at `/work` inside the container, and starts there. The host path is not mounted.
-- The container receives an isolated HOME and XDG cache stored in a temporary directory on the host; the host home and SSH directory are not mounted.
+- The container receives an isolated HOME and XDG cache stored in a temporary directory under `$TMPDIR` (default `/tmp`); the host home and SSH directory are not mounted. A foreground run deletes that directory afterwards. A `--detach` run prints it instead, because the container keeps reading it after the script exits.
 - No host Podman or Docker socket is exposed. That means the container cannot control sibling containers or the host Podman service.
 - The profile runs unprivileged, defaults to --rm, does not use --privileged, and avoids --network=host and host PID namespaces by default.
 

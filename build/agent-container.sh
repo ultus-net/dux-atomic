@@ -303,7 +303,7 @@ fi
 extra_fields_to_append=("${allowed_extra_tokens[@]:-}")
 
 # Build podman run args
-TMP_ROOT=$(mktemp -d /tmp/opencode/agent-container.XXXX)
+TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/dux-atomic-agent.XXXXXX")
 HOME_IN_CONTAINER=/home/agent
 XDG_CACHE=/tmp/agent-cache
 PROJECT_IN_CONTAINER=/work
