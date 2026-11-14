@@ -64,12 +64,18 @@ if [[ -n ${PACKAGE_MANIFEST_EXTRA:-} ]]; then
 fi
 
 # akmods builds against the headers of the kernel the image boots, so a devel
-# package for another kernel is a first-boot failure instead of a build failure.
-# The shared image ships no kernel-devel, so this does nothing there.
+# package for another kernel is a build failure instead of an image without a
+# module. The shared image ships no kernel-devel, so this does nothing there.
 if rpm -q kernel-devel >/dev/null 2>&1; then
   mapfile -t kernels < <(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel | sort -V)
   mapfile -t devels < <(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-devel)
   bash /ctx/build/check-kernel-devel.sh "${kernels[-1]}" "${devels[@]}"
+fi
+
+# The variant ships akmod-nvidia and the shared image does not, so this block is
+# a no-op there. A base that dragged an akmod in would need its headers anyway.
+if rpm -q akmod-nvidia >/dev/null 2>&1; then
+  bash /ctx/build/build-nvidia-modules.sh
 fi
 
 # Fedora's base enables sshd.service. This image documents that a fresh install

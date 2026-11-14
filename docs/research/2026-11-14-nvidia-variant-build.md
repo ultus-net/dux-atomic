@@ -2,7 +2,9 @@
 
 Status: measurement record. Cutoff 2026-11-14. This record builds the variant
 locally and reads the installed set back out of the image. It does not boot the
-image on NVIDIA hardware, compile the akmod, or make a Secure Boot claim.
+image on NVIDIA hardware or make a Secure Boot claim. The sections before the
+compile read the manifest and kernel wiring from an earlier build; the compile
+section records build 5 (image `c4fd38cddb70`).
 
 ## Question
 
@@ -107,11 +109,66 @@ The check fails the build unless one installed `kernel-devel` equals the newest
 installed kernel. Its green, mismatched, and empty-set paths are exercised by
 `tests/test-static.sh`.
 
+## The akmod compiles during the image build
+
+The earlier decision said first boot. `docs/research/2026-11-14-nvidia-module-path-decision.md:22`
+records why this image cannot do that and the operator's approval of the
+build-time path. The compile runs in `build/common.sh` through
+`build/build-nvidia-modules.sh`, guarded on an installed `akmod-nvidia`:
+
+```
++ rpm -q akmod-nvidia
++ bash /ctx/build/build-nvidia-modules.sh
+Checking kmods exist for 7.3.3-300.fc45.x86_64 [  OK  ]
+Building and installing nvidia-kmod [  OK  ]
+```
+
+Build 5 is the proof of the build path. The probe supplied the compile duration,
+which the build log does not print, and showed the same five modules after the
+same `akmods --force --kernels 7.3.3-300.fc45.x86_64` invocation. Build 5 ran
+that path inside `podman build --layers -t localhost/dux-atomic:nvidia
+-f Containerfile.nvidia .`, which exited 0 after 28m47s and committed image
+`c4fd38cddb70` (digest
+`sha256:51e8dc13ac74ba2f325df29578b4da8c60452d8aa94c55f2850d4c75bbb6886d`).
+`bootc container lint` reported `Checks passed: 12`, `Checks skipped: 1`,
+`Warnings: 2`, the same counts as build 4.
+
+Read back from build 5:
+
+```
+$ podman run --rm localhost/dux-atomic:nvidia find /lib/modules -path '*extra/nvidia*' -name '*.ko*' -print
+/lib/modules/7.3.3-300.fc45.x86_64/extra/nvidia/nvidia-drm.ko.xz
+/lib/modules/7.3.3-300.fc45.x86_64/extra/nvidia/nvidia-modeset.ko.xz
+/lib/modules/7.3.3-300.fc45.x86_64/extra/nvidia/nvidia-peermem.ko.xz
+/lib/modules/7.3.3-300.fc45.x86_64/extra/nvidia/nvidia-uvm.ko.xz
+/lib/modules/7.3.3-300.fc45.x86_64/extra/nvidia/nvidia.ko.xz
+```
+
+```
+nvidia signer=[] version=[620.70.06] owner=[kmod-nvidia-7.3.3-300.fc45.x86_64-620.70.06-2.fc45.x86_64]
+nvidia-uvm signer=[] version=[620.70.06] owner=[kmod-nvidia-7.3.3-300.fc45.x86_64-620.70.06-2.fc45.x86_64]
+nvidia-drm signer=[] version=[620.70.06] owner=[kmod-nvidia-7.3.3-300.fc45.x86_64-620.70.06-2.fc45.x86_64]
+nvidia-modeset signer=[] version=[620.70.06] owner=[kmod-nvidia-7.3.3-300.fc45.x86_64-620.70.06-2.fc45.x86_64]
+nvidia-peermem signer=[] version=[620.70.06] owner=[kmod-nvidia-7.3.3-300.fc45.x86_64-620.70.06-2.fc45.x86_64]
+vermagic=[7.3.3-300.fc45.x86_64 SMP preempt mod_unload]
+```
+
+The akmod's RPM owns every module, so the build installed them rather than
+leaving unowned files under `/usr`. The directory is 13 MB. Every module has an
+empty signer, which is the documented exception and not a surprise: the build
+does not generate or enroll a key. That value comes from `modinfo` in the
+readback, not from the build check.
+
+`build/check-nvidia-modules.sh` asserts presence and non-emptiness only. The
+empty signer is an observed value in this record, not an assertion. A build that
+enrolls a MOK key (#40) would sign these modules, so asserting an empty signer
+would fail that improvement rather than catch a regression.
+
 ## What this record does not prove
 
-- No `akmods` run, so no `nvidia.ko` exists and no `modinfo -F signer` output
-  was read. The first-boot compile is unobserved.
-- No boot on NVIDIA hardware, with Secure Boot off or on.
+- No boot on NVIDIA hardware, with Secure Boot off or on. The modules are
+  unsigned, so a Secure Boot machine refuses them until a local MOK enrollment
+  (#40).
 - The check compares the newest installed kernel with the installed devel. It
   does not prove the image carries exactly one kernel, and a two-kernel image
   with the older one booting would pass it.

@@ -33,6 +33,8 @@ bash_scripts=(
   build/compare-lock.sh
   build/check-kernel-devel.sh
   build/check-manifest-name.sh
+  build/build-nvidia-modules.sh
+  build/check-nvidia-modules.sh
   tests/lint.sh
   tests/test-signing.sh
   tests/test-static.sh
