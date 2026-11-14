@@ -45,7 +45,7 @@ The table below is the result of applying the tests above, not a second policy.
 | `kubectl`, `helm`, `OpenTofu`, cloud CLIs, `k9s`, `stern`, `kubectx` | A pinned operations container, run with `podman` | The design keeps the host image free of cloud SDKs and gives them their own update cadence |
 | Zed, Bitwarden, Obsidian, Zen Browser, Discord, Spotify | Flathub at first login | User GUI applications, recorded in [Applications](applications.md) |
 
-Every user tool the dotfiles install appears in this table, so the split can be checked by reading this page instead of diffing two repositories.
+This table names the tools whose delivery the policy decides. The dotfiles `Brewfile` holds the full set and carries more entries than this table, so read the table as the decision and the `Brewfile` as the inventory (#82).
 
 ## What the split buys
 
@@ -61,6 +61,7 @@ Everything the tests above keep out of the image updates on its own cadence. Hom
 
 ## Known gaps
 
+- The inventory predates the rule in one place. Eight names in the Homebrew row are Fedora 45 packages, measured with `dnf5 repoquery --available` in the pinned base on 2026-11-14: `ripgrep`, `zoxide`, `yq`, `gh`, `glab`, `restic`, `rclone`, `atuin`. The rule gives a Fedora-packaged interactive CLI no row, because the image does not need it before login and it is not a cloud CLI, so those eight sit in a layer the rule does not grant them. The dotfiles also install `azure-cli` by Homebrew while the inventory puts cloud CLIs in a container. Reconciling the two is [#82](https://github.com/ultus-net/dux-atomic/issues/82), and a dotfiles edit belongs to that repository under the #70 hand-off.
 - `lazygit` and `yazi` are not in the Fedora 45 repositories, so no image test covers them. The dotfiles `Brewfile` is the intended delivery path and does not list them yet.
 - The image ships a compiler and its headers but no `cmake` or `meson`. A native build needs those from Homebrew or a Distrobox container.
 - The Homebrew row has no automated check yet. Nothing compares the dotfiles `Brewfile` against this page, so a tool added to one and not the other drifts without a red gate. The `Brewfile` commit is also the only pin, because nothing signs a Homebrew package.
