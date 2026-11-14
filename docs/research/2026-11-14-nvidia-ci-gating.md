@@ -79,9 +79,9 @@ adds the boot smoke, an unmeasured 11m21s at PR #93's rates.
 
 - CI cannot boot the variant on a GPU. A hosted runner has no GPU and no
   `/dev/kvm`, so the existing boot smoke is TCG and headless.
-- CI cannot prove Secure Boot. The modules carry an empty signer
+ - CI cannot prove Secure Boot. The modules carry an empty signer
   (`docs/research/2026-11-14-nvidia-variant-build.md`), so a Secure Boot machine
-  refuses them until a local MOK enrollment (#40).
+  refuses them until a local MOK enrollment (#95).
 - The 28m47s build and 7.57 GB image are one local cold build. The hosted wall
   time, disk headroom, and image size after a hosted build are unmeasured.
 - A build-and-verify job does not prove the variant boots or that the driver
