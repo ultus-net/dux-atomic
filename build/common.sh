@@ -22,27 +22,51 @@ curl --retry 3 -fsSLo /etc/yum.repos.d/fedora-multimedia.repo \
 sed -i '/^\[fedora-multimedia\]$/a priority=90' /etc/yum.repos.d/fedora-multimedia.repo
 
 manifest=/ctx/manifests/packages-common.txt
-if [[ ! -r $manifest ]]; then
-  echo "cannot read ${manifest}" >&2
-  exit 1
-fi
-# grep exits 1 for an all-comment manifest, which is not an error. Any other
-# non-zero exit is a read failure and must fail the build.
-if packages=$(grep -Ev '^[[:space:]]*(#.*)?$' "$manifest"); then
-  :
-else
-  status=$?
-  if ((status != 1)); then
-    echo "cannot read ${manifest} (grep exit ${status})" >&2
+
+# One installer for every manifest, so a variant's extra set takes the same
+# read-failure and word-splitting rules as the shared set.
+install_manifest() {
+  local path=$1 packages status
+  if [[ ! -r $path ]]; then
+    echo "cannot read ${path}" >&2
     exit 1
   fi
-  packages=
+  # grep exits 1 for an all-comment manifest, which is not an error. Any other
+  # non-zero exit is a read failure and must fail the build.
+  if packages=$(grep -Ev '^[[:space:]]*(#.*)?$' "$path"); then
+    :
+  else
+    status=$?
+    if ((status != 1)); then
+      echo "cannot read ${path} (grep exit ${status})" >&2
+      exit 1
+    fi
+    packages=
+  fi
+  if [[ -n $packages ]]; then
+    # Word splitting is intended: the manifest is one package per line.
+    dnf5 install -y $packages
+  else
+    echo "no packages in ${path} yet"
+  fi
+}
+
+install_manifest "$manifest"
+
+# A variant image installs one extra manifest after the shared set, so its
+# Containerfile names a file in this repository instead of repeating the
+# installer. Unset is the shared image, which is every other Containerfile here.
+if [[ -n ${PACKAGE_MANIFEST_EXTRA:-} ]]; then
+  install_manifest "/ctx/manifests/${PACKAGE_MANIFEST_EXTRA}"
 fi
-if [[ -n $packages ]]; then
-  # Word splitting is intended: the manifest is one package per line.
-  dnf5 install -y $packages
-else
-  echo "no packages in manifests/packages-common.txt yet"
+
+# akmods builds against the headers of the kernel the image boots, so a devel
+# package for another kernel is a first-boot failure instead of a build failure.
+# The shared image ships no kernel-devel, so this does nothing there.
+if rpm -q kernel-devel >/dev/null 2>&1; then
+  mapfile -t kernels < <(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel | sort -V)
+  mapfile -t devels < <(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-devel)
+  bash /ctx/build/check-kernel-devel.sh "${kernels[-1]}" "${devels[@]}"
 fi
 
 # Fedora's base enables sshd.service. This image documents that a fresh install

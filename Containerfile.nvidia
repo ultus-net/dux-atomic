@@ -1,5 +1,7 @@
-# NVIDIA variant. Not built in CI and not published; no Secure Boot claim is
-# made until a hardware boot is recorded, as task 6 requires.
+# NVIDIA variant. The module path is decided: akmod-nvidia compiles on the host
+# at first boot and the module is unsigned, so no Secure Boot claim is made until
+# a hardware boot is recorded (#40). docs/research/2026-11-14-nvidia-module-path-decision.md
+# records the exception; manifests/packages-nvidia.txt carries the build set.
 
 # Allow build scripts to be referenced without being copied into the final image.
 FROM scratch AS ctx
@@ -13,10 +15,13 @@ COPY overlay /overlay
 # tests/test-static.sh asserts the tag+digest form.
 FROM quay.io/fedora/fedora-bootc:45@sha256:42259b1db41a7f792a19cfd28e0c66e3e415392109a7d7095f292ad1e2a56453
 
+# The extra manifest is installed after the shared set by build/common.sh, so
+# this file names the variant set instead of repeating the installer.
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     --mount=type=tmpfs,dst=/tmp \
+    PACKAGE_MANIFEST_EXTRA=packages-nvidia.txt \
     bash /ctx/build/common.sh
 
 RUN bootc container lint

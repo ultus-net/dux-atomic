@@ -33,9 +33,12 @@ signature (`:96` through `:104` of the same record).
 
 ## What the exception costs
 
-- The image must ship `akmods`, `kernel-devel`, and a compiler for the build to
+- The image must ship `akmods`, kernel headers, and a compiler for the build to
   run at first boot. It ships none of them today, so the variant needs a
-  manifest addition before it can boot with a working module.
+  manifest addition before it can boot with a working module. The variant names
+  `kernel-devel-matched` rather than `kernel-devel`, so the headers belong to
+  the installed kernel instead of the newest one in the repository; the
+  measurement is in `docs/research/2026-11-14-nvidia-variant-build.md`.
 - The first boot is slower and can fail on a kernel mismatch. That failure mode
   has no test yet, because the variant has never been built.
 - Secure Boot on NVIDIA hardware needs a per-machine MOK enrollment, which is
