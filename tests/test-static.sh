@@ -64,9 +64,9 @@ else
   fi
 fi
 
-# The lock records the resolved third-party packages. Fedora packages float with
-# the updates repo, so comparing them would fail every build after an update;
-# tests/verify-image.sh compares the non-Fedora lines only.
+# The lock records every installed package whose origin repository is not a
+# Fedora repository, so a Fedora updates bump cannot red it. tests/verify-image.sh
+# compares the whole recorded set against the generator's measurement.
 lock=$repo_root/manifests/packages-common.lock
 if [[ ! -f $lock ]]; then
   echo "FAIL manifests/packages-common.lock is missing; run 'just lock'" >&2
@@ -80,7 +80,7 @@ else
     echo "FAIL packages-common.lock has no package lines" >&2
     failures=$((failures + 1))
   elif grep -qvE $'^[^\t]+\t[^\t]+$' <<<"$lock_data"; then
-    echo "FAIL packages-common.lock has a line without a single <nevra> TAB <vendor>" >&2
+    echo "FAIL packages-common.lock has a line without a single <nevra> TAB <from_repo>" >&2
     failures=$((failures + 1))
   elif [[ $lock_data != "$(printf '%s\n' "$lock_data" | LC_ALL=C sort)" ]]; then
     echo "FAIL packages-common.lock is not sorted; regenerate it with 'just lock'" >&2
@@ -104,12 +104,11 @@ elif ! grep -qF 'the lock measurement failed' "$repo_root/tests/verify-image.sh"
    ! grep -qF 'the package lock has no third-party lines' "$repo_root/tests/verify-image.sh"; then
   echo "FAIL tests/verify-image.sh does not separate a failed measurement from drift" >&2
   failures=$((failures + 1))
-elif [[ $(grep -cF "grep -vF '+git'" "$repo_root/tests/verify-image.sh" || true) -lt 2 ]] ||
-   ! grep -qF "sort -u | awk '!index(\$0, \"+git\")'" "$repo_root/build/package-lock.sh"; then
-  echo "FAIL the lock generator or the gate does not drop +git builds, or the gate drops them on one side only" >&2
+elif ! grep -qF "awk '!index(\$0, \"+git\")'" "$repo_root/build/package-lock.sh"; then
+  echo "FAIL the lock generator does not drop +git builds" >&2
   failures=$((failures + 1))
 else
-  echo "ok   the lock is written atomically, drift is separated from a failed measurement, and +git builds are dropped on both sides"
+  echo "ok   the lock is written atomically, drift is separated from a failed measurement, and the generator drops +git builds"
 fi
 
 # Secure Boot needs no per-machine enrollment only while the base keeps Fedora's

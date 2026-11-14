@@ -95,14 +95,16 @@ akmod-nvidia-620.70.06-2.fc45.x86_64.rpm:
     Header SHA256 digest: OK
     Payload SHA256 digest: OK
 
-Recommendation (the decision stays with the operator):
-Take the akmod path, because it is the only module path these repositories
-provide. That means the variant needs `akmods`, `kernel-devel`, and a compiler
-at first boot, plus a local signing key whose public half is enrolled in MOK on
-each target, or Secure Boot off on that machine. The prebuilt path is the better
-operating model if it ever becomes available, since it removes the on-host build
-and the per-machine enrollment, but proposing it means naming the repository
-that publishes per-kernel modules and accepting its trust.
+## The choice the operator faces
+
+The enabled repositories support one module path: `akmod-nvidia` compiled on the
+host. That path needs `akmods`, `kernel-devel`, and a compiler at first boot,
+plus a local signing key whose public half is enrolled in MOK on each target, or
+Secure Boot off on that machine. The prebuilt path removes the on-host build and
+the per-machine enrollment, but no repository enabled here publishes a per-kernel
+module, so it needs a new repository decision and the acceptance of that
+repository's trust. This record does not choose between them. The roadmap's
+second task-6 box is that decision and it belongs to the operator.
 
 ## What this record does not prove
 
