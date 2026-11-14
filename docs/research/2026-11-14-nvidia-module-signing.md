@@ -2,6 +2,10 @@
 
 Commands run in the local dev image and on public repos, with verbatim output.
 
+Mechanism note, added 2026-11-14: the package facts below still hold, but the
+akmod is compiled during the image build rather than at first boot. See
+`docs/research/2026-11-14-nvidia-module-path-decision.md:22` for the reason.
+
 The commands below were run against the local dev image `localhost/dux-atomic:dev`.
 
 1) Inspect the kmod-nvidia RPM (it contains no files)
