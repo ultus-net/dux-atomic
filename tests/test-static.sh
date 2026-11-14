@@ -142,6 +142,37 @@ else
   echo "ok   the image proves Node 22.18 and npm run for the dotfiles npm globals"
 fi
 
+# docs/developer-tooling.md states how a new tool is placed (#80). The rule is
+# the deliverable, and the order is the rule, so compare the delivery paths in
+# the placement table against the expected sequence. Reordering, removing, or
+# rewording a path reds here. Then anchor the test that decides the Homebrew
+# row, the support-tier boundary that keeps it narrow, and the record it cites.
+tooling_doc=$repo_root/docs/developer-tooling.md
+tooling_research=$repo_root/docs/research/2026-11-14-package-delivery-layers.md
+expected_delivery=$'Image\nImage, recorded in the lock\nA pinned `podman` container\nFlathub\nHomebrew, from the dotfiles `Brewfile`\nThat project\'s devcontainer or a Distrobox'
+actual_delivery=$(awk -F'|' '
+  /^## How a new tool is placed$/ { inside = 1; next }
+  inside && /^## / { inside = 0 }
+  inside && /^\|/ {
+    cell = $3
+    gsub(/^[ \t]+|[ \t]+$/, "", cell)
+    if (cell == "Delivery" || cell ~ /^-+$/) next
+    print cell
+  }' "$tooling_doc" 2>/dev/null || true)
+if [[ ! -f $tooling_doc ]] ||
+   [[ $actual_delivery != "$expected_delivery" ]] ||
+   ! grep -qF 'dnf5 repoquery --available <name>' "$tooling_doc" ||
+   ! grep -qF 'Homebrew is the fallback, not the default' "$tooling_doc" ||
+   ! grep -qF 'https://docs.brew.sh/Support-Tiers' "$tooling_doc" ||
+   ! grep -qF 'Ubuntu within its standard support window or a Homebrew-provided Docker image' "$tooling_doc" ||
+   ! grep -qF '[the package-delivery research record](research/2026-11-14-package-delivery-layers.md)' "$tooling_doc" ||
+   [[ ! -f $tooling_research ]]; then
+  echo "FAIL docs/developer-tooling.md changed the ordered delivery paths, the Homebrew boundary, or the research record it cites" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   docs/developer-tooling.md keeps the ordered delivery paths and the Homebrew boundary"
+fi
+
 desktop_unit=$repo_root/overlay/usr/lib/systemd/user/dux-atomic-desktop.service
 defaults_unit=$repo_root/overlay/usr/lib/systemd/user/dux-atomic-dms-defaults.service
 user_preset=$repo_root/overlay/usr/lib/systemd/user-preset/01-dux-atomic.preset
