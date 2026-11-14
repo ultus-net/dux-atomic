@@ -27,12 +27,12 @@ Status: active. Supersedes the unstarted tasks in `2026-11-09-dux-atomic-candida
 
 | Area | State | Evidence |
 | --- | --- | --- |
-| `main` | `8be8e62`, clean, three open work items before this roadmap (#4, #20, #67) | `git log -1` |
+| `main` | `5ea293d`, clean, three open work items before this roadmap (#4, #68, #69) | `git log -1` |
 | Base image | Fedora `fedora-bootc:45`, digest-pinned, signed kernel asserted in CI | #59, #65 |
 | Desktop | niri, DMS, greeter, Ghostty, Xfce fallback; first login provisions the DMS session | `docs/first-login.md` |
 | Developer tooling | In review on `feature/dev-sysadmin-tooling`: compiler, Node 22 with npm, btop, diagnostics set, Node contract in `tests/verify-image.sh` | #67 |
 | Gaming | Steam in the image; no game launched from a built image; Lutris not shipped | #69, `docs/known-gaps.md` |
-| NVIDIA variant | Planned, not built; #40 planned it and closed | #72 |
+| NVIDIA variant | The variant has its own pinned `FROM`, a local build carries the five compiled modules, and it is not published; tracker #94 | #94 |
 | Agent isolation | Not built | #71 |
 | Home snapshots | Not built | #68 |
 | Publication | Signed digest, SBOM and provenance attested, `:latest` moves on manual promotion | #63, `docs/ci.md` |
@@ -69,7 +69,7 @@ Acceptance: the hosted `image` job is green, the lock carries the new Fedora NEV
 
 ## Task 2: prove the dotfiles bootstrap (#70)
 
-Status: blocked on a booted image and a test account; the sequence is in `docs/research/2026-11-14-dotfiles-bootstrap.md`.
+Status: closed on 2026-11-14 without its acceptance run; the record still carries the operator hand-off and its four untested claims. The residual is tracked as #96.
 
 Files: `tests/vm/boot-smoke.sh`, `docs/research/<date>-dotfiles-bootstrap.md`, `docs/developer-tooling.md`.
 
@@ -82,24 +82,25 @@ Acceptance: the dotfiles' own installer completes on this image without a manual
 
 ## Task 3: ship a containers signing policy (#4)
 
-Status: the trust root is decided, a repository release key named by `keyPath`; the policy, the rotation note, and the tests remain (#4). See `docs/research/2026-11-14-signing-trust-root-decision.md`.
+Status: the trust root is decided and the signing tests (`tests/test-signing.sh`) run in lint and CI. Three remaining items follow (#4). See `docs/research/2026-11-14-signing-trust-root-decision.md`.
 
 Files: `overlay/etc/containers/policy.json`, `tests/test-signing.sh`, `docs/known-gaps.md`, `CHANGELOG.md`.
 
 - [x] Decide the trust root: a release key referenced by `keyPath`, or a recorded decision to ship no policy.
-- [ ] Write the policy and the rotation note.
-- [ ] Extend `tests/test-signing.sh` with an accept and a reject against the shipped policy.
+- [ ] Generate or record the repository keypair and custody instructions.
+- [ ] Write the containers signing policy and the rotation note.
+- [ ] Ship the policy and add accept/reject tests against it.
 
 Acceptance: a host either verifies the image it pulls or the repository records why it cannot, with a test for whichever answer ships.
 
 ## Task 4: lock every third-party package (#20)
 
-Status: the gate and its documentation landed; the fixture proving the rejection is [#85](https://github.com/ultus-net/dux-atomic/issues/85).
+Status: closed 2026-11-14; `tests/test-lock-drift.sh` runs from `tests/lint.sh`, and `tests/test-static.sh` pins both drift diagnoses. The fixture proving the rejection is `tests/test-lock-drift.sh` and is recorded in issue #85.
 
 Files: `build/package-lock.sh`, `tests/verify-image.sh`, `tests/test-static.sh`, `docs/build.md`, `docs/known-gaps.md`.
 
 - [x] Enumerate transitive packages from a non-Fedora vendor, not only manifest names.
-- [ ] Add a fixture proving a transitive rebuild reds the gate.
+- [x] Add a fixture proving a transitive rebuild reds the gate (`tests/test-lock-drift.sh`).
 - [x] Record the `+git` exception and the vendor-string limit in `docs/build.md`.
 
 Acceptance: a rebuild of a package the manifest pulls in transitively fails the image job.
@@ -118,13 +119,14 @@ Acceptance: the dogfood record exists and Lutris ships behind a green assertion,
 
 ## Task 6: build the NVIDIA variant (#72)
 
-Status: the module path is decided, `akmod-nvidia` compiled on the host, unsigned, as a documented exception (#72, and #40 for Secure Boot); the variant is still unbuilt. See `docs/research/2026-11-14-nvidia-module-path-decision.md`.
+Status: the module path is decided and the akmod build runs during the image build, producing the five compiled modules unsigned; the variant is built locally but not published. CI build, lock, publish, and a hardware boot are tracked as #94; MOK enrollment is tracked as #95. See `docs/research/2026-11-14-nvidia-module-path-decision.md`.
 
-Files: `Containerfile.nvidia`, `manifests/packages-nvidia.txt`, `build/nvidia.sh`, `.github/workflows/ci.yml`, `tests/test-static.sh`, `docs/known-gaps.md`.
+Files: `Containerfile.nvidia`, `manifests/packages-nvidia.txt`, `build/build-nvidia-modules.sh`, `build/check-nvidia-modules.sh`, `.github/workflows/ci.yml`, `tests/test-static.sh`, `docs/known-gaps.md`.
 
 - [x] Pin the variant `FROM` by tag and digest and extend the static gate to it.
 - [x] Decide the module path: a vendor-signed module from a repository, or a documented unsigned-module exception.
-- [ ] Build the variant and publish it under its own tag.
+- [x] Build the variant locally. (done in #93)
+- [ ] Publish it under its own tag. (open, #94)
 
 Acceptance: the variant builds from its own pin, the module policy is recorded, and no Secure Boot claim is made until a boot is recorded.
 
@@ -140,7 +142,7 @@ Acceptance: an agent works in the container and the test proves the host surface
 
 ## Task 8: local home snapshots (#68)
 
-Status: the layout is decided, a dedicated `home` subvolume snapshotted alone; nothing ships until a btrfs host has taken the four measurements in `docs/research/2026-11-14-btrfs-home-layout-decision.md` (#68).
+Status: the layout is decided, a dedicated `home` subvolume snapshotted alone. The four measurements can be taken from a VM install because `tests/vm/make-disk.sh:82` builds a btrfs qcow2. The install-path change and one to-disk validation remain (#68).
 
 Files: `overlay/etc/btrbk/btrbk.conf`, `overlay/usr/lib/systemd/system/btrbk.timer`, `tests/verify-image.sh`, `docs/install.md`.
 
@@ -152,10 +154,10 @@ Acceptance: the timer is enabled, the config names the home subvolume, and the d
 
 ## Task 9: promotion gate
 
-Status: blocked on Secure Boot boots and the graphical dogfood on hardware; CI cannot reach either.
+Status: blocked on hardware evidence: the gaming host is EFI with a TPM and Secure Boot is off. The remaining work is firmware enablement, an install, and a recorded boot with `mokutil --sb-state` and graphical dogfood evidence; CI cannot reach firmware state.
 
 - [ ] Boot the promoted digest with Secure Boot enabled on each target and record `mokutil --sb-state`.
-- [ ] Run the graphical dogfood on the promoted digest.
+- [ ] Run the graphical dogfood on the promoted digest and record the run.
 - [ ] Promote `:latest` and record the registry digests.
 
 Acceptance: `docs/install.md` and `docs/known-gaps.md` state what the promoted digest was proven to do, and nothing more.

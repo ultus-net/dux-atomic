@@ -16,7 +16,7 @@ Secure Boot claim.
 - **No Secure Boot claim for the variant.** The non-NVIDIA image keeps its
   "nothing to enroll" property, because it keeps Fedora's signed kernel. A
   machine that runs the NVIDIA variant with Secure Boot on needs a local MOK
-  enrollment, which is tracked as #40 and belongs to the machine's owner.
+  enrollment, which is tracked as #95 and belongs to the machine's owner.
 - **No new third-party repository is enabled to obtain a prebuilt module.**
 
 ## Revision 2026-11-14 (iteration 3): image build, not first boot
@@ -42,7 +42,7 @@ on an installed `akmod-nvidia`, and `build/check-nvidia-modules.sh` fails the
 build when any of the five modules is missing or empty.
 
 The revision does not change the security position: the module is still unsigned,
-Secure Boot on NVIDIA hardware still needs a per-machine MOK enrollment (#40), and
+Secure Boot on NVIDIA hardware still needs a per-machine MOK enrollment (#95), and
 no boot on NVIDIA hardware is recorded.
 
 ## Why the vendor-signed option is not available
@@ -72,22 +72,21 @@ signature (`:96` through `:104` of the same record).
   build. Nothing can compile one at runtime, because the unit is skipped and
   `/usr` is read-only.
 - Secure Boot on NVIDIA hardware needs a per-machine MOK enrollment, which is
-  the exception's price and is recorded as #40 rather than hidden.
+  the exception's price and is recorded as #95 rather than hidden.
 
 ## What this record does not do
 
 - The variant is not built in CI, has no lock file, and is not published
   (`docs/known-gaps.md:4`).
 - No boot on NVIDIA hardware is recorded, with Secure Boot off or on. The
-  modules are unsigned, so a Secure Boot machine needs the #40 enrollment.
+  modules are unsigned, so a Secure Boot machine needs the #95 enrollment.
 - No MOK enrollment or key is created, and no signature is applied.
 
 ## Follow-up work
 
-Issue #72 keeps the remaining items: build the variant in CI, give it a lock file,
-publish it under its own tag, and record a boot on NVIDIA hardware. The manifest
-already carries `akmods`, the headers, and the compiler. The roadmap's Task 6
-carries the same items.
+The CI, lock, publish, and hardware-boot items are tracked as #94, and MOK
+enrollment is tracked as #95. The manifest already carries `akmods`, the
+headers, and the compiler. The roadmap's Task 6 carries the same items.
 
 ## What would reverse this
 

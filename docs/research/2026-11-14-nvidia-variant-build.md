@@ -161,14 +161,14 @@ readback, not from the build check.
 
 `build/check-nvidia-modules.sh` asserts presence and non-emptiness only. The
 empty signer is an observed value in this record, not an assertion. A build that
-enrolls a MOK key (#40) would sign these modules, so asserting an empty signer
+enrolls a MOK key (#95) would sign these modules, so asserting an empty signer
 would fail that improvement rather than catch a regression.
 
 ## What this record does not prove
 
 - No boot on NVIDIA hardware, with Secure Boot off or on. The modules are
   unsigned, so a Secure Boot machine refuses them until a local MOK enrollment
-  (#40).
+  (#95).
 - The check compares the newest installed kernel with the installed devel. It
   does not prove the image carries exactly one kernel, and a two-kernel image
   with the older one booting would pass it.
