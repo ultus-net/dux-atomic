@@ -3,6 +3,9 @@
 # NVIDIA module for one kernel. A missing module means the variant boots
 # without a driver, and akmods.service cannot build one at first boot.
 #
+# Asserts presence and non-emptiness only. The signer is not asserted: a
+# MOK-signed build (#40) must pass this check.
+#
 #   build/check-nvidia-modules.sh <kernel-nvr> [modules-root]
 
 set -euo pipefail

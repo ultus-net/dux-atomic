@@ -123,10 +123,10 @@ Checking kmods exist for 7.3.3-300.fc45.x86_64 [  OK  ]
 Building and installing nvidia-kmod [  OK  ]
 ```
 
-A probe in a container of the earlier variant image established the compile
-separately and measured it: `akmods --force --kernels 7.3.3-300.fc45.x86_64`
-exited 0 in 1:09.45 and produced the five modules with no signer. Build 5 then
-ran the same path inside `podman build --layers -t localhost/dux-atomic:nvidia
+Build 5 is the proof of the build path. The probe supplied the compile duration,
+which the build log does not print, and showed the same five modules after the
+same `akmods --force --kernels 7.3.3-300.fc45.x86_64` invocation. Build 5 ran
+that path inside `podman build --layers -t localhost/dux-atomic:nvidia
 -f Containerfile.nvidia .`, which exited 0 after 28m47s and committed image
 `c4fd38cddb70` (digest
 `sha256:51e8dc13ac74ba2f325df29578b4da8c60452d8aa94c55f2850d4c75bbb6886d`).
@@ -157,6 +157,11 @@ The akmod's RPM owns every module, so the build installed them rather than
 leaving unowned files under `/usr`. The directory is 13 MB. Every module has an
 empty signer, which is the documented exception and not a surprise: the build
 does not generate or enroll a key.
+
+`build/check-nvidia-modules.sh` asserts presence and non-emptiness only. The
+empty signer is an observed value in this record, not an assertion. A build that
+enrolls a MOK key (#40) would sign these modules, so asserting an empty signer
+would fail that improvement rather than catch a regression.
 
 ## What this record does not prove
 
