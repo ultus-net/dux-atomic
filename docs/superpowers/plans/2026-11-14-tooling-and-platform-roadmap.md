@@ -83,10 +83,11 @@ Acceptance: the dotfiles' own installer completes on this image without a manual
 ## Task 3: ship a containers signing policy (#4)
 
 
-Status: the trust root is decided and the signing tests (`tests/test-signing.sh`) run in lint and CI. Remaining items are:
+Status: the trust root is decided and the signing tests (`tests/test-signing.sh`) run in lint and CI. Three remaining items follow (#4). See `docs/research/2026-11-14-signing-trust-root-decision.md`.
 
 Files: `overlay/etc/containers/policy.json`, `tests/test-signing.sh`, `docs/known-gaps.md`, `CHANGELOG.md`.
 
+- [x] Decide the trust root: a release key referenced by `keyPath`, or a recorded decision to ship no policy.
 - [ ] Generate or record the repository keypair and custody instructions.
 - [ ] Write the containers signing policy and the rotation note.
 - [ ] Ship the policy and add accept/reject tests against it.
@@ -119,7 +120,7 @@ Acceptance: the dogfood record exists and Lutris ships behind a green assertion,
 
 ## Task 6: build the NVIDIA variant (#72)
 
-Status: the module path is decided and the akmod build runs during the image build, producing the five compiled modules unsigned; the variant is built locally but not published. CI build, lock, publish, and a hardware boot are tracked as #94; MOK enrollment and its advisory are #95. See `docs/research/2026-11-14-nvidia-module-path-decision.md`.
+Status: the module path is decided and the akmod build runs during the image build, producing the five compiled modules unsigned; the variant is built locally but not published. CI build, lock, publish, and a hardware boot are tracked as #94; MOK enrollment is tracked as #95. See `docs/research/2026-11-14-nvidia-module-path-decision.md`.
 
 Files: `Containerfile.nvidia`, `manifests/packages-nvidia.txt`, `build/build-nvidia-modules.sh`, `build/check-nvidia-modules.sh`, `.github/workflows/ci.yml`, `tests/test-static.sh`, `docs/known-gaps.md`.
 
