@@ -111,15 +111,9 @@ installed kernel. Its green, mismatched, and empty-set paths are exercised by
 
 ## The akmod compiles during the image build
 
-The first attempt at this path said the akmod compiles on first boot. The image
-rules that out before any boot. `akmods.service` carries
-`ConditionPathExists=!/run/ostree-booted` and is enabled, and a bootc host is
-ostree-booted. `/lib` is also a symlink to `usr/lib`, and a booted deployment
-mounts `/usr` read-only, so the write would fail even without the unit
-condition. `akmods@.service` is a kernel-transaction trigger and
-`akmods-shutdown.service` is disabled, so neither reaches a first boot.
-
-The compile therefore runs in `build/common.sh` through
+The earlier decision said first boot. `docs/research/2026-11-14-nvidia-module-path-decision.md:22`
+records why this image cannot do that and the operator's approval of the
+build-time path. The compile runs in `build/common.sh` through
 `build/build-nvidia-modules.sh`, guarded on an installed `akmod-nvidia`:
 
 ```

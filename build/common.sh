@@ -72,8 +72,8 @@ if rpm -q kernel-devel >/dev/null 2>&1; then
   bash /ctx/build/check-kernel-devel.sh "${kernels[-1]}" "${devels[@]}"
 fi
 
-# The NVIDIA variant ships akmod-nvidia. The shared image does not, so the NVIDIA
-# build block is a guarded no-op there.
+# The variant ships akmod-nvidia and the shared image does not, so this block is
+# a no-op there. A base that dragged an akmod in would need its headers anyway.
 if rpm -q akmod-nvidia >/dev/null 2>&1; then
   bash /ctx/build/build-nvidia-modules.sh
 fi
