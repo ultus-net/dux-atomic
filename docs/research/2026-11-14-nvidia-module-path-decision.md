@@ -21,6 +21,9 @@ Secure Boot claim.
 
 ## Revision 2026-11-14 (iteration 3): image build, not first boot
 
+This section is the authoritative statement of the mechanism. The build record
+measures it and the signing record keeps the package facts that led to it.
+
 The original decision said the module is built on first boot. The image falsifies
 that mechanism. `akmods.service` carries
 `ConditionPathExists=!/run/ostree-booted` (line 3 of the unit), the unit is

@@ -156,7 +156,8 @@ vermagic=[7.3.3-300.fc45.x86_64 SMP preempt mod_unload]
 The akmod's RPM owns every module, so the build installed them rather than
 leaving unowned files under `/usr`. The directory is 13 MB. Every module has an
 empty signer, which is the documented exception and not a surprise: the build
-does not generate or enroll a key.
+does not generate or enroll a key. That value comes from `modinfo` in the
+readback, not from the build check.
 
 `build/check-nvidia-modules.sh` asserts presence and non-emptiness only. The
 empty signer is an observed value in this record, not an assertion. A build that
