@@ -112,10 +112,11 @@ ships.
 3. Inside the guest, run the three commands above and the restore drill from
    the design's recovery section, then capture their verbatim outputs.
 
-4. Record the outputs in this document with the date and the disk digest (the
-   qcow2 produced by `make-disk.sh` is the test artifact; record its sha256
-   digest alongside the guest outputs). Include the exact command lines used
-   and the full copy-paste of the outputs so reviewers can verify them later.
+4. Record the outputs in this document with the date and the disk digest. The
+   qcow2 produced by `make-disk.sh` is the test artifact, and
+   `sha256sum output/qcow2/disk.qcow2` prints the digest to record. Include the
+   exact command lines and the full copy-paste of the outputs, so reviewers can
+   verify them later.
 
 ## What this record does not prove
 
