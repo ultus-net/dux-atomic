@@ -90,6 +90,15 @@ the rule had no row for a Fedora-packaged tool the image does not need before
 login. Six are not, so the Homebrew fallback row keeps them. The twenty-third,
 `crush`, resolves in neither set.
 
+The sixteen split three ways in the delivery table, and the counts are only
+clear when that split is written down. Thirteen get the grandfather row
+(`atuin`, `bash-preexec`, `chezmoi`, `direnv`, `git-credential-oauth`, `rclone`,
+`ripgrep`, `restic`, `shellcheck`, `stress-ng`, `ugrep`, `yq`, `zoxide`).
+`gh`, `glab`, and `azure-cli` are claimed first by the cloud-CLI row, because a
+later row never overrides an earlier one, so the placement rule puts them in a
+container while the `Brewfile` still installs them by Homebrew. That divergence
+is recorded in the page and is not resolved by this record.
+
 The same `Brewfile` also installs one cask (`git-credential-manager`, `:49`),
 seven `npm` globals (`:79` through `:85`), and 29 `flatpak` entries (`:50`
 through `:78`). Those are three other layers. The cask is a user binary with no
@@ -111,7 +120,7 @@ Everything the tests above keep out of the image updates on its own cadence. Hom
 
 ## Known gaps
 
-- The inventory is reconciled with the dotfiles `Brewfile` at `6eaffc9`, and the reconciliation is a recorded divergence rather than a move (#82, closed by this page). Sixteen of the 23 `brew` entries are Fedora 45 packages, so the placement table gains a grandfather row that names the dotfiles `Brewfile` as their delivery until the dotfiles move them. `gh`, `glab`, and `azure-cli` are cloud CLIs, so the earlier cloud-CLI row claims them while the dotfiles still install them by Homebrew. Moving any of them is a `Brewfile` change in the dotfiles repository under the #70 hand-off. The measurement that decides each row is [the inventory measurement](research/2026-11-14-brewfile-inventory-measurement.md).
+- The inventory is reconciled with the dotfiles `Brewfile` at `6eaffc9`, and the reconciliation is a recorded divergence rather than a move. Sixteen of the 23 `brew` entries are Fedora 45 packages. Thirteen of those sixteen get the grandfather row, which names the dotfiles `Brewfile` as their delivery until the dotfiles move them. The other three, `gh`, `glab`, and `azure-cli`, are cloud CLIs, so the earlier cloud-CLI row claims them while the dotfiles still install them by Homebrew: that divergence is recorded here, not closed, and it needs no row of its own. Moving any of the sixteen is a `Brewfile` change in the dotfiles repository under the #70 hand-off. The measurement that decides each row is [the inventory measurement](research/2026-11-14-brewfile-inventory-measurement.md).
 - `lazygit` and `yazi` are not in the Fedora 45 repositories, so no image test covers them. The dotfiles `Brewfile` is the intended delivery path and does not list them yet.
 - The image ships a compiler and its headers but no `cmake` or `meson`. A native build needs those from Homebrew or a Distrobox container.
 - The inventory has no automated check yet. Nothing compares the dotfiles `Brewfile` against the table above, so a tool added to one and not the other drifts without a red gate. The `Brewfile` commit is also the only pin, because nothing signs a Homebrew package.

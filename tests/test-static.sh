@@ -193,7 +193,9 @@ fi
 # The inventory is the other half of #82: every `brew` entry in the dotfiles
 # Brewfile gets a row, so the page cannot claim completeness it does not have
 # (the claim this check replaced), and the Homebrew row names only the tools
-# Fedora 45 does not carry. A dropped row or a widened Homebrew row reds here.
+# Fedora 45 does not carry. A dropped row, a renamed row, or a widened Homebrew
+# row reds here. The expected names are frozen in Brewfile order on purpose: a
+# count alone lets a rename through, and the order is the list's own order.
 inventory_rows=$(awk -F'|' '
   /^## The inventory the dotfiles install$/ { inside = 1; next }
   inside && /^## / { inside = 0 }
@@ -203,15 +205,16 @@ inventory_rows=$(awk -F'|' '
     if (cell == "Tool" || cell ~ /^-+$/) next
     print cell
   }' "$tooling_doc" 2>/dev/null || true)
-inventory_count=$(printf '%s\n' "$inventory_rows" | grep -c '^`' || true)
-if ((inventory_count != 23)) ||
+inventory_names=$(printf '%s\n' "$inventory_rows" | sed -n 's/^`\(.*\)`$/\1/p')
+expected_inventory_names=$'atuin\nazure-cli\nbash-preexec\nchezmoi\ndirenv\ndysk\nfd\ngh\ngit-credential-oauth\nglab\ngo\nrclone\nripgrep\nrestic\nshellcheck\nstarship\nstress-ng\ntealdeer\ntelevision\nugrep\nyq\nzoxide\ncharmbracelet/tap/crush'
+if [[ $inventory_names != "$expected_inventory_names" ]] ||
    ! grep -qF '[the inventory measurement](research/2026-11-14-brewfile-inventory-measurement.md)' "$tooling_doc" ||
    ! grep -qF '| `fd`, `starship`, `go` (Fedora'"'"'s `golang`) | Homebrew, through the dotfiles `Brewfile` |' "$tooling_doc" ||
    [[ ! -f $tooling_inventory ]]; then
-  echo "FAIL docs/developer-tooling.md lost a row of the 23-entry Brewfile inventory, widened the Homebrew row, or dropped the measurement record" >&2
+  echo "FAIL docs/developer-tooling.md no longer inventories the 23 Brewfile names in order, widened the Homebrew row, or dropped the measurement record" >&2
   failures=$((failures + 1))
 else
-  echo "ok   docs/developer-tooling.md inventories all ${inventory_count} Brewfile entries and links the measurement"
+  echo "ok   docs/developer-tooling.md inventories all 23 Brewfile names in order and links the measurement"
 fi
 
 desktop_unit=$repo_root/overlay/usr/lib/systemd/user/dux-atomic-desktop.service

@@ -119,6 +119,13 @@ a package name.
   measurement adds eight more the page does not mention at all: `azure-cli`,
   `bash-preexec`, `chezmoi`, `direnv`, `git-credential-oauth`, `shellcheck`,
   `stress-ng`, `ugrep`.
+- The sixteen do not all land in one row. Thirteen are user-level CLIs the image
+  does not need before login, so they take the grandfather row. `gh`, `glab`,
+  and `azure-cli` are cloud CLIs, so the earlier cloud-CLI row in
+  `docs/developer-tooling.md` claims them while the `Brewfile` still installs
+  them by Homebrew. Availability is the only thing this record measures; which
+  row a Fedora package lands in is the placement rule's answer, not a
+  measurement.
 
 ## What this record does not prove
 
