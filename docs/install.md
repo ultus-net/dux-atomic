@@ -1,6 +1,6 @@
 # Install
 
-The published image installs to a physical disk with `bootc install to-disk` from a Fedora live environment. That path needs no install media artifact, which matters because this repo builds only a qcow2 for the VM test (`tests/vm/make-disk.sh:81`). Read the gates before wiping either target: neither machine gets an encrypted root by policy (#54), the laptop's Secure Boot state is unrecorded, and the desktop needs the NVIDIA variant from [#40](https://github.com/ultus-net/dux-atomic/issues/40).
+The published image installs to a physical disk with `bootc install to-disk` from a Fedora live environment. That path needs no install media artifact, which matters because this repo builds only a qcow2 for the VM test (`tests/vm/make-disk.sh:81`). Read the gates before wiping either target: neither machine gets an encrypted root by policy (#54), the laptop's Secure Boot state is unrecorded, and the desktop needs the NVIDIA variant tracked in [#94](https://github.com/ultus-net/dux-atomic/issues/94), with MOK enrollment in [#95](https://github.com/ultus-net/dux-atomic/issues/95).
 
 ## What the image provides
 
@@ -98,11 +98,11 @@ No target has run this order yet. It exists so the first install produces the ev
 
 Installing with Secure Boot off first separates a firmware refusal, which stops the boot before the kernel loads, from a defect in the image, which shows up after it. The disk does not depend on the answer: the install writes no key, so the same image boots either way.
 
-The desktop's NVIDIA modules are unsigned, so that machine needs Secure Boot off or a locally signed module, which [#40](https://github.com/ultus-net/dux-atomic/issues/40) covers. The `image` job checks the kernel's signature on every build (`tests/verify-kernel-signature.sh`), so a base that stopped shipping Fedora's kernel would red CI rather than fail at first boot. The evidence, the base swap that removed the old enrollment path, and the remaining check are in [Disk encryption and Secure Boot policy](research/2026-11-12-luks-secureboot-policy.md) (#54).
+The desktop's NVIDIA modules are unsigned, so that machine needs Secure Boot off or a locally signed module, which [#95](https://github.com/ultus-net/dux-atomic/issues/95) covers. The `image` job checks the kernel's signature on every build (`tests/verify-kernel-signature.sh`), so a base that stopped shipping Fedora's kernel would red CI rather than fail at first boot. The evidence, the base swap that removed the old enrollment path, and the remaining check are in [Disk encryption and Secure Boot policy](research/2026-11-12-luks-secureboot-policy.md) (#54).
 
 ## The desktop
 
-The generic image does not drive the desktop's monitors. Both active displays are on the RTX 3070 (`docs/superpowers/specs/2026-11-09-dux-atomic-design.md:73`), and the image has no NVIDIA kernel driver. Arch cannot switch to bootc in place (`docs/superpowers/specs/2026-11-09-dux-atomic-design.md:81`), so the desktop needs a fresh atomic install of an NVIDIA variant that does not exist yet. Do not install the generic image on the desktop. [#40](https://github.com/ultus-net/dux-atomic/issues/40) plans the variant.
+The generic image does not drive the desktop's monitors. Both active displays are on the RTX 3070 (`docs/superpowers/specs/2026-11-09-dux-atomic-design.md:73`), and the image has no NVIDIA kernel driver. Arch cannot switch to bootc in place (`docs/superpowers/specs/2026-11-09-dux-atomic-design.md:81`), so the desktop needs a fresh atomic install of an NVIDIA variant that does not exist yet. Do not install the generic image on the desktop. [#94](https://github.com/ultus-net/dux-atomic/issues/94) builds and publishes the variant.
 
 ## After first boot
 
