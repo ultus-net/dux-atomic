@@ -2,3 +2,5 @@
 /output/
 /.vm/
 /.cache/
+# local test and run evidence; not committed
+/.evidence/

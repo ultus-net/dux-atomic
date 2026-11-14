@@ -84,10 +84,9 @@ signature (`:96` through `:104` of the same record).
 
 ## Follow-up work
 
-Issue #72 keeps the remaining items: build the variant in CI, give it a lock file,
-publish it under its own tag, and record a boot on NVIDIA hardware. The manifest
-already carries `akmods`, the headers, and the compiler. The roadmap's Task 6
-carries the same items.
+The CI, lock, publish, and hardware-boot items are tracked as #94, and MOK
+enrollment and its advisory are #95. The manifest already carries `akmods`, the
+headers, and the compiler. The roadmap's Task 6 carries the same items.
 
 ## What would reverse this
 
