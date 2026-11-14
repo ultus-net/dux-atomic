@@ -150,3 +150,27 @@ tamper-evident (hash-chained admission).
 - interpretation: the review's mechanism finding was an editorial defect with a real cause: the name and the requirement were both close enough to right that the first draft stated the outcome as the mechanism. The path finding was smaller, but the fix produced a tested red rather than a grep-pinned branch. The timeline finding was a misreading of a sentence that had no business asserting what git cannot show.
 - keep/revert: keep. All three findings are addressed, and the two held-out checks were re-run rather than assumed.
 - next hypothesis: (a) the remaining unproven step is the akmod compile, which can run without NVIDIA hardware through `akmods --force` in a container and would close the last unobserved claim in the decision record; (b) the variant lock is still missing, so build 4's digest is a snapshot; (c) publish and the hardware boot stay #72's own items, and MOK enrollment stays #40's.
+
+### n=5 · 2026-11-14 · compile the NVIDIA akmod during the image build (#72)
+
+- hypothesis (falsifiable): the module path says the akmod compiles on first boot. The image falsifies that mechanism: `akmods.service` ships `ConditionPathExists=!/run/ostree-booted` and is enabled, a bootc host is ostree-booted, and `/lib` is a symlink into `/usr`, which is read-only at runtime. Compiling during the image build, guarded on the installed `akmod-nvidia`, and asserting the five modules for the newest installed kernel makes the variant ship a module. Predicts: the variant build exits 0; the image carries `nvidia`, `nvidia-uvm`, `nvidia-drm`, `nvidia-modeset`, and `nvidia-peermem` under `/usr/lib/modules/<kver>/extra/nvidia`, each reporting `version=620.70.06` and an empty signer; the shared image installs nothing extra; the static gate reds when the compile call or a module disappears. Falsified by a build failure, a missing module, a changed shared path, or a gate that passes with the wiring removed.
+- predicted at-risk regressions: `build/common.sh` is shared by both Containerfiles, so the compile must stay behind a guard that the shared image never satisfies; the compile adds about 70 seconds and tens of megabytes; `akmods` wants `/var/log/akmods` and `/var/cache/akmods`; files installed under `/usr` by a build tool rather than RPM may trip `bootc container lint` or leave unowned content.
+- accept/reject rule: accept only if the variant build exits 0, all five modules read back with a version, `bootc container lint` still passes, `tests/lint.sh` exits 0, and the new static reds are observed. Reject if any of those fails.
+- non-goals: no module signing or MOK enrollment (#40), no hardware boot, no publish, no variant lock, no variant CI job, no change to `tests/verify-image.sh`.
+- trace evidence: `.evidence/akmods-probe.txt` (akmods exit 0, 1:09.45 wall, five modules, `signer=[]`, `version=620.70.06`, `vermagic 7.3.3-300.fc45.x86_64`); `systemctl is-enabled akmods.service` prints `enabled`; `ConditionPathExists=!/run/ostree-booted` is line 3 of `/usr/lib/systemd/system/akmods.service`; `readlink -f /lib` prints `/usr/lib`; `rpm -q ostree bootc` prints both installed; `akmods-shutdown.service` is disabled and `akmods@.service` is a kernel-transaction trigger, so neither reaches a first boot.
+- code change: pending.
+- commit SHA + git tree: pending.
+- artifact name + checksum: pending.
+- exact command/config: `podman build --layers -t localhost/dux-atomic:nvidia -f Containerfile.nvidia .`; `CONTAINER_RUNTIME=podman bash tests/lint.sh`; `bash tests/test-static.sh`.
+- test results: results pending.
+- eval job path: none. The variant is not built in CI, so the `image` job exercises the shared path only.
+- selection score: pending.
+- held-out score: pending.
+- prev-chain: sha256:4aa64e653f2f24953f19b8e6056e03acc26aca1ee86edb3ab046f5fd367b234b
+- gains: results pending.
+- losses: results pending.
+- exceptions/idiosyncratic constraints: results pending.
+- token/cost/duration: results pending.
+- interpretation: results pending.
+- keep/revert: results pending.
+- next hypothesis: results pending.
