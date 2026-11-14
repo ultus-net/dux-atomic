@@ -54,10 +54,13 @@ configuration that snapshots nothing. The design anticipated exactly this: it
 keeps snapshots "disabled until per-device paths, retention, and permission
 policy are configured explicitly".
 
-## What only a btrfs host can answer
+## What only a btrfs install of this image can answer
 
-These describe a disk the installer built, so no image inspection can answer
-them:
+These describe a disk created by the installer. The repository also builds
+such a disk as a qcow2 image: `tests/vm/make-disk.sh:82` writes a disk with
+`--rootfs btrfs`, which produces a bootable qcow2 that contains a btrfs
+installation of the image. An operator with root on the host can build that
+qcow2 and boot it under QEMU to run the checks below inside the guest.
 
 | Question | Command |
 | --- | --- |
@@ -65,6 +68,9 @@ them:
 | Which subvolumes did the installer create? | `btrfs subvolume list /` |
 | Is home a directory in root or a mount of its own? | `findmnt -no TARGET,SOURCE /var/home` |
 | Does a snapshot restore one deleted file? | the drill in the design's recovery section |
+
+Keep the four commands above: the procedure below tells an operator how to
+produce a btrfs install of the image and run them.
 
 ## The three ways forward
 
@@ -78,7 +84,35 @@ Recommendation, not a decision: option A. The design asks for home recovery with
 a defined retention (daily for seven days, weekly for four weeks), and option B
 trades that for whole-root snapshots whose size the design never budgeted. The
 choice is the operator's, and it needs the four measurements above from one
-target before either option lands.
+target before either option lands. These measurements may be taken on a VM
+install of the image (see the Procedure section), but to-disk validation on
+real hardware is still required by the deployment checklist.
+
+## Procedure
+
+1. Build the test disk (requires root on the host):
+
+   sudo tests/vm/make-disk.sh localhost/dux-atomic:dev <out.qcow2>
+
+2. Boot the resulting qcow2 under QEMU using the repository's invocation in
+   `tests/vm/boot-smoke.sh` (see the `qemu=(...)` construction around lines
+   99-110 of that file). The script builds an invocation equivalent to:
+
+   qemu-system-x86_64 -machine "q35,accel=$accel" -cpu "$cpu" -m 4096 -smp 2 \
+     -snapshot -drive "if=pflash,format=raw,readonly=on,file=<OVMF_CODE>" \
+     -drive "if=pflash,format=raw,file=<OVMF_VARS>" -drive "file=<disk>,if=virtio,format=qcow2" \
+     -nic "user,model=virtio-net-pci" <display-args> -serial "pipe:<run_dir>/serial" -no-reboot
+
+   Use `boot-smoke.sh` so the test harness' serial console markers are present
+   and the run logs are recorded in the same layout the repo test expects.
+
+3. Inside the guest, run the four commands listed above and capture their
+   verbatim outputs.
+
+4. Record the outputs in this document with the date and the disk digest (the
+   qcow2 produced by `make-disk.sh` is the test artifact; record its sha256
+   digest alongside the guest outputs). Include the exact command lines used
+   and the full copy-paste of the outputs so reviewers can verify them later.
 
 ## What this record does not prove
 
