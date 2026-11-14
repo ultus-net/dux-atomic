@@ -95,7 +95,7 @@ Acceptance: a host either verifies the image it pulls or the repository records 
 
 ## Task 4: lock every third-party package (#20)
 
-Status: closed 2026-11-14; `tests/test-lock-drift.sh` runs in `tests/lint.sh` at lines 38 and 65, and `tests/test-static.sh` pins both drift diagnoses. The fixture proving the rejection is `tests/test-lock-drift.sh` and is recorded in issue #85.
+Status: closed 2026-11-14; `tests/test-lock-drift.sh` runs from `tests/lint.sh`, and `tests/test-static.sh` pins both drift diagnoses. The fixture proving the rejection is `tests/test-lock-drift.sh` and is recorded in issue #85.
 
 Files: `build/package-lock.sh`, `tests/verify-image.sh`, `tests/test-static.sh`, `docs/build.md`, `docs/known-gaps.md`.
 
