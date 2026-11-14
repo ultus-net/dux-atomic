@@ -31,6 +31,8 @@ bash_scripts=(
   build/install-packages.sh
   build/package-lock.sh
   build/compare-lock.sh
+  build/check-kernel-devel.sh
+  build/check-manifest-name.sh
   tests/lint.sh
   tests/test-signing.sh
   tests/test-static.sh

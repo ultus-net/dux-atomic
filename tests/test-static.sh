@@ -64,6 +64,75 @@ else
   fi
 fi
 
+# The NVIDIA variant installs a second manifest (#72). The shared image reads
+# only packages-common.txt, so the variant names its own file through
+# PACKAGE_MANIFEST_EXTRA. Losing either half of that wiring still builds an
+# image: it just ships none of the variant's userspace or akmod packages. The
+# akmod build set is named here because the module compiles on the host at
+# first boot, and the build fails there without a compiler and matching headers.
+variant_manifest=$repo_root/manifests/packages-nvidia.txt
+variant_containerfile=$repo_root/Containerfile.nvidia
+variant_build_deps=(akmod-nvidia akmods kernel-devel-matched gcc make)
+missing_deps=()
+for dep in "${variant_build_deps[@]}"; do
+  grep -qx "$dep" "$variant_manifest" 2>/dev/null || missing_deps+=("$dep")
+done
+if [[ ! -f $variant_manifest ]]; then
+  echo "FAIL manifests/packages-nvidia.txt is missing" >&2
+  failures=$((failures + 1))
+elif ((${#missing_deps[@]} > 0)); then
+  echo "FAIL packages-nvidia.txt no longer names the akmod build set: ${missing_deps[*]}" >&2
+  failures=$((failures + 1))
+elif ! grep -qE '^[[:space:]]+PACKAGE_MANIFEST_EXTRA=packages-nvidia\.txt([[:space:]]|$)' "$variant_containerfile"; then
+  echo "FAIL Containerfile.nvidia does not set PACKAGE_MANIFEST_EXTRA=packages-nvidia.txt, so the variant installs no variant packages" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'install_manifest "$extra"' "$repo_root/build/common.sh"; then
+  echo "FAIL build/common.sh does not install the caller-named extra manifest" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'check-kernel-devel.sh "${kernels[-1]}" "${devels[@]}"' "$repo_root/build/common.sh"; then
+  echo "FAIL build/common.sh no longer fails the build when no installed kernel-devel matches the newest kernel" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'check-manifest-name.sh "$PACKAGE_MANIFEST_EXTRA"' "$repo_root/build/common.sh"; then
+  echo "FAIL build/common.sh does not validate the extra manifest name before installing it" >&2
+  failures=$((failures + 1))
+elif grep -qF 'PACKAGE_MANIFEST_EXTRA' "$repo_root/Containerfile"; then
+  echo "FAIL Containerfile sets PACKAGE_MANIFEST_EXTRA, so the shared image would install a variant manifest" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the NVIDIA variant names its own manifest and the shared image does not"
+fi
+
+# The two helpers the variant path adds are decision functions, so exercise
+# them here: a matching devel must pass, a mismatched or absent one must fail
+# with its message, a manifest name must become a path under manifests/, and a
+# path or an empty name must be refused. A behaviour change reds this block
+# without needing an image.
+kernel_devel_check=$repo_root/build/check-kernel-devel.sh
+manifest_name_check=$repo_root/build/check-manifest-name.sh
+variant_kernel=7.3.3-300.fc45.x86_64
+helpers_ok=0
+if bash "$kernel_devel_check" "$variant_kernel" "$variant_kernel" &&
+   bash "$manifest_name_check" packages-nvidia.txt | grep -qx '/ctx/manifests/packages-nvidia.txt'; then
+  kd_mismatch=$(bash "$kernel_devel_check" "$variant_kernel" 7.2.11-300.fc45.x86_64 2>&1) || kd_mismatch_status=$?
+  kd_empty=$(bash "$kernel_devel_check" "$variant_kernel" 2>&1) || kd_empty_status=$?
+  mn_slash=$(bash "$manifest_name_check" ../packages-common.txt 2>&1) || mn_slash_status=$?
+  mn_empty=$(bash "$manifest_name_check" '' 2>&1) || mn_empty_status=$?
+  if [[ ${kd_mismatch_status:-0} -eq 1 && ${kd_empty_status:-0} -eq 1 ]] &&
+     [[ ${mn_slash_status:-0} -eq 1 && ${mn_empty_status:-0} -eq 1 ]] &&
+     [[ $kd_mismatch == *"does not match the newest kernel $variant_kernel"* ]] &&
+     [[ $kd_empty == *'does not match the newest kernel'* ]] &&
+     [[ $mn_slash == *'must be a file name in manifests/: ../packages-common.txt'* ]] &&
+     [[ $mn_empty == *'must be a file name in manifests/'* ]]; then
+    helpers_ok=1
+  fi
+fi
+if ((helpers_ok == 1)); then
+  echo "ok   the variant's manifest-name and kernel-devel helpers accept their inputs and refuse the rest"
+else
+  echo "FAIL build/check-manifest-name.sh or build/check-kernel-devel.sh lost a green or red path, or its message" >&2
+  failures=$((failures + 1))
+fi
+
 # The lock records every installed package whose origin repository is not a
 # Fedora repository, so a Fedora updates bump cannot red it. tests/verify-image.sh
 # compares the whole recorded set against the generator's measurement.
@@ -380,9 +449,10 @@ if ! grep -qF 'wait_for "DUX_USER:${test_user}"' "$boot_smoke" ||
 elif ! grep -qF 'readlink "$portal_mask"' "$common" ||
      ! grep -qF '= /dev/null' "$common" ||
      ! grep -qF "trap 'rm -rf \"\$check_root\"' EXIT" "$common" ||
-     ! grep -qF 'cannot read ${manifest}' "$common" ||
+     ! grep -qF 'cannot read ${path}' "$common" ||
+     ! grep -qF 'install_manifest "$manifest"' "$common" ||
      grep -qF 'packages-common.txt || true' "$common"; then
-  echo "FAIL build/common.sh does not assert the portal mask target, trap the scratch root, or read the manifest fail-closed" >&2
+  echo "FAIL build/common.sh does not assert the portal mask target, trap the scratch root, or read every manifest fail-closed" >&2
   failures=$((failures + 1))
 else
   echo "ok   the vm login probes and greeter mask fail closed"

@@ -1,15 +1,19 @@
 # manifests/packages-nvidia.txt — NVIDIA variant package manifest.
 #
-# The userspace stack. Every name here was verified to resolve against the
-# image's enabled repositories (negativo17 fedora-multimedia plus Fedora) on
-# 2026-11-14; the commands and their output are in
-# docs/research/2026-11-14-nvidia-module-signing.md.
+# The userspace stack and the kernel-module build set. Every name here was
+# verified to resolve against the image's enabled repositories (negativo17
+# fedora-multimedia plus Fedora) in the pinned base on 2026-11-14; the commands
+# and their output are in docs/research/2026-11-14-nvidia-module-signing.md and
+# docs/research/2026-11-14-nvidia-variant-build.md.
 #
-# The kernel module has no prebuilt path in those repositories. `kmod-nvidia`
-# is a 10 KB meta-package with no files that requires `akmod-nvidia`, and
-# `akmod-nvidia` ships a source RPM that akmods compiles on the host at first
-# boot. The module delivery decision belongs to #72 and this file does not make
-# it.
+# The module path is decided (#72): `akmod-nvidia` ships source under
+# /usr/src/akmods and `akmods` compiles it against the running kernel at first
+# boot. The resulting module is unsigned, which is the documented exception in
+# docs/research/2026-11-14-nvidia-module-path-decision.md, so this variant makes
+# no Secure Boot claim and needs a per-machine MOK enrollment (#40).
+#
+# build/common.sh installs this file only when Containerfile.nvidia names it in
+# PACKAGE_MANIFEST_EXTRA. The shared image does not read it.
 
 nvidia-driver
 nvidia-driver-libs
@@ -20,9 +24,20 @@ nvidia-settings
 egl-wayland
 libva-nvidia-driver
 
+# The akmod build set. akmod-nvidia needs the akmods machinery, a compiler, and
+# headers for the kernel the image boots. kernel-devel-matched requires
+# kernel-core and kernel-devel at its own version, which pins the pair to one
+# version; build/common.sh fails the build when the installed devel does not
+# match the newest installed kernel.
+akmod-nvidia
+akmods
+kernel-devel-matched
+gcc
+make
+
 # 32-bit libraries for x86_64, for Steam. Both resolve from fedora-multimedia.
 mesa-vulkan-drivers.i686
 nvidia-driver-libs.i686
 
 # Deliberately absent: nvidia-container-toolkit does not resolve in the enabled
-# repositories. The kernel module is absent until #72 chooses a delivery path.
+# repositories.
