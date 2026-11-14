@@ -54,8 +54,11 @@ else
   echo "ok   a moved transitive NEVRA drifts and names both lines"
 fi
 
-# The dux-greeter NEVRA from #40 carries +git, so the generator drops it. A
-# measurement that still carries it must not count as drift.
+# Case 3 adds a +git NEVRA the generator drops, so a measurement that still
+# carries one must not count as drift. This line is reconstructed rather than
+# copied: manifests/packages-common.lock no longer carries it, so the name and
+# the git snapshot come from docs/research/2026-11-10-hyprland-session-assessment.md
+# (dux-greeter-git-2.1.3) and CHANGELOG.md's +git entry (git132.7bdf4546).
 git_extra=$work/git-extra.lock
 cat >"$git_extra" <<'LOCK'
 dux-greeter-git-2:2.1.3+git132.7bdf4546-2.fc45.x86_64	copr:copr.fedorainfracloud.org:duxlabs:dux-repo
