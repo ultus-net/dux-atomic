@@ -57,3 +57,4 @@ The image ships no interactive user. A real install creates the operator account
 - [Roadmap](docs/superpowers/plans/2026-11-14-tooling-and-platform-roadmap.md)
 - [Approved design](docs/superpowers/specs/2026-11-09-dux-atomic-design.md)
 - [Agent container profile](docs/agent-container.md)
+- [Microsoft Agent Framework study plan](docs/learning/2026-11-14-microsoft-agent-framework-12-stage-plan.md)
