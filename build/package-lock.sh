@@ -1,64 +1,49 @@
 #!/usr/bin/env bash
-# Print the installed NEVRA and vendor of every package the manifest names.
+# Print the installed NEVRA and origin repository of every package that was
+# installed from a non-Fedora origin repository in the built image.
 #
 #   build/package-lock.sh [image]
 #
-# The image's rpm database is the source of truth, so the lock records what a
-# build actually installed rather than what a repository offers. A manifest
-# entry may name a provides rather than a package (xinit, dms-greeter), so a
-# failed exact query falls back to the providing package. Regenerate the lock
-# with `just lock`.
-#
-# Scope: manifest names only. Packages those names pull in transitively from a
-# third-party repo are not locked; docs/known-gaps.md records that gap. A +git
-# build is excluded because it tracks an upstream branch and cannot be pinned.
+# Contract: one line per resolved NEVRA: <nevra> TAB <from_repo>.
+# Packages whose from_repo is empty, '@System', 'unknown', or a local path
+# (begins with '/') are excluded. Fedora-origin repositories are excluded so a
+# Fedora updates bump does not red the gate. +git builds are excluded.
 
 set -euo pipefail
 
-repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 image=${1:-localhost/dux-atomic:dev}
 runtime=${CONTAINER_RUNTIME:-podman}
-manifest=$repo_root/manifests/packages-common.txt
-
-# grep exits 1 for an all-comment manifest, which is not an error. Any other
-# non-zero exit is a read failure and must stop the run.
-if packages=$(grep -Ev '^[[:space:]]*(#.*)?$' "$manifest"); then
-  :
-else
-  status=$?
-  if ((status != 1)); then
-    echo "cannot read ${manifest} (grep exit ${status})" >&2
-    exit 1
-  fi
-  packages=
-fi
-if [[ -z $packages ]]; then
-  echo "no packages in $manifest" >&2
-  exit 1
-fi
-mapfile -t names <<<"$packages"
 
 cat <<'HEADER'
 # manifests/packages-common.lock - regenerate with 'just lock'
-# One line per resolved NEVRA: <nevra> TAB <vendor>.
-# tests/verify-image.sh compares the non-Fedora lines, because Fedora
-# packages move with the updates repository on every build.
-# A +git build tracks an upstream branch, so it cannot be pinned and is
-# left out of this file and the comparison; the VM boot test covers it.
+# One line per resolved NEVRA: <nevra> TAB <from_repo>.
+# Records every package whose origin repository is not a Fedora repository.
+# COPR publishes a main repository and a dependency repository; which one
+# served a package can vary at build time, so the generator normalizes the
+# dependency-repo prefix to the main project prefix before recording. The
+# NEVRA still pins what landed, and a package moving between those two
+# repositories of the same COPR is therefore not drift.
 HEADER
 
-"$runtime" run --rm "$image" bash -c '
-  set -euo pipefail
-  format="%{NEVRA}\t%{VENDOR}\n"
-  for name in "$@"; do
-    if out=$(rpm -q --qf "$format" "$name" 2>/dev/null); then
-      printf "%s\n" "$out"
-    elif providers=$(rpm -q --whatprovides "$name" 2>/dev/null); then
-      # Word splitting is intended: rpm prints one provider per line.
-      rpm -q --qf "$format" $providers
-    else
-      echo "no installed package provides ${name}" >&2
-      exit 1
-    fi
-  done
-' _ "${names[@]}" | LC_ALL=C sort -u | awk '!index($0, "+git")'
+# Run repoquery once inside the image. Pass an explicit '*' pattern so every
+# installed package is enumerated rather than only the user-installed set.
+"$runtime" run --rm "$image" \
+  dnf5 repoquery --installed --qf '%{full_nevra}\t%{from_repo}\n' '*' | \
+  # Normalize any literal "\\t" sequences into real tabs so the split below
+  # works regardless of how repoquery formats its qf output in this rootfs.
+  sed 's/\\t/\t/g' | \
+  # Normalize COPR repository ids: copr publishes a main repo and a
+  # dependency repo. Which repository served a package can vary by build-time
+  # resolution but refers to the same COPR project; record the project by
+  # normalizing coprdep: to copr: so identical NEVRAs do not appear as drift.
+  sed 's/^\([^\t]*\t\)coprdep:/\1copr:/' | \
+  LC_ALL=C sort -u | \
+  # Denylist Fedora-owned or system origins only. Record everything else so an
+  # unexpected repo id is visible rather than dropped. Exclude exactly:
+  # fedora, updates, fedora-cisco-openh264, empty, <unknown>, @System, and
+  # local paths beginning with '/'. <unknown> is the value dnf5 reports for
+  # packages originating from the pinned base image and therefore cannot drift
+  # inside that digest.
+  awk -F"\t" 'tolower($2) == "" { next } tolower($2) == "<unknown>" { next } tolower($2) == "@system" { next } tolower($2) == "unknown" { next } tolower($2) == "fedora" { next } tolower($2) == "updates" { next } tolower($2) == "fedora-cisco-openh264" { next } $2 ~ /^\// { next } { print }' | \
+  # Drop +git NEVRAs (cannot be pinned)
+  awk '!index($0, "+git")'
