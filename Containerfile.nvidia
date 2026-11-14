@@ -1,5 +1,6 @@
-# NVIDIA variant. The module path is decided: akmod-nvidia compiles on the host
-# at first boot and the module is unsigned, so no Secure Boot claim is made until
+# NVIDIA variant. The module path is decided: akmod-nvidia compiles during the
+# image build because the base's akmods.service is skipped on an ostree-booted
+# host. The resulting module is unsigned, so no Secure Boot claim is made until
 # a hardware boot is recorded (#40). docs/research/2026-11-14-nvidia-module-path-decision.md
 # records the exception; manifests/packages-nvidia.txt carries the build set.
 

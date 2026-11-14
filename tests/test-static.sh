@@ -68,8 +68,8 @@ fi
 # only packages-common.txt, so the variant names its own file through
 # PACKAGE_MANIFEST_EXTRA. Losing either half of that wiring still builds an
 # image: it just ships none of the variant's userspace or akmod packages. The
-# akmod build set is named here because the module compiles on the host at
-# first boot, and the build fails there without a compiler and matching headers.
+# akmod build set is named here because the image build compiles the module,
+# and the build fails there without a compiler and matching headers.
 variant_manifest=$repo_root/manifests/packages-nvidia.txt
 variant_containerfile=$repo_root/Containerfile.nvidia
 variant_build_deps=(akmod-nvidia akmods kernel-devel-matched gcc make)
@@ -94,6 +94,12 @@ elif ! grep -qF 'check-kernel-devel.sh "${kernels[-1]}" "${devels[@]}"' "$repo_r
   failures=$((failures + 1))
 elif ! grep -qF 'check-manifest-name.sh "$PACKAGE_MANIFEST_EXTRA"' "$repo_root/build/common.sh"; then
   echo "FAIL build/common.sh does not validate the extra manifest name before installing it" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'build-nvidia-modules.sh' "$repo_root/build/common.sh"; then
+  echo "FAIL build/common.sh does not compile the akmod during the image build" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'rpm -q akmod-nvidia >/dev/null 2>&1' "$repo_root/build/common.sh"; then
+  echo "FAIL build/common.sh compiles the akmod without a guard, so the shared image would run it" >&2
   failures=$((failures + 1))
 elif grep -qF 'PACKAGE_MANIFEST_EXTRA' "$repo_root/Containerfile"; then
   echo "FAIL Containerfile sets PACKAGE_MANIFEST_EXTRA, so the shared image would install a variant manifest" >&2
@@ -130,6 +136,37 @@ if ((helpers_ok == 1)); then
   echo "ok   the variant's manifest-name and kernel-devel helpers accept their inputs and refuse the rest"
 else
   echo "FAIL build/check-manifest-name.sh or build/check-kernel-devel.sh lost a green or red path, or its message" >&2
+  failures=$((failures + 1))
+fi
+
+# The module check is the assertion that the image build produced a driver.
+# Exercise its green, missing-module, empty-module, and usage paths against a
+# scratch tree, so a behaviour change reds without an image.
+modules_check=$repo_root/build/check-nvidia-modules.sh
+modules_root=$(mktemp -d)
+modules_dir=$modules_root/$variant_kernel/extra/nvidia
+mkdir -p "$modules_dir"
+for module in nvidia nvidia-uvm nvidia-drm nvidia-modeset nvidia-peermem; do
+  printf 'module' > "$modules_dir/$module.ko.xz"
+done
+modules_ok=0
+if bash "$modules_check" "$variant_kernel" "$modules_root"; then
+  rm "$modules_dir/nvidia-uvm.ko.xz"
+  mod_missing=$(bash "$modules_check" "$variant_kernel" "$modules_root" 2>&1) || mod_missing_status=$?
+  : > "$modules_dir/nvidia-uvm.ko.xz"
+  mod_empty=$(bash "$modules_check" "$variant_kernel" "$modules_root" 2>&1) || mod_empty_status=$?
+  bash "$modules_check" >/dev/null 2>&1 || mod_usage_status=$?
+  if [[ ${mod_missing_status:-0} -eq 1 && ${mod_empty_status:-0} -eq 1 && ${mod_usage_status:-0} -eq 2 ]] &&
+     [[ $mod_missing == *'nvidia-uvm'* && $mod_missing == *"$variant_kernel"* ]] &&
+     [[ $mod_empty == *'nvidia-uvm'* ]]; then
+    modules_ok=1
+  fi
+fi
+rm -rf "$modules_root"
+if ((modules_ok == 1)); then
+  echo "ok   the module check accepts a complete set and reds a missing or empty module"
+else
+  echo "FAIL build/check-nvidia-modules.sh lost its green, red, or usage path" >&2
   failures=$((failures + 1))
 fi
 

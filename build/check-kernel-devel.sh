@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # build/check-kernel-devel.sh — fail when no installed kernel-devel matches the
-# newest installed kernel. akmods builds against the running kernel's headers,
-# so a devel for another kernel is a first-boot failure, not a build failure.
+# newest installed kernel. akmods builds against the image's build kernel, so a
+# devel for another kernel is a build failure, or an image without a module.
 #
 #   build/check-kernel-devel.sh <newest-kernel-nvr> <devel-nvr>...
 
