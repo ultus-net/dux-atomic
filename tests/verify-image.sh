@@ -66,27 +66,25 @@ if (( node_major < 22 || (node_major == 22 && node_minor < 18) )); then
 fi
 "$runtime" run --rm "$image" npm --version >/dev/null \
   || { echo "FAIL npm is not runnable in the image" >&2; exit 1; }
-# The lock records the third-party packages the manifest names. Fedora packages
-# move with the updates repository on every build, so only other vendors are
-# compared; a drift there is a third-party rebuild and needs a lock update.
-# The vendor string is package-controlled, so this is a drift signal rather
-# than a provenance check; docs/known-gaps.md records the limitation. A +git
-# build tracks an upstream branch, so it cannot be pinned; the generator leaves
-# it out and the VM boot test covers a broken build.
+# The lock records every package whose origin repository is not a Fedora
+# repository. The comparison is a post-build drift gate: the build installs
+# from live repositories and the lock records what landed in the image, so a
+# Fedora updates bump must not red this gate. A +git build tracks an upstream
+# branch and cannot be pinned; the generator leaves it out and the VM boot
+# test covers a broken one.
 lock=$repo_root/manifests/packages-common.lock
-expected=$(grep -vE '^(#|$)' "$lock" | grep -vE $'\tFedora Project$' | grep -vF '+git' || true)
+expected=$(grep -vE '^(#|$)' "$lock" || true)
 if [[ -z $expected ]]; then
   echo "FAIL the package lock has no third-party lines to compare" >&2
   exit 1
 fi
 # A nonzero status here means the generator or the image is broken, not that the
-# lock drifted, so keep the two diagnoses apart. The filters run afterwards, so
-# an empty third-party set reads as drift with a diff instead.
+# lock drifted, so keep the two diagnoses apart. The filters run afterwards.
 if ! raw=$(CONTAINER_RUNTIME=$runtime "$repo_root/build/package-lock.sh" "$image"); then
   echo "FAIL the lock measurement failed; the generator or the image is broken" >&2
   exit 1
 fi
-measured=$(grep -vE '^(#|$)' <<<"$raw" | grep -vE $'\tFedora Project$' | grep -vF '+git' || true)
+measured=$(grep -vE '^(#|$)' <<<"$raw" || true)
 if [[ $measured != "$expected" ]]; then
   echo "FAIL the third-party package lock drifted; run 'just lock'" >&2
   diff -u <(printf '%s\n' "$expected") <(printf '%s\n' "$measured") >&2 || true
