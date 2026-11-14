@@ -86,21 +86,50 @@ elif ((${#missing_deps[@]} > 0)); then
 elif ! grep -qE '^[[:space:]]+PACKAGE_MANIFEST_EXTRA=packages-nvidia\.txt([[:space:]]|$)' "$variant_containerfile"; then
   echo "FAIL Containerfile.nvidia does not set PACKAGE_MANIFEST_EXTRA=packages-nvidia.txt, so the variant installs no variant packages" >&2
   failures=$((failures + 1))
-elif ! grep -qF 'install_manifest "/ctx/manifests/${PACKAGE_MANIFEST_EXTRA}"' "$repo_root/build/common.sh"; then
+elif ! grep -qF 'install_manifest "$extra"' "$repo_root/build/common.sh"; then
   echo "FAIL build/common.sh does not install the caller-named extra manifest" >&2
-  failures=$((failures + 1))
-elif grep -qF 'PACKAGE_MANIFEST_EXTRA' "$repo_root/Containerfile"; then
-  echo "FAIL Containerfile sets PACKAGE_MANIFEST_EXTRA, so the shared image would install a variant manifest" >&2
   failures=$((failures + 1))
 elif ! grep -qF 'check-kernel-devel.sh "${kernels[-1]}" "${devels[@]}"' "$repo_root/build/common.sh"; then
   echo "FAIL build/common.sh no longer fails the build when no installed kernel-devel matches the newest kernel" >&2
   failures=$((failures + 1))
-elif bash "$repo_root/build/check-kernel-devel.sh" 7.3.3-300.fc45.x86_64 7.3.3-300.fc45.x86_64 &&
-     ! bash "$repo_root/build/check-kernel-devel.sh" 7.3.3-300.fc45.x86_64 7.2.11-300.fc45.x86_64 2>/dev/null &&
-     ! bash "$repo_root/build/check-kernel-devel.sh" 7.3.3-300.fc45.x86_64 2>/dev/null; then
-  echo "ok   the NVIDIA variant installs its own manifest, names the akmod build set, and checks kernel-devel"
+elif ! grep -qF 'check-manifest-name.sh "$PACKAGE_MANIFEST_EXTRA"' "$repo_root/build/common.sh"; then
+  echo "FAIL build/common.sh does not validate the extra manifest name before installing it" >&2
+  failures=$((failures + 1))
+elif grep -qF 'PACKAGE_MANIFEST_EXTRA' "$repo_root/Containerfile"; then
+  echo "FAIL Containerfile sets PACKAGE_MANIFEST_EXTRA, so the shared image would install a variant manifest" >&2
+  failures=$((failures + 1))
 else
-  echo "FAIL build/check-kernel-devel.sh does not pass a matching devel or does not red a mismatch and an empty set" >&2
+  echo "ok   the NVIDIA variant names its own manifest and the shared image does not"
+fi
+
+# The two helpers the variant path adds are decision functions, so exercise
+# them here: a matching devel must pass, a mismatched or absent one must fail
+# with its message, a manifest name must become a path under manifests/, and a
+# path or an empty name must be refused. A behaviour change reds this block
+# without needing an image.
+kernel_devel_check=$repo_root/build/check-kernel-devel.sh
+manifest_name_check=$repo_root/build/check-manifest-name.sh
+variant_kernel=7.3.3-300.fc45.x86_64
+helpers_ok=0
+if bash "$kernel_devel_check" "$variant_kernel" "$variant_kernel" &&
+   bash "$manifest_name_check" packages-nvidia.txt | grep -qx '/ctx/manifests/packages-nvidia.txt'; then
+  kd_mismatch=$(bash "$kernel_devel_check" "$variant_kernel" 7.2.11-300.fc45.x86_64 2>&1) || kd_mismatch_status=$?
+  kd_empty=$(bash "$kernel_devel_check" "$variant_kernel" 2>&1) || kd_empty_status=$?
+  mn_slash=$(bash "$manifest_name_check" ../packages-common.txt 2>&1) || mn_slash_status=$?
+  mn_empty=$(bash "$manifest_name_check" '' 2>&1) || mn_empty_status=$?
+  if [[ ${kd_mismatch_status:-0} -eq 1 && ${kd_empty_status:-0} -eq 1 ]] &&
+     [[ ${mn_slash_status:-0} -eq 1 && ${mn_empty_status:-0} -eq 1 ]] &&
+     [[ $kd_mismatch == *"does not match the newest kernel $variant_kernel"* ]] &&
+     [[ $kd_empty == *'does not match the newest kernel'* ]] &&
+     [[ $mn_slash == *'must be a file name in manifests/: ../packages-common.txt'* ]] &&
+     [[ $mn_empty == *'must be a file name in manifests/'* ]]; then
+    helpers_ok=1
+  fi
+fi
+if ((helpers_ok == 1)); then
+  echo "ok   the variant's manifest-name and kernel-devel helpers accept their inputs and refuse the rest"
+else
+  echo "FAIL build/check-manifest-name.sh or build/check-kernel-devel.sh lost a green or red path, or its message" >&2
   failures=$((failures + 1))
 fi
 

@@ -57,7 +57,10 @@ install_manifest "$manifest"
 # Containerfile names a file in this repository instead of repeating the
 # installer. Unset is the shared image, which is every other Containerfile here.
 if [[ -n ${PACKAGE_MANIFEST_EXTRA:-} ]]; then
-  install_manifest "/ctx/manifests/${PACKAGE_MANIFEST_EXTRA}"
+  # The variable names a file in manifests/, not a path. The helper turns the
+  # name into the path, so a typo and an escape attempt fail the same way.
+  extra=$(bash /ctx/build/check-manifest-name.sh "$PACKAGE_MANIFEST_EXTRA")
+  install_manifest "$extra"
 fi
 
 # akmods builds against the headers of the kernel the image boots, so a devel

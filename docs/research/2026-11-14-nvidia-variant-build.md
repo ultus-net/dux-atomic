@@ -38,7 +38,9 @@ and tmpfiles notes this base already produces; the build does not gate on them.
 ## The extra manifest installs
 
 `build/common.sh` logs the command it runs for each manifest. The variant's
-install is the second one, after the shared set:
+install is the second one, after the shared set. `build/check-manifest-name.sh`
+turns the `PACKAGE_MANIFEST_EXTRA` value into the path first, so a slash or an
+empty value fails the build instead of reading another file in the context:
 
 ```
 + dnf5 install -y nvidia-driver nvidia-driver-libs nvidia-driver-cuda nvidia-modprobe nvidia-persistenced nvidia-settings egl-wayland libva-nvidia-driver akmod-nvidia akmods kernel-devel-matched gcc make mesa-vulkan-drivers.i686 nvidia-driver-libs.i686
@@ -86,15 +88,14 @@ rpmlib(PayloadFilesHavePrefix) <= 4.0-1
 rpmlib(PayloadIsXz) <= 5.2-1
 ```
 
-`kernel-devel-matched` is a 0-byte meta-package whose version is the kernel
-version it matches. It pulls the devel package, and it requires the
-`kernel-core` of that same version, so the header and the kernel arrive
-together. `rpm -qR` above is the mechanism; the four equal versions are the
-result.
+`kernel-devel-matched` is a 0-byte meta-package. `rpm -qR` above shows the two
+requirements it carries: `kernel-devel` and `kernel-core`, both at its own
+version. That pins the pair to one version. The package does not consult the
+installed kernel. The four equal versions above are the result here because the
+`updates` repository's newest kernel is also the pinned base's kernel on this
+date, so this build cannot separate the two mechanisms.
 
-The name does not read the installed kernel. It matches because the `updates`
-repository's newest kernel is also the pinned base's kernel on this date. A
-later base that lags `updates` is the case the name would not catch, so
+A later base that lags `updates` is the case the name would not catch, so
 `build/common.sh` runs `build/check-kernel-devel.sh` when `kernel-devel` is
 installed:
 

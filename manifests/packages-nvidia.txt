@@ -25,10 +25,10 @@ egl-wayland
 libva-nvidia-driver
 
 # The akmod build set. akmod-nvidia needs the akmods machinery, a compiler, and
-# headers for the kernel the image boots. kernel-devel-matched requires the
-# kernel-core and the kernel-devel of its own version, so header and kernel
-# arrive together; build/common.sh then fails the build if the installed devel
-# does not match the newest installed kernel.
+# headers for the kernel the image boots. kernel-devel-matched requires
+# kernel-core and kernel-devel at its own version, which pins the pair to one
+# version; build/common.sh fails the build when the installed devel does not
+# match the newest installed kernel.
 akmod-nvidia
 akmods
 kernel-devel-matched
