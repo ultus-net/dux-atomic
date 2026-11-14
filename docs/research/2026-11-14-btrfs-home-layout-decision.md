@@ -32,8 +32,9 @@ only `--filesystem btrfs`, so home lives in the root filesystem
 
 Four measurements from one btrfs install of this image (these may be taken on
 a VM install of the image; the measurements are valid for the decision, but
-to-disk validation on real hardware is still required by the deployment
-checklist) (`docs/research/2026-11-14-btrbk-home-layout.md:57` through `:66`):
+one to-disk install on a real target must still confirm the same answers before
+the btrbk configuration ships) (see the section "## What only a btrfs install of
+this image can answer" in `docs/research/2026-11-14-btrbk-home-layout.md`):
 
 | Question | Command |
 | --- | --- |
@@ -62,9 +63,9 @@ for the home subvolume, enable the timer and assert it in the image job, and
 record the restore drill. Before any of them, two items the plan does not
 list: run the four measurements on a btrfs install of the image (a VM install
 is acceptable for the measurements), and change the install path so a home
-subvolume exists. The roadmap's Task 8 carries the same three items. To-disk
-validation on real hardware is still required before deploying the configuration
-to production targets.
+subvolume exists. The roadmap's Task 8 carries the same three items. One to-
+disk install on a real target must still confirm the same answers before the
+btrbk configuration ships.
 
 ## What would reverse this
 

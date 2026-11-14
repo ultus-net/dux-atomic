@@ -76,7 +76,7 @@ produce a btrfs install of the image and run them.
 
 | Option | What changes | What it buys | What it costs | What it cannot prove |
 | --- | --- | --- | --- | --- |
-| A. Give home its own subvolume | a repart.d `/home` definition or an explicit `to-filesystem` layout, plus the mount and the `/home` symlink | btrbk snapshots home alone, which is what the design asks for, and pruning stays small | a layout change on both targets, validated on a btrfs host, and the symlink has to keep resolving | nothing about disk failure, theft, or privileged compromise, which the design already excludes |
+| A. Give home its own subvolume | a repart.d `/home` definition or an explicit `to-filesystem` layout, plus the mount and the `/home` symlink | btrbk snapshots home alone, which is what the design asks for, and pruning stays small | a layout change on both targets, validated on a btrfs install, and the symlink has to keep resolving | nothing about disk failure, theft, or privileged compromise, which the design already excludes |
 | B. Snapshot the root subvolume | btrbk `volume /` with a `subvolume` name once `/` is known to be one | no layout change, and the snapshot also covers `/etc` | every snapshot is a whole-root copy, so `/var` churn fills the disk faster and restore is coarser | whether `/` is a named subvolume at all is unmeasured here |
 | C. Keep the gap | nothing | no false claim in the image | no recovery path until the decision is made | — |
 
@@ -85,26 +85,28 @@ a defined retention (daily for seven days, weekly for four weeks), and option B
 trades that for whole-root snapshots whose size the design never budgeted. The
 choice is the operator's, and it needs the four measurements above from one
 target before either option lands. These measurements may be taken on a VM
-install of the image (see the Procedure section), but to-disk validation on
-real hardware is still required by the deployment checklist.
+install of the image (see the Procedure section), but one to-disk install on a
+real target must still confirm the same answers before the btrbk configuration
+ships.
 
 ## Procedure
 
-1. Build the test disk (requires root on the host):
+1. Build the test disk (requires root on the host). The script takes an image
+   argument and an output directory. Run it like this:
 
-   sudo tests/vm/make-disk.sh localhost/dux-atomic:dev <out.qcow2>
+   sudo tests/vm/make-disk.sh localhost/dux-atomic:dev output
 
-2. Boot the resulting qcow2 under QEMU using the repository's invocation in
-   `tests/vm/boot-smoke.sh` (see the `qemu=(...)` construction around lines
-   99-110 of that file). The script builds an invocation equivalent to:
+   The produced disk will be written to output/qcow2/disk.qcow2.
 
-   qemu-system-x86_64 -machine "q35,accel=$accel" -cpu "$cpu" -m 4096 -smp 2 \
-     -snapshot -drive "if=pflash,format=raw,readonly=on,file=<OVMF_CODE>" \
-     -drive "if=pflash,format=raw,file=<OVMF_VARS>" -drive "file=<disk>,if=virtio,format=qcow2" \
-     -nic "user,model=virtio-net-pci" <display-args> -serial "pipe:<run_dir>/serial" -no-reboot
+2. Boot the resulting qcow2 under QEMU through the repository test harness.
+   Export the test credentials (the defaults below match the values
+   make-disk.sh creates) and run the documented entry point:
 
-   Use `boot-smoke.sh` so the test harness' serial console markers are present
-   and the run logs are recorded in the same layout the repo test expects.
+   export TEST_USER=dux TEST_PASSWORD=dux-test
+   tests/vm/boot-smoke.sh output/qcow2/disk.qcow2 .vm/boot.log
+
+   This is the documented usage at `tests/vm/boot-smoke.sh:17` and ensures the
+   serial console markers and log layout the repository test helpers expect.
 
 3. Inside the guest, run the four commands listed above and capture their
    verbatim outputs.
