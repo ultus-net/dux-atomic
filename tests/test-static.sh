@@ -112,14 +112,16 @@ else
 fi
 
 # The comparison is one helper so tests/test-lock-drift.sh can run it with no
-# image. Pin the call and the operator's drift message, so a later edit cannot
-# inline the comparison again quietly.
+# image. Pin the call, the operator's drift message, and the branch that keeps a
+# failed measurement apart from drift, so a later edit cannot collapse them.
 if ! grep -qF 'build/compare-lock.sh' "$repo_root/tests/verify-image.sh" ||
-   ! grep -qF "FAIL the third-party package lock drifted; run 'just lock'" "$repo_root/tests/verify-image.sh"; then
-  echo "FAIL tests/verify-image.sh no longer calls build/compare-lock.sh or lost the drift message" >&2
+   ! grep -qF "FAIL the third-party package lock drifted; run 'just lock'" "$repo_root/tests/verify-image.sh" ||
+   ! grep -qF 'elif ((compare_status != 0))' "$repo_root/tests/verify-image.sh" ||
+   ! grep -qF 'FAIL the lock measurement failed; the generator or the image is broken' "$repo_root/tests/verify-image.sh"; then
+  echo "FAIL tests/verify-image.sh no longer calls build/compare-lock.sh or lost the drift and failed-measurement messages" >&2
   failures=$((failures + 1))
 else
-  echo "ok   the lock comparison runs through build/compare-lock.sh and keeps its drift message"
+  echo "ok   the lock comparison runs through build/compare-lock.sh and keeps both diagnoses"
 fi
 
 # Secure Boot needs no per-machine enrollment only while the base keeps Fedora's
