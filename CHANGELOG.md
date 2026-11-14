@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add the RSI campaign scaffolding under `docs/agents/`: the playbook with this repository's verifier (`tests/lint.sh`) and brakes, the create-only ledger seeded with an `n=0` genesis block that the holdout gate needs as a chain predecessor, and the lesson registry. No behaviour change.
+
 - Decide the btrfs home layout: a dedicated `home` subvolume, snapshotted alone, so btrbk's retention stays the design's daily-seven and weekly-four instead of whole-root copies whose size nothing budgeted (#68). `docs/research/2026-11-14-btrfs-home-layout-decision.md` records the decision, the four measurements a btrfs host must take first, and the two items the plan did not list. No btrbk package, timer, or configuration ships, and the install path is unchanged.
 - Decide the NVIDIA module path: `akmod-nvidia` compiled on the host, unsigned, as a documented exception, because the enabled repositories publish only an empty `kmod-nvidia` meta-package and akmod sources (#72). `docs/research/2026-11-14-nvidia-module-path-decision.md` records that the variant makes no Secure Boot claim, that Secure Boot on NVIDIA hardware needs a per-machine MOK enrollment (#40), and that the variant's manifest still needs the build dependencies. The variant stays unbuilt.
 - Decide the containers signing trust root: a repository release key named by `keyPath`, with keyless as the migration once `container-libs#625` lands (#4). `docs/research/2026-11-14-signing-trust-root-decision.md` records the custody answers for who signs, where the key lives, rotation, revocation, and attestations. No key is generated and no policy ships, so a host still verifies nothing.
