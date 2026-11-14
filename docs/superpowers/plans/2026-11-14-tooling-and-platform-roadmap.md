@@ -61,13 +61,15 @@ Files: `manifests/packages-common.txt`, `manifests/packages-common.lock`, `tests
 - [x] Add the compiler, Node, and diagnostics groups to the manifest.
 - [x] Add the Node and npm probes to `tests/verify-image.sh`, pinned by `tests/test-static.sh`.
 - [x] Record the image, Homebrew, container, and Flathub split in `docs/developer-tooling.md`.
-- [ ] Build the image and run `tests/verify-image.sh` against it.
-- [ ] Regenerate `manifests/packages-common.lock`.
-- [ ] Open the PR and wait for a green hosted `image` job.
+- [x] Build the image and run `tests/verify-image.sh` against it.
+- [x] Regenerate `manifests/packages-common.lock`.
+- [x] Open the PR and wait for a green hosted `image` job.
 
 Acceptance: the hosted `image` job is green, the lock carries the new Fedora NEVRAs, and the PR merges with `Fixes #67`.
 
 ## Task 2: prove the dotfiles bootstrap (#70)
+
+Status: blocked on a booted image and a test account; the sequence is in `docs/research/2026-11-14-dotfiles-bootstrap.md`.
 
 Files: `tests/vm/boot-smoke.sh`, `docs/research/<date>-dotfiles-bootstrap.md`, `docs/developer-tooling.md`.
 
@@ -80,6 +82,8 @@ Acceptance: the dotfiles' own installer completes on this image without a manual
 
 ## Task 3: ship a containers signing policy (#4)
 
+Status: blocked on the trust-root choice; the options and custody questions are in `docs/research/2026-11-14-containers-signing-trust-root.md`.
+
 Files: `overlay/etc/containers/policy.json`, `tests/test-signing.sh`, `docs/known-gaps.md`, `CHANGELOG.md`.
 
 - [ ] Decide the trust root: a release key referenced by `keyPath`, or a recorded decision to ship no policy.
@@ -90,15 +94,19 @@ Acceptance: a host either verifies the image it pulls or the repository records 
 
 ## Task 4: lock every third-party package (#20)
 
+Status: the gate and its documentation landed; the fixture proving the rejection is [#85](https://github.com/ultus-net/dux-atomic/issues/85).
+
 Files: `build/package-lock.sh`, `tests/verify-image.sh`, `tests/test-static.sh`, `docs/build.md`, `docs/known-gaps.md`.
 
-- [ ] Enumerate transitive packages from a non-Fedora vendor, not only manifest names.
+- [x] Enumerate transitive packages from a non-Fedora vendor, not only manifest names.
 - [ ] Add a fixture proving a transitive rebuild reds the gate.
-- [ ] Record the `+git` exception and the vendor-string limit in `docs/build.md`.
+- [x] Record the `+git` exception and the vendor-string limit in `docs/build.md`.
 
 Acceptance: a rebuild of a package the manifest pulls in transitively fails the image job.
 
 ## Task 5: gaming dogfood, then Lutris (#69)
+
+Status: blocked on a game launched on the gaming machine; `docs/known-gaps.md` records that none has run.
 
 Files: `manifests/packages-common.txt`, `tests/verify-image.sh`, `docs/applications.md`, `docs/research/`.
 
@@ -110,6 +118,8 @@ Acceptance: the dogfood record exists and Lutris ships behind a green assertion,
 
 ## Task 6: build the NVIDIA variant (#72)
 
+Status: blocked on the module policy, which is an operator choice (#72); the scaffold is on `main` and unbuilt.
+
 Files: `Containerfile.nvidia`, `manifests/packages-nvidia.txt`, `build/nvidia.sh`, `.github/workflows/ci.yml`, `tests/test-static.sh`, `docs/known-gaps.md`.
 
 - [x] Pin the variant `FROM` by tag and digest and extend the static gate to it.
@@ -120,15 +130,17 @@ Acceptance: the variant builds from its own pin, the module policy is recorded, 
 
 ## Task 7: project-scoped agent container (#71)
 
-Files: `build/agent-run.sh`, `tests/test-agent-run.sh`, `docs/developer-tooling.md`.
+Files: `build/agent-container.sh`, `tests/test-agent-container.sh`, `docs/agent-container.md`, `docs/developer-tooling.md`.
 
-- [ ] Write the `podman run` profile: the project mounted writable, a separate home and cache, no host home, SSH directory, agent socket, or Podman socket.
-- [ ] Add a test that reds when any forbidden mount appears.
-- [ ] Record a run on a built image.
+- [x] Write the `podman run` profile: the project mounted writable, a separate home and cache, no host home, SSH directory, agent socket, or Podman socket.
+- [x] Add a test that reds when any forbidden mount appears.
+- [x] Record a run on a built image.
 
 Acceptance: an agent works in the container and the test proves the host surface stays out of it.
 
 ## Task 8: local home snapshots (#68)
+
+Status: blocked on the btrfs layout choice; `docs/research/2026-11-14-btrbk-home-layout.md` measures the install path and names what a host must check.
 
 Files: `overlay/etc/btrbk/btrbk.conf`, `overlay/usr/lib/systemd/system/btrbk.timer`, `tests/verify-image.sh`, `docs/install.md`.
 
@@ -139,6 +151,8 @@ Files: `overlay/etc/btrbk/btrbk.conf`, `overlay/usr/lib/systemd/system/btrbk.tim
 Acceptance: the timer is enabled, the config names the home subvolume, and the drill is recorded.
 
 ## Task 9: promotion gate
+
+Status: blocked on Secure Boot boots and the graphical dogfood on hardware; CI cannot reach either.
 
 - [ ] Boot the promoted digest with Secure Boot enabled on each target and record `mokutil --sb-state`.
 - [ ] Run the graphical dogfood on the promoted digest.
