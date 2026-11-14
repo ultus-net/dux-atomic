@@ -59,8 +59,12 @@ policy are configured explicitly".
 These describe a disk created by the installer. The repository also builds
 such a disk as a qcow2 image: `tests/vm/make-disk.sh:82` writes a disk with
 `--rootfs btrfs`, which produces a bootable qcow2 that contains a btrfs
-installation of the image. An operator with root on the host can build that
-qcow2 and boot it under QEMU to run the checks below inside the guest.
+installation of the image. An operator with root on the host can build that qcow2
+and boot it under QEMU to run the checks below inside the guest.
+
+The qcow2 comes from `bootc-image-builder` (`tests/vm/make-disk.sh:2`), while
+`docs/install.md:17` installs the published image with `bootc install to-disk`.
+If the two produce different layouts, the to-disk install is the authority.
 
 | Question | Command |
 | --- | --- |
@@ -68,9 +72,6 @@ qcow2 and boot it under QEMU to run the checks below inside the guest.
 | Which subvolumes did the installer create? | `btrfs subvolume list /` |
 | Is home a directory in root or a mount of its own? | `findmnt -no TARGET,SOURCE /var/home` |
 | Does a snapshot restore one deleted file? | the drill in the design's recovery section |
-
-Keep the four commands above: the procedure below tells an operator how to
-produce a btrfs install of the image and run them.
 
 ## The three ways forward
 
@@ -108,8 +109,8 @@ ships.
    This is the documented usage at `tests/vm/boot-smoke.sh:17` and ensures the
    serial console markers and log layout the repository test helpers expect.
 
-3. Inside the guest, run the four commands listed above and capture their
-   verbatim outputs.
+3. Inside the guest, run the three commands above and the restore drill from
+   the design's recovery section, then capture their verbatim outputs.
 
 4. Record the outputs in this document with the date and the disk digest (the
    qcow2 produced by `make-disk.sh` is the test artifact; record its sha256
