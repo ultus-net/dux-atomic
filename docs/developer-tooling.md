@@ -2,7 +2,36 @@
 
 The image serves a machine that is a sysadmin's first and a developer's second. That ordering decides who owns each tool: the image ships what has to work on a broken machine and what needs root, and the user-space layers arrive later.
 
+## How a new tool is placed
+
+Apply these tests in order and deliver the tool by the first one that matches. The order is the policy: a later row never overrides an earlier one.
+
+| Test | Delivery | Why this layer |
+| --- | --- | --- |
+| Needs root, a kernel capability, or early boot | Image | Nothing else exists before the boot finishes. `tcpdump` and `strace` are examples |
+| Fedora packages it and the image needs it: before the first login, on a broken machine, or at the version the build and tests use | Image, recorded in the lock | Fedora signs it and the lock pins the NEVRA. The image may also assert it at runtime |
+| A cloud or operations CLI | A pinned `podman` container | Digest-pinned, no host mutation, and its own cadence. See [the agent container](agent-container.md) for the isolation rules |
+| A GUI application | Flathub | Sandboxed, updated by its publisher, no host package licence burden |
+| User-level CLI that Fedora does not package | Homebrew, from the dotfiles `Brewfile` | No root and one prefix, and the alternative is nothing. Check with `dnf5 repoquery --available <name>` before choosing it |
+| A language-specific developer tool for one project | That project's devcontainer or a Distrobox | The project owns its runtime version |
+
+A tool that Fedora packages and that the image does not need before login belongs in a container or a Flatpak, not in the image.
+
+## Homebrew is the fallback, not the default
+
+Homebrew is the right answer for exactly one row above: user-level CLI that Fedora does not package. Its own documentation scopes it that way, under Features: the first listed use is "Install software not packaged by your host distribution".
+
+It is also not a supported configuration on this base, and that is a reason to keep it narrow. Homebrew's support tiers list Linux Tier 1 as "Ubuntu within its standard support window or a Homebrew-provided Docker image", with a `glibc` at or above 2.39 and the default prefix. Fedora appears in no tier, so a Fedora-only bug sits outside the project's support contract even though the same page gives Fedora bootstrap commands. Never place a Homebrew package on a path the boot needs.
+
+The trust model differs from Fedora's, which is why the pin lives in the dotfiles: "Homebrew does not use any libraries provided by your host system, except *glibc* and *gcc* if they are new enough", and it "expects a working system C compiler and the standard Linux development tools". The `Brewfile` records intent, not a digest, and nothing signs a Homebrew package. The pinned source for a Homebrew tool is therefore the dotfiles commit that names it.
+
+Homebrew runs on the host, not in a container, because the dotfiles own the `Brewfile` and the image already ships the compiler Homebrew bootstraps against. [The research record](research/2026-11-14-package-delivery-layers.md) lists containerized Homebrew as a bootstrap option that this policy rejected, so it is not a live alternative. Reopening it is a policy change, not a tool addition.
+
+Sources: [Homebrew on Linux](https://docs.brew.sh/Homebrew-on-Linux), [Support Tiers](https://docs.brew.sh/Support-Tiers). The evidence for every row, and what each project says about its own layer, is in [the package-delivery research record](research/2026-11-14-package-delivery-layers.md).
+
 ## Delivery split
+
+The table below is the result of applying the tests above, not a second policy.
 
 | Tool | Source | Reason |
 | --- | --- | --- |
@@ -18,11 +47,9 @@ The image serves a machine that is a sysadmin's first and a developer's second. 
 
 Every user tool the dotfiles install appears in this table, so the split can be checked by reading this page instead of diffing two repositories.
 
-## Why the image stops at the compiler
+## What the split buys
 
-A tool belongs in the image when one of three things is true. It needs root or a kernel capability, such as `tcpdump` and `strace`. It has to work before the first successful user login, which the compiler and Node both do. Or its version must match what the build and tests use.
-
-Everything else stays out. Homebrew packages update without an image rebuild, a Flatpak app updates on its own cadence, and an operations container carries the cloud CLIs that would otherwise pin `kubectl` to the OS release. The split keeps the image small and keeps a routine tool upgrade out of a deployment.
+Everything the tests above keep out of the image updates on its own cadence. Homebrew packages update without an image rebuild, a Flatpak app updates when its publisher ships, and an operations container carries the cloud CLIs that would otherwise pin `kubectl` to the OS release. The split keeps the image small and keeps a routine tool upgrade out of a deployment.
 
 ## Verification
 
@@ -30,8 +57,12 @@ Everything else stays out. Homebrew packages update without an image rebuild, a 
 
 `manifests/packages-common.lock` records the Fedora NEVRA of each new name. Fedora lines float with the updates repository, so the lock is a record rather than a drift gate for them, as [Build](build.md) explains.
 
+`tests/test-static.sh` also anchors this page. It compares the ordered delivery paths in the placement table against the expected sequence, so a reorder, a removal, or a reworded path reds, and it reds when the `dnf5` check, the support-tier boundary, or the research record this page links disappears. It is a presence and order check, not a reading of the policy's meaning.
+
 ## Known gaps
 
 - `lazygit` and `yazi` are not in the Fedora 45 repositories, so no image test covers them. The dotfiles `Brewfile` is the intended delivery path and does not list them yet.
 - The image ships a compiler and its headers but no `cmake` or `meson`. A native build needs those from Homebrew or a Distrobox container.
+- The Homebrew row has no automated check yet. Nothing compares the dotfiles `Brewfile` against this page, so a tool added to one and not the other drifts without a red gate. The `Brewfile` commit is also the only pin, because nothing signs a Homebrew package.
+- No test runs a Homebrew tool, a Flatpak application, or an operations container on a built image. The placement rule is enforced by a static check on this page, not by exercising the layers.
 - No test launches an interactive session as the operator and runs a tool. The checks above prove the packages exist and the two runtimes execute.
