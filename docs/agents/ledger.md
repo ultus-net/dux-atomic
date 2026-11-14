@@ -85,4 +85,26 @@ tamper-evident (hash-chained admission).
 - keep/revert: keep. Both mutations the gate claims to catch were observed red, and the faithful tree is green.
 - next hypothesis: (a) a cross-repository check needs a checked-in snapshot of the `Brewfile` (a one-line-per-brew file plus a hash), so a dotfiles commit that moves the set reds here instead of drifting quietly; (b) the Fedora cells carry versions that float, so the record could cite the repository id only, which is the fact the rule uses; (c) `docs/known-gaps.md` and this page now both describe the NVIDIA manifest gap, so the two bullets will drift.
 
+### n=2 · 2026-11-14 · revision of n=1 after review
+
+- hypothesis (falsifiable): the reviewer's two P1 findings are real defects in n=1's prose and gate, and fixing the prose plus freezing the 23 inventory names in the gate makes the page's claims match what the checks prove. Falsified if either P1 is a misreading of the text, or if the strengthened gate still passes a renamed row.
+- trace evidence: reviewer subagent `ses_e276c657bffeM2A4ERHIW40gof` (REJECT: two P1s, two P2s, one P3). P1-1 named `docs/developer-tooling.md:114-115`; P1-2 named `docs/research/2026-11-14-brewfile-inventory-measurement.md:108-121`; P2-4 named `tests/test-static.sh:207-214`. The bullet already named `gh`, `glab`, and `azure-cli`, so P1-1 was a partial misreading; its true target was the phrase "#82, closed by this page", which claimed more than the page does.
+- code change: the Known gaps bullet now says thirteen of the sixteen Fedora names take the grandfather row and the three cloud CLIs stay claimed by the earlier row, and drops "closed by this page". The measurement record gains a bullet naming the same split and stating that row assignment is the rule's answer, not a measurement. `tests/test-static.sh` now compares the inventory's tool cells against the 23 names in `Brewfile` order instead of counting rows.
+- commit SHA + git tree: `0afae9a` · tree `034f5cfabc7ebbd92edeca627d1f559ed8a1fc3d`.
+- artifact name + checksum: `docs/developer-tooling.md` sha256 `d59d8cd44f52251407473784f83406aadc39b5bc54279b2885d3e185b681efcb`; `tests/test-static.sh` sha256 `ed5ace8189fc6ced5a79a143345c87c6d44ab60cd8a57bd052ae9273f97a8b7b`; `docs/research/2026-11-14-brewfile-inventory-measurement.md` sha256 `8da5d5db23256f7696a5f45f2d1e56935317d5ee4b000261e5d1ce37b82ce46b`. These supersede n=1's checksums for the same three paths; n=1 is not edited, so its checksums describe the state before this revision.
+- exact command/config: `CONTAINER_RUNTIME=podman bash tests/lint.sh`; `bash tests/test-static.sh`; the rename mutation is `sed -i 's/^| \`zoxide\` | \`:46\`/| \`zoxide-fork\` | \`:46\`/'`.
+- test results: `tests/lint.sh` exit 0, last two lines `ok   an empty measurement exits 2, not the drift code` and `ok   an unreadable measurement exits 2, not the drift code`. Renaming `zoxide` to `zoxide-fork` printed `FAIL docs/developer-tooling.md no longer inventories the 23 Brewfile names in order, widened the Homebrew row, or dropped the measurement record`; the restored tree printed `ok   docs/developer-tooling.md inventories all 23 Brewfile names in order and links the measurement`. `git diff --check` exit 0.
+- eval job path: none. Same reasoning as n=1.
+- selection score 3/3 (3 items): the three findings this revision claims to close, one item each: P1-1 prose claim, P1-2 evidence cross-reference, P2-4 rename blindness.
+- held-out score 2/2 (2 items, never used for selection): (a) the ordered-delivery gate still passes unchanged; (b) a row deletion still reds, re-run after the rewrite rather than assumed.
+- prev-chain: sha256:8af73746e0fa25e5a85d31cc8e5cdcf2c8f593b710444d7df6fca08ab082cdd7
+- gains: the page's Known gaps bullet no longer implies the cloud-CLI divergence is closed; the measurement record says which of the sixteen names take which row; a renamed inventory row now reds, which the count could not catch.
+- losses: the gate now duplicates the 23 names, so a doc reorder that is otherwise harmless reds until the list is updated. That is the intended trade: order is the `Brewfile` order, and the failure is one line to fix.
+- exceptions/idiosyncratic constraints: P2-3 (the ledger's "verified by the gate" framing) was declined: n=0 already states that the genesis link is checked by inspection, and n=1's chain verifies. P3 (the sixteen/six/crush arithmetic) was accepted as a parenthetical in the doc rather than as a new sentence, because the counts are now spelled out in both places.
+- token/cost/duration: one review pass, one revision, two lint runs, four static runs.
+- interpretation: the first P1 was half wrong on the facts and right on the tone; the second was right, and both were cheap to fix. The P2 about the count-only gate was the finding that changed behaviour rather than prose.
+- keep/revert: keep. Both P1s addressed, the P2 hardened, and the renamed-row mutation is observed red.
+- next hypothesis: (a) same as n=1 (a) — the snapshot is the only way to catch a dotfiles-side move; (b) a reviewer reading a claim sentence as stronger than the text supports is a signal to name the count explicitly next to the sentence, not only in the table.
+
+
 
