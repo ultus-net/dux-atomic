@@ -35,3 +35,5 @@ Everything else stays out. Homebrew packages update without an image rebuild, a 
 - `lazygit` and `yazi` are not in the Fedora 45 repositories, so no image test covers them. The dotfiles `Brewfile` is the intended delivery path and does not list them yet.
 - The image ships a compiler and its headers but no `cmake` or `meson`. A native build needs those from Homebrew or a Distrobox container.
 - No test launches an interactive session as the operator and runs a tool. The checks above prove the packages exist and the two runtimes execute.
+
+- Project-scoped rootless agent containers are not exercised by the image tests here; see docs/agent-container.md for the recommended profile and how to run it.
