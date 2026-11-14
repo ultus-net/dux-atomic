@@ -1,6 +1,7 @@
 # Known gaps before promotion
 
-- The image has no NVIDIA variant, application set, agent sandbox, or snapshot automation yet. The README marks these as planned.
+- The image has no application set or snapshot automation yet. The README marks these as planned.
+- The NVIDIA variant is scaffolded in `Containerfile.nvidia` and `manifests/packages-nvidia.txt`, but it is not built, locked, or published. The enabled repositories ship no prebuilt kernel module, so the module path is still a decision (#72).
 - The gaming layer ships Steam and its graphics stack, but no game has been launched from a built image. `ntsync-autoload` arrives as a weak dependency and its kernel module is unverified, and the layer lands on the Intel laptop as well as the gaming machine, because one image serves both.
 - The developer and sysadmin layer ships a C toolchain, Node 22 with npm, btop, and a diagnostics set, but it is proven only by package presence and two runtime probes. `tests/verify-image.sh` runs `node --version` and `npm --version`, so the dotfiles npm globals can start, and the manifest-wide query proves every diagnostic binary's package is installed. No test runs a diagnostic, and nothing exercises the Homebrew bootstrap that the compiler exists for. `lazygit` and `yazi` stay outside the image because Fedora 45 carries neither, and `cmake` and `meson` stay outside because the split leaves native build systems to Homebrew or a Distrobox container. `docs/developer-tooling.md` records the split and these gaps (#67).
 - The VM test covers the greeter and a serial login. It does not log in through the greeter, start a second session, or exercise the Xfce fallback.
