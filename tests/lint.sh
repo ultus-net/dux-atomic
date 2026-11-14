@@ -33,6 +33,7 @@ bash_scripts=(
   tests/lint.sh
   tests/test-signing.sh
   tests/test-static.sh
+  tests/test-agent-container.sh
   tests/verify-image.sh
   tests/verify-kernel-signature.sh
   tests/vm/boot-smoke.sh
@@ -59,4 +60,4 @@ done
 "$runtime" run --rm -v "$repo_root:/mnt:ro" -w /mnt "$actionlint_image" \
   .github/workflows/ci.yml
 
-bash tests/test-static.sh
+bash tests/test-static.sh && bash tests/test-agent-container.sh
