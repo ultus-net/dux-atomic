@@ -63,7 +63,7 @@ installation of the image. An operator with root on the host can build that qcow
 and boot it under QEMU to run the checks below inside the guest.
 
 The qcow2 comes from `bootc-image-builder` (`tests/vm/make-disk.sh:2`), while
-`docs/install.md:17` installs the published image with `bootc install to-disk`.
+`docs/install.md:15` installs the published image with `bootc install to-disk`.
 If the two produce different layouts, the to-disk install is the authority.
 
 | Question | Command |
