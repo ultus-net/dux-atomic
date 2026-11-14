@@ -35,5 +35,5 @@ Everything else stays out. Homebrew packages update without an image rebuild, a 
 - `lazygit` and `yazi` are not in the Fedora 45 repositories, so no image test covers them. The dotfiles `Brewfile` is the intended delivery path and does not list them yet.
 - The image ships a compiler and its headers but no `cmake` or `meson`. A native build needs those from Homebrew or a Distrobox container.
 - No test launches an interactive session as the operator and runs a tool. The checks above prove the packages exist and the two runtimes execute.
-
-- Project-scoped rootless agent containers are not exercised by the image tests here; see docs/agent-container.md for the recommended profile and how to run it.
+- The dotfiles stage 20 is not recorded as running on a booted image yet. Its disk build and VM boot need rootful podman, which the agent sessions cannot run, so [the bootstrap hand-off](research/2026-11-14-dotfiles-bootstrap.md) records the blocked commands and the exact operator sequence that finishes the proof. `tests/vm/boot-smoke.sh` carries an opt-in `POST_LOGIN_CMD` hook to capture that run (#70).
+- Project-scoped rootless agent containers are not exercised by the image tests here. [The agent container page](agent-container.md) documents the profile and how to run it (#71).
