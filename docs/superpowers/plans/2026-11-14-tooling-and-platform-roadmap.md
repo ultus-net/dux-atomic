@@ -112,7 +112,7 @@ Acceptance: the dogfood record exists and Lutris ships behind a green assertion,
 
 Files: `Containerfile.nvidia`, `manifests/packages-nvidia.txt`, `build/nvidia.sh`, `.github/workflows/ci.yml`, `tests/test-static.sh`, `docs/known-gaps.md`.
 
-- [ ] Pin the variant `FROM` by tag and digest and extend the static gate to it.
+- [x] Pin the variant `FROM` by tag and digest and extend the static gate to it.
 - [ ] Decide the module path: a vendor-signed module from a repository, or a documented unsigned-module exception.
 - [ ] Build the variant and publish it under its own tag.
 

@@ -1,0 +1,28 @@
+# manifests/packages-nvidia.txt — NVIDIA variant package manifest.
+#
+# The userspace stack. Every name here was verified to resolve against the
+# image's enabled repositories (negativo17 fedora-multimedia plus Fedora) on
+# 2026-11-14; the commands and their output are in
+# docs/research/2026-11-14-nvidia-module-signing.md.
+#
+# The kernel module has no prebuilt path in those repositories. `kmod-nvidia`
+# is a 10 KB meta-package with no files that requires `akmod-nvidia`, and
+# `akmod-nvidia` ships a source RPM that akmods compiles on the host at first
+# boot. The module delivery decision belongs to #72 and this file does not make
+# it.
+
+nvidia-driver
+nvidia-driver-libs
+nvidia-driver-cuda
+nvidia-modprobe
+nvidia-persistenced
+nvidia-settings
+egl-wayland
+libva-nvidia-driver
+
+# 32-bit libraries for x86_64, for Steam. Both resolve from fedora-multimedia.
+mesa-vulkan-drivers.i686
+nvidia-driver-libs.i686
+
+# Deliberately absent: nvidia-container-toolkit does not resolve in the enabled
+# repositories. The kernel module is absent until #72 chooses a delivery path.
