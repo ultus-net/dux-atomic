@@ -18,7 +18,11 @@ cat <<'HEADER'
 # manifests/packages-common.lock - regenerate with 'just lock'
 # One line per resolved NEVRA: <nevra> TAB <from_repo>.
 # Records every package whose origin repository is not a Fedora repository.
-# Excludes empty/@System/unknown/local-path origins, and excludes +git NEVRAs.
+# COPR publishes a main repository and a dependency repository; which one
+# served a package can vary at build time, so the generator normalizes the
+# dependency-repo prefix to the main project prefix before recording. The
+# NEVRA still pins what landed, and a package moving between those two
+# repositories of the same COPR is therefore not drift.
 HEADER
 
 # Run repoquery once inside the image. Pass an explicit '*' pattern so every
@@ -28,6 +32,11 @@ HEADER
   # Normalize any literal "\\t" sequences into real tabs so the split below
   # works regardless of how repoquery formats its qf output in this rootfs.
   sed 's/\\t/\t/g' | \
+  # Normalize COPR repository ids: copr publishes a main repo and a
+  # dependency repo. Which repository served a package can vary by build-time
+  # resolution but refers to the same COPR project; record the project by
+  # normalizing coprdep: to copr: so identical NEVRAs do not appear as drift.
+  sed 's/^\([^\t]*\t\)coprdep:/\1copr:/' | \
   LC_ALL=C sort -u | \
   # Denylist Fedora-owned or system origins only. Record everything else so an
   # unexpected repo id is visible rather than dropped. Exclude exactly:
