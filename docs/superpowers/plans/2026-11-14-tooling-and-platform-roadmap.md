@@ -82,7 +82,6 @@ Acceptance: the dotfiles' own installer completes on this image without a manual
 
 ## Task 3: ship a containers signing policy (#4)
 
-
 Status: the trust root is decided and the signing tests (`tests/test-signing.sh`) run in lint and CI. Three remaining items follow (#4). See `docs/research/2026-11-14-signing-trust-root-decision.md`.
 
 Files: `overlay/etc/containers/policy.json`, `tests/test-signing.sh`, `docs/known-gaps.md`, `CHANGELOG.md`.
@@ -100,9 +99,9 @@ Status: closed 2026-11-14; `tests/test-lock-drift.sh` runs in `tests/lint.sh` at
 
 Files: `build/package-lock.sh`, `tests/verify-image.sh`, `tests/test-static.sh`, `docs/build.md`, `docs/known-gaps.md`.
 
- - [x] Enumerate transitive packages from a non-Fedora vendor, not only manifest names.
- - [x] Add a fixture proving a transitive rebuild reds the gate (`tests/test-lock-drift.sh`).
- - [x] Record the `+git` exception and the vendor-string limit in `docs/build.md`.
+- [x] Enumerate transitive packages from a non-Fedora vendor, not only manifest names.
+- [x] Add a fixture proving a transitive rebuild reds the gate (`tests/test-lock-drift.sh`).
+- [x] Record the `+git` exception and the vendor-string limit in `docs/build.md`.
 
 Acceptance: a rebuild of a package the manifest pulls in transitively fails the image job.
 
