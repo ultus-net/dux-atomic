@@ -82,11 +82,11 @@ Acceptance: the dotfiles' own installer completes on this image without a manual
 
 ## Task 3: ship a containers signing policy (#4)
 
-Status: blocked on the trust-root choice; the options and custody questions are in `docs/research/2026-11-14-containers-signing-trust-root.md`.
+Status: the trust root is decided, a repository release key named by `keyPath`; the policy, the rotation note, and the tests remain (#4). See `docs/research/2026-11-14-signing-trust-root-decision.md`.
 
 Files: `overlay/etc/containers/policy.json`, `tests/test-signing.sh`, `docs/known-gaps.md`, `CHANGELOG.md`.
 
-- [ ] Decide the trust root: a release key referenced by `keyPath`, or a recorded decision to ship no policy.
+- [x] Decide the trust root: a release key referenced by `keyPath`, or a recorded decision to ship no policy.
 - [ ] Write the policy and the rotation note.
 - [ ] Extend `tests/test-signing.sh` with an accept and a reject against the shipped policy.
 
@@ -118,12 +118,12 @@ Acceptance: the dogfood record exists and Lutris ships behind a green assertion,
 
 ## Task 6: build the NVIDIA variant (#72)
 
-Status: blocked on the module policy, which is an operator choice (#72); the scaffold is on `main` and unbuilt.
+Status: the module path is decided, `akmod-nvidia` compiled on the host, unsigned, as a documented exception (#72, and #40 for Secure Boot); the variant is still unbuilt. See `docs/research/2026-11-14-nvidia-module-path-decision.md`.
 
 Files: `Containerfile.nvidia`, `manifests/packages-nvidia.txt`, `build/nvidia.sh`, `.github/workflows/ci.yml`, `tests/test-static.sh`, `docs/known-gaps.md`.
 
 - [x] Pin the variant `FROM` by tag and digest and extend the static gate to it.
-- [ ] Decide the module path: a vendor-signed module from a repository, or a documented unsigned-module exception.
+- [x] Decide the module path: a vendor-signed module from a repository, or a documented unsigned-module exception.
 - [ ] Build the variant and publish it under its own tag.
 
 Acceptance: the variant builds from its own pin, the module policy is recorded, and no Secure Boot claim is made until a boot is recorded.
@@ -140,7 +140,7 @@ Acceptance: an agent works in the container and the test proves the host surface
 
 ## Task 8: local home snapshots (#68)
 
-Status: blocked on the btrfs layout choice; `docs/research/2026-11-14-btrbk-home-layout.md` measures the install path and names what a host must check.
+Status: the layout is decided, a dedicated `home` subvolume snapshotted alone; nothing ships until a btrfs host has taken the four measurements in `docs/research/2026-11-14-btrfs-home-layout-decision.md` (#68).
 
 Files: `overlay/etc/btrbk/btrbk.conf`, `overlay/usr/lib/systemd/system/btrbk.timer`, `tests/verify-image.sh`, `docs/install.md`.
 
