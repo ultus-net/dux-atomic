@@ -274,6 +274,24 @@ if [[ $login == 1 ]]; then
     echo "login failed: the session probe did not finish" >&2
     exit 1
   fi
+
+  # Optional: run a single post-login command as the logged-in user and emit
+  # markers for the run. Intended for automated post-login probes such as the
+  # dotfiles bootstrap stage (#70). Guard is off by default; set POST_LOGIN_CMD
+  # to the literal command to run, with no shell wrapping. The caller reads the
+  # exit status from the DUX_POST_END marker in the log.
+  if [[ -n ${POST_LOGIN_CMD:-} ]]; then
+    serial_write 'printf "DUX_POST_BEGIN\n"'
+    serial_write "$POST_LOGIN_CMD"
+    # The login shell runs this line after the command, so $? is that command's
+    # status, not printf's.
+    serial_write 'printf "DUX_POST_END:%s\n" "$?"'
+    if ! wait_for 'DUX_POST_END:' 300; then
+      echo "post-login command did not finish within 300s" >&2
+      tail -20 "$log" >&2 || true
+      exit 1
+    fi
+  fi
   # The command text holds "DUX_SESSION:%s", so only real output matches the
   # literal marker.
   if ! grep -q 'DUX_SESSION:ok' "$log"; then

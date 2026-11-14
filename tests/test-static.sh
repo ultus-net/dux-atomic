@@ -313,6 +313,22 @@ else
   echo "ok   the vm login probes and greeter mask fail closed"
 fi
 
+# boot-smoke.sh gained an opt-in POST_LOGIN_CMD hook for automated post-login
+# probes such as the dotfiles bootstrap (#70). It must stay off by default, and
+# a command that never returns must fail the boot test rather than warn.
+if ! grep -qF 'if [[ -n ${POST_LOGIN_CMD:-} ]]; then' "$boot_smoke" ||
+   ! grep -qF 'DUX_POST_END:' "$boot_smoke" ||
+   ! awk '/post-login command did not finish/ { found = 1; next }
+          found { n++ }
+          found && n <= 3 && /^[[:space:]]*exit 1$/ { ok = 1 }
+          found && n > 3 { found = 0; n = 0 }
+          END { exit ok ? 0 : 1 }' "$boot_smoke"; then
+  echo "FAIL boot-smoke.sh lost the opt-in POST_LOGIN_CMD hook or its fail-closed timeout" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   boot-smoke.sh keeps the opt-in POST_LOGIN_CMD hook fail-closed"
+fi
+
 # A hosted TCG boot reached the login prompt after 21 minutes in run 43068532421
 # (#50), so the login wait must consume BOOT_TIMEOUT and CI must budget for it.
 # Lowering either brings back a red release for a slow runner, not a broken image.
