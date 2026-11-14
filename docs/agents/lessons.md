@@ -25,3 +25,5 @@ carrying its id in the bullet and registered below.
 
 - L001 — a completeness claim over an external list is a claim about a diff; name the list, its commit, and one row per entry, or drop the claim (evidence: `docs/developer-tooling.md:48` before `7737bd7`, `docs/agents/lessons/20261114T054500Z-completeness-claim-needs-a-diff.md`)
 
+- L002 — a package name that promises a property (`-matched`, `-latest`, `uname-r`) states its own version relation, not a lookup on the machine; read `rpm -qR` and assert the property at build time (evidence: `rpm -qR kernel-devel-matched` in the `aae9510831b0` image, `3500e54`, `docs/agents/lessons/20261114T062000Z-name-promising-a-property-is-not-a-check.md`)
+
