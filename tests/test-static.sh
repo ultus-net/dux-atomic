@@ -111,6 +111,17 @@ else
   echo "ok   the lock is written atomically, drift is separated from a failed measurement, and the generator drops +git builds"
 fi
 
+# The comparison is one helper so tests/test-lock-drift.sh can run it with no
+# image. Pin the call and the operator's drift message, so a later edit cannot
+# inline the comparison again quietly.
+if ! grep -qF 'build/compare-lock.sh' "$repo_root/tests/verify-image.sh" ||
+   ! grep -qF "FAIL the third-party package lock drifted; run 'just lock'" "$repo_root/tests/verify-image.sh"; then
+  echo "FAIL tests/verify-image.sh no longer calls build/compare-lock.sh or lost the drift message" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the lock comparison runs through build/compare-lock.sh and keeps its drift message"
+fi
+
 # Secure Boot needs no per-machine enrollment only while the base keeps Fedora's
 # signed kernel, and the image job is the only place that can see it (#65). Pin
 # the call and the issuer: the old base shipped a signed kernel too, so the

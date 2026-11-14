@@ -30,10 +30,12 @@ bash_scripts=(
   build/common.sh
   build/install-packages.sh
   build/package-lock.sh
+  build/compare-lock.sh
   tests/lint.sh
   tests/test-signing.sh
   tests/test-static.sh
   tests/test-agent-container.sh
+  tests/test-lock-drift.sh
   tests/verify-image.sh
   tests/verify-kernel-signature.sh
   tests/vm/boot-smoke.sh
@@ -60,4 +62,4 @@ done
 "$runtime" run --rm -v "$repo_root:/mnt:ro" -w /mnt "$actionlint_image" \
   .github/workflows/ci.yml
 
-bash tests/test-static.sh && bash tests/test-agent-container.sh
+bash tests/test-static.sh && bash tests/test-agent-container.sh && bash tests/test-lock-drift.sh

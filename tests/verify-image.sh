@@ -79,14 +79,20 @@ if [[ -z $expected ]]; then
   exit 1
 fi
 # A nonzero status here means the generator or the image is broken, not that the
-# lock drifted, so keep the two diagnoses apart. The filters run afterwards.
+# lock drifted, so keep the two diagnoses apart. The comparison lives in
+# build/compare-lock.sh so tests/test-lock-drift.sh can exercise it with no
+# image: its status 2 is the failed measurement, its status 1 is drift.
 if ! raw=$(CONTAINER_RUNTIME=$runtime "$repo_root/build/package-lock.sh" "$image"); then
   echo "FAIL the lock measurement failed; the generator or the image is broken" >&2
   exit 1
 fi
-measured=$(grep -vE '^(#|$)' <<<"$raw" || true)
-if [[ $measured != "$expected" ]]; then
+compare_status=0
+compare_detail=$("$repo_root/build/compare-lock.sh" "$lock" <(printf '%s\n' "$raw") 2>&1) || compare_status=$?
+if ((compare_status == 1)); then
   echo "FAIL the third-party package lock drifted; run 'just lock'" >&2
-  diff -u <(printf '%s\n' "$expected") <(printf '%s\n' "$measured") >&2 || true
+  printf '%s\n' "$compare_detail" >&2
+  exit 1
+elif ((compare_status != 0)); then
+  echo "FAIL the lock measurement failed; the generator or the image is broken" >&2
   exit 1
 fi
