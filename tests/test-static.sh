@@ -617,6 +617,35 @@ else
   echo "ok   the overlay ships the dnf.conf defaults and the verifier reads them back"
 fi
 
+# The image enables firewalld and the overlay replaces the public zone with a
+# closed baseline: SSH for the operator and DHCPv6 for the network (#116). The
+# distribution default also allows mDNS, so a file naming it reds rather than
+# restoring the advertisement. The verifier's readback and its expected value are
+# both kept whole: a readback whose comparison is deleted would otherwise red
+# only in the hosted job, where it cannot red at all.
+firewalld_zone=$repo_root/overlay/etc/firewalld/zones/public.xml
+firewalld_readback='zone_services=$("$runtime" run --rm "$image" firewall-offline-cmd --zone=public --list-services) \'
+firewalld_expect="if [[ \$zone_services != 'dhcpv6-client ssh' ]]; then"
+if [[ ! -f $firewalld_zone ]]; then
+  echo "FAIL overlay/etc/firewalld/zones/public.xml is missing; the image enables firewalld with no managed zone" >&2
+  failures=$((failures + 1))
+elif ! grep -qxF '  <service name="ssh"/>' "$firewalld_zone" ||
+     ! grep -qxF '  <service name="dhcpv6-client"/>' "$firewalld_zone"; then
+  echo "FAIL overlay/etc/firewalld/zones/public.xml does not allow both ssh and dhcpv6-client" >&2
+  failures=$((failures + 1))
+elif grep -qE '<service name="(mdns|http|https|samba-client|cockpit)"' "$firewalld_zone"; then
+  echo "FAIL overlay/etc/firewalld/zones/public.xml opens a service the baseline does not approve" >&2
+  failures=$((failures + 1))
+elif ! grep -qxF "$firewalld_readback" "$repo_root/tests/verify-image.sh"; then
+  echo "FAIL tests/verify-image.sh no longer reads the firewalld zone back with firewall-offline-cmd" >&2
+  failures=$((failures + 1))
+elif ! grep -qxF "$firewalld_expect" "$repo_root/tests/verify-image.sh"; then
+  echo "FAIL tests/verify-image.sh reads the zone back but no longer compares it to 'dhcpv6-client ssh'" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the overlay ships a closed firewalld baseline and the verifier reads it back"
+fi
+
 workflow=$repo_root/.github/workflows/ci.yml
 # Assert the NVIDIA CI job and its gating and flags
 if ! grep -qF 'podman build --layers -f Containerfile.nvidia -t localhost/dux-atomic:nvidia' "$workflow" ||

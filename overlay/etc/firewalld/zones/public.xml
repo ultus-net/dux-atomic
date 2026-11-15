@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<zone>
+  <short>Public</short>
+  <description>Dux-atomic baseline: SSH for the operator, DHCPv6 for the network, and nothing else. The distribution's public zone also allows mDNS, which advertises the host on the local network; this file drops it so the baseline is closed by default (#116).</description>
+  <service name="ssh"/>
+  <service name="dhcpv6-client"/>
+  <forward/>
+</zone>

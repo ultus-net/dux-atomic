@@ -36,6 +36,19 @@ for want in 'max_parallel_downloads = 10' 'fastestmirror = 1' 'defaultyes = 1' '
   fi
 done
 echo "ok   dnf5 resolves the four overlay defaults (#111)"
+# firewalld is enabled in the image and the overlay replaces the public zone with
+# a closed baseline (#116). Assert the file parses and that the effective service
+# set is exactly that baseline, so a distro default change or an added service
+# reds here instead of widening the image silently.
+"$runtime" run --rm "$image" firewall-offline-cmd --check-config \
+  || { echo "FAIL the firewalld configuration does not parse in the image" >&2; exit 1; }
+zone_services=$("$runtime" run --rm "$image" firewall-offline-cmd --zone=public --list-services) \
+  || { echo "FAIL firewall-offline-cmd cannot list the public zone services" >&2; exit 1; }
+if [[ $zone_services != 'dhcpv6-client ssh' ]]; then
+  echo "FAIL the public zone allows '${zone_services}', expected 'dhcpv6-client ssh'" >&2
+  exit 1
+fi
+echo "ok   the public zone allows exactly dhcpv6-client and ssh (#116)"
 # The Fedora base carries no desktop, so every name in the manifest has to
 # resolve in the built image. Query all of them in one call, so a silently
 # dropped name fails here rather than at the first login, and a new manifest
