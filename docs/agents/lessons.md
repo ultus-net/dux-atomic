@@ -31,3 +31,7 @@ carrying its id in the bullet and registered below.
 
 - L005 — assert the whole line, not a fragment: a comment, a second call site, or a rename that keeps the fragment satisfies a substring match, so anchor both ends with `grep -qxF` over the line itself (evidence: reviewer P1 on the `grep -qF` form that kept only the command prefix, the committed `grep -qxF "$dnf_readback"`, `docs/agents/lessons/20261115T091500Z-assert-the-whole-line-not-a-fragment.md`)
 
+- L006 — a conflict resolution is a deletion until the diff says otherwise: a merge that keeps one side of a conflicted file removes the other side's lines, so read `git show --stat` on the conflicted paths and compare each parent's line count (evidence: `b3bb525` deleted 95 lines of `CHANGELOG.md`, 100 lines at `b3a2f8f` to 6 at the merge, and the `static` run at `b3bb525` concluded `success`, `docs/agents/lessons/20261115T090646Z-a-conflict-resolution-is-a-deletion.md`)
+
+- L007 — a closing keyword in code formatting does not close the issue: the forge reads the rendered body, so `Fixes #123` in backticks leaves the work item open, and the check is the issue's state after the merge (evidence: PR #124 merged 2026-11-15T06:31:51Z, `#123` closed by hand at 2026-11-15T08:39:21Z, `docs/agents/lessons/20261115T090646Z-a-closing-keyword-in-code-formatting-does-not-close.md`)
+

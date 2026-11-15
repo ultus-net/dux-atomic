@@ -11,6 +11,8 @@
 - `promote` runs only on a `workflow_dispatch` on `main` with `promote` set, and needs both `publish` and `verify`. It copies the signed manifest to `:latest` and asserts the registry digest. A failed copy leaves the previous tag and fails the run, so a human retries. A push never moves `:latest`.
 - A `workflow_dispatch` on `main` with `publish` set and `promote` unset publishes the commit it runs on without moving `:latest`. A dispatch with neither input runs `static`, `signing`, `image`, and `image-nvidia`, because the variant filter answers true for every event that is not a pull request or a push, so a green run does not always publish.
 - `static` and `image` are required checks on `main`; a red hosted `image` run blocks merge. `signing` runs on every trigger but is not a required check, so a red signing run shows on the PR without blocking it.
+- Every PR names its work item with a bare closing keyword on its own line, never inside backticks or a fenced block. GitHub reads the keyword from the rendered body, so a formatted one leaves the issue open: PR #124 formatted it, and #123 stayed open until it was closed by hand 2h07m after the merge (L007).
+
 - The `ghcr` environment is the approval hook. Add required reviewers in the repository settings to gate publication.
 - The first push creates a private GHCR package. Set the package visibility to public in the package settings if anonymous pulls are wanted.
 
