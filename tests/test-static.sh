@@ -558,7 +558,7 @@ fi
 workflow=$repo_root/.github/workflows/ci.yml
 # Assert the NVIDIA CI job and its gating and flags
 if ! grep -qF 'podman build --layers -f Containerfile.nvidia -t localhost/dux-atomic:nvidia' "$workflow" ||
-   [[ $(grep -c -- '--no-package-lock' "$workflow") -ne 1 ]] ||
+   [[ $(grep -cF 'tests/verify-image.sh --no-package-lock' "$workflow") -ne 1 ]] ||
    ! grep -qF "tests/verify-image.sh --no-package-lock localhost/dux-atomic:nvidia" "$workflow" ||
    ! grep -qF "if: needs.changes.outputs.nvidia == 'true'" "$workflow" ||
    ! grep -qF "^(Containerfile\\.nvidia$|manifests/packages-nvidia\\.txt$|manifests/packages-common\\.txt$|build/|overlay/|tests/verify-image\\.sh$)" "$workflow"; then
