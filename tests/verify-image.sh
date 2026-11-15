@@ -20,11 +20,12 @@ runtime=${CONTAINER_RUNTIME:-podman}
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 
 "$runtime" run --rm "$image" bootc container lint
-# The desktop contract, expressed in terms any desktop satisfies: the units the
-# image's own presets enable exist and verify, every binding resolves, the
-# greeter command and a session entry name executables, and first-login setup is
-# ordered, bounded and idempotent. Nothing below names the shipped desktop, so
-# these assertions survive a swap.
+# The desktop contract, expressed in terms any desktop satisfies: every unit the
+# image ships outside a package, and every unit its own preset enables, verifies;
+# every binding resolves; the greeter command and a session entry name
+# executables; and first-login setup is gated, ordered, bounded and marks
+# completion. Nothing below names the shipped desktop, so these assertions
+# survive a swap.
 "$runtime" run --rm -i "$image" bash -s <<'IN_IMAGE'
 set -euo pipefail
 fail() { echo "$*" >&2; exit 1; }
@@ -34,6 +35,7 @@ fail() { echo "$*" >&2; exit 1; }
 image_own() {
   local dir=$1 file
   for file in "$dir"/*; do
+    [[ -f $file ]] || continue
     rpm -qf "$file" >/dev/null 2>&1 || echo "$file"
   done
 }
@@ -45,8 +47,17 @@ mapfile -t preset_units < <(awk '$1 == "enable" { print $2 }' "${own_presets[@]}
 for unit in "${preset_units[@]}"; do
   [[ -f /usr/lib/systemd/user/$unit ]] || fail "FAIL the preset enables $unit, which the image does not ship"
 done
-systemd-analyze verify "${preset_units[@]/#//usr/lib/systemd/user/}" ||
-  fail "FAIL a unit the image enables for new accounts does not verify"
+
+# Every unit the image ships outside a package must verify, and so must every
+# unit its own preset enables. This covers the module's units by ownership
+# rather than by name, so a swapped desktop is verified without the verifier
+# naming it.
+mapfile -t own_system_units < <(image_own /usr/lib/systemd/system)
+mapfile -t own_user_units < <(image_own /usr/lib/systemd/user)
+verify_units=("${own_system_units[@]}" "${own_user_units[@]}" "${preset_units[@]/#//usr/lib/systemd/user/}")
+((${#verify_units[@]} > 0)) || fail "FAIL the image ships no unit of its own"
+systemd-analyze verify "${verify_units[@]}" ||
+  fail "FAIL a unit the image ships or enables does not verify"
 
 # Every binding in the image resolves, so no session starts against a missing
 # unit.
@@ -80,11 +91,10 @@ for dir in /usr/share/wayland-sessions /usr/share/xsessions; do
 done
 [[ -n $session ]] || fail "FAIL no session entry names an executable"
 
-# First-login setup is gated, ordered, bounded and marks completion, so a crash
-# retries and a hang cannot hold the session open.
-mapfile -t own_units < <(image_own /usr/lib/systemd/user)
+# First-login setup is gated on a condition script, ordered, bounded and marks
+# completion, so a crash retries and a hang cannot hold the session open.
 setup_unit=
-for unit in "${own_units[@]}"; do
+for unit in "${own_user_units[@]}"; do
   grep -q '^ExecCondition=' "$unit" && setup_unit=$unit
 done
 [[ -n $setup_unit ]] || fail "FAIL no user unit gates first-login setup on a condition"
@@ -95,7 +105,24 @@ grep -q '^Before=graphical-session-pre.target' "$setup_unit" ||
 grep -q '^TimeoutStartSec=' "$setup_unit" || fail "FAIL the first-login unit has no start timeout"
 grep -q '^ExecStartPost=' "$setup_unit" || fail "FAIL the first-login unit writes no completion marker"
 IN_IMAGE
-echo "ok   the desktop contract holds: preset units verify, bindings resolve, the greeter and a session start, first-login is bounded"
+echo "ok   the desktop contract holds: image units verify, bindings resolve, the greeter and a session start, first-login is bounded"
+
+# Every path the module ships must be present in the image, so the relocated
+# overlay is proven to land where systemd and the session look. The paths come
+# from the tree, not from a list of product names, so a swapped desktop is
+# covered by the same assertion.
+module_overlay=$repo_root/overlay/desktop
+if [[ -d $module_overlay ]]; then
+  mapfile -t module_paths < <(cd "$module_overlay" && find . \( -type f -o -type l \) -printf '/%P\n' | sort)
+  ((${#module_paths[@]} > 0)) || { echo "FAIL overlay/desktop/ is empty" >&2; exit 1; }
+  missing=$(printf '%s\n' "${module_paths[@]}" |
+    "$runtime" run --rm -i "$image" bash -c 'while read -r path; do [[ -e $path ]] || echo "$path"; done')
+  if [[ -n $missing ]]; then
+    echo "FAIL the desktop module ships paths the image does not carry:"$'\n'"$missing" >&2
+    exit 1
+  fi
+  echo "ok   every path in overlay/desktop/ is present in the image (${#module_paths[@]} paths)"
+fi
 # The pinned base's /etc/dnf/dnf.conf carries only a comment and [main], and the
 # overlay replaces it with the linutil Configure DNF defaults (#111). Ask dnf5
 # for the values it resolves, so a file that parses but is not read still reds.

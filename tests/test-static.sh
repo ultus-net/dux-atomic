@@ -337,8 +337,8 @@ leaks=
 if [[ ! -f $desktop_manifest ]] || [[ ! -d $desktop_overlay ]]; then
   echo "FAIL the desktop module needs both manifests/packages-desktop.txt and overlay/desktop/" >&2
   failures=$((failures + 1))
-elif ! grep -qx 'install_manifest /ctx/manifests/packages-desktop.txt' "$desktop_overlay/usr/libexec/dux-atomic/desktop-provision.sh"; then
-  echo "FAIL the desktop provisioner does not install the desktop manifest" >&2
+elif ! grep -qx 'install_manifest /ctx/manifests/packages-desktop.txt' "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh"; then
+  echo "FAIL the desktop build step does not install the desktop manifest" >&2
   failures=$((failures + 1))
 else
   # Reachable shared files only. manifests/packages-common.lock records the
@@ -540,12 +540,14 @@ if ! grep -qF 'wait_for "DUX_USER:${test_user}"' "$boot_smoke" ||
    grep -qF "wait_for 'DUX_PROBE_END'" "$boot_smoke"; then
   echo "FAIL boot-smoke waits on an echoed marker instead of printf output" >&2
   failures=$((failures + 1))
-elif ! grep -qF 'readlink "$portal_mask"' "$desktop_overlay/usr/libexec/dux-atomic/desktop-provision.sh" ||
-     ! grep -qF '= /dev/null' "$desktop_overlay/usr/libexec/dux-atomic/desktop-provision.sh" ||
-     ! grep -qF "trap 'rm -rf \"\$check_root\"' EXIT" "$desktop_overlay/usr/libexec/dux-atomic/desktop-provision.sh" ||
+elif ! grep -qF 'readlink "$portal_mask"' "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh" ||
+     ! grep -qF '= /dev/null' "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh" ||
+     ! grep -qF "trap desktop_cleanup EXIT" "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh" ||
+     ! grep -qF 'copr disable duxlabs/dms' "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh" ||
      ! grep -qF 'cannot read ${path}' "$repo_root/build/manifest.sh" ||
      ! grep -qF 'install_manifest "$manifest"' "$common" ||
-     ! grep -qF 'install_manifest /ctx/manifests/packages-desktop.txt' "$desktop_overlay/usr/libexec/dux-atomic/desktop-provision.sh" ||
+     ! grep -qF 'install_manifest /ctx/manifests/packages-desktop.txt' "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh" ||
+     ! grep -qF '/usr/libexec/dux-atomic/build.d/*.sh' "$common" ||
      grep -qF 'packages-common.txt || true' "$common"; then
   echo "FAIL the greeter mask, the manifest reader or a manifest install does not fail closed" >&2
   failures=$((failures + 1))
@@ -705,14 +707,23 @@ else
 fi
 
 workflow=$repo_root/.github/workflows/ci.yml
+# job_block <name>: print one job from $workflow, so every job assertion reads
+# the block the same way and a renamed job cannot widen one copy silently.
+job_block() {
+  awk -v job="$1" '
+    $0 == "  " job ":" { found = 1; next }
+    found && /^  [a-z][a-z0-9-]*:/ { exit }
+    found { print }
+  ' "$workflow"
+}
 # Assert the NVIDIA CI job and its gating and flags
 if ! grep -qF 'podman build --layers -f Containerfile.nvidia -t localhost/dux-atomic:nvidia' "$workflow" ||
    # Count the verify invocation only inside the image-nvidia job block so an
    # identical invocation in another job does not false-red this check. Extract
    # the job with the same awk region used elsewhere in this file and count the
    # flag inside that block only.
-   image_block=$(awk '/^  image-nvidia:$/ {f=1; next} f && /^  [a-z][a-z0-9-]*:/{exit} f {print}' "$workflow") && \
-   [[ $(grep -cF 'tests/verify-image.sh --no-package-lock' <<<"$image_block") -ne 1 ]] || \
+    image_block=$(job_block image-nvidia) && \
+    [[ $(grep -cF 'tests/verify-image.sh --no-package-lock' <<<"$image_block") -ne 1 ]] || \
    ! grep -qF "tests/verify-image.sh --no-package-lock localhost/dux-atomic:nvidia" "$workflow" ||
    ! grep -qF "if: needs.changes.outputs.nvidia == 'true'" "$workflow" ||
    ! grep -qF "^(Containerfile\\.nvidia$|manifests/packages-nvidia\\.txt$|manifests/packages-common\\.txt$|build/|overlay/|tests/verify-image\\.sh$)" "$workflow" ||
@@ -838,7 +849,7 @@ fi
 
 # The signing job runs repository test code on a PR, so it holds no write token
 # and pins every action; a floating tag would let that run change under it.
-signing_block=$(awk '/^  signing:/{f=1;next} f&&/^  [a-z]/{exit} f' "$workflow")
+    signing_block=$(job_block signing)
 if [[ -z $signing_block ]]; then
   echo "FAIL ci.yml has no signing job" >&2
   failures=$((failures + 1))
@@ -890,9 +901,9 @@ fi
 # ends it. It must hold no OIDC identity, and promotion must wait for it. The
 # digest crosses the job boundary as a job output, so a lost output or a renamed
 # step id would leave verification with an empty digest.
-publish_block=$(awk '/^  publish:/{f=1;next} f&&/^  [a-z]/{exit} f' "$workflow")
-verify_block=$(awk '/^  verify:/{f=1;next} f&&/^  [a-z]/{exit} f' "$workflow")
-promote_block=$(awk '/^  promote:/{f=1;next} f&&/^  [a-z]/{exit} f' "$workflow")
+    publish_block=$(job_block publish)
+    verify_block=$(job_block verify)
+    promote_block=$(job_block promote)
 if [[ -z $publish_block ]] ||
    ! grep -qF 'digest: ${{ steps.push.outputs.digest }}' <<<"$publish_block" ||
    ! grep -qF 'id: push' <<<"$publish_block" ||

@@ -74,10 +74,12 @@ install -d /etc/flatpak/remotes.d
 curl --retry 3 -fsSLo /etc/flatpak/remotes.d/flathub.flatpakrepo \
   https://dl.flathub.org/repo/flathub.flatpakrepo
 
-# The desktop is optional and entirely its own: the module ships this
-# provisioner inside overlay/desktop/, so a tree without that subtree installs
-# no desktop and runs nothing here. The shared build knows the path and no
-# desktop package, unit or command.
-if [[ -f /usr/libexec/dux-atomic/desktop-provision.sh ]]; then
-  bash /usr/libexec/dux-atomic/desktop-provision.sh
-fi
+# Any module may ship build-time steps under
+# overlay/*/usr/libexec/dux-atomic/build.d/. They run in name order after the
+# shared install, so a module owns its repositories, its packages, its presets
+# and its checks, and this build names none of them. A tree with no module has
+# no steps and installs no desktop.
+for step in /usr/libexec/dux-atomic/build.d/*.sh; do
+  [[ -e $step ]] || continue
+  bash "$step"
+done

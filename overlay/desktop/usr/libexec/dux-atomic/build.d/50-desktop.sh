@@ -1,15 +1,26 @@
 #!/bin/bash
-# Build-time desktop provisioning. The shared build runs this only when the
-# module ships it, so everything a desktop needs lives with the desktop. It
-# reads the module's manifest from the build context, so the desktop's
-# repositories, packages and presets are one unit. A variant replaces this file
-# together with the rest of overlay/desktop/.
+# Build-time desktop step. The shared build runs every script under
+# /usr/libexec/dux-atomic/build.d/ in name order, so the desktop's repositories,
+# packages, presets and checks travel with the desktop and the shared build
+# names none of them. A variant replaces this file with the rest of
+# overlay/desktop/.
 set -ouex pipefail
 
 # The desktop packages come from the Dux COPRs. duxlabs/dms pulls
-# duxlabs/dux-repo, which also carries the terminal and the shell.
+# duxlabs/dux-repo, which also carries the terminal and the shell. They are
+# third-party, so they stay enabled only while this step needs them: the trap
+# below disables them on every exit, including a failed check, so no layer
+# commits with them enabled.
 dnf5 -y copr enable duxlabs/dms
 dnf5 -y copr enable duxlabs/dux-repo
+
+check_root=
+desktop_cleanup() {
+  [[ -z ${check_root:-} ]] || rm -rf "$check_root"
+  dnf5 -y copr disable duxlabs/dms >/dev/null || true
+  dnf5 -y copr disable duxlabs/dux-repo >/dev/null || true
+}
+trap desktop_cleanup EXIT
 
 source /ctx/build/manifest.sh
 install_manifest /ctx/manifests/packages-desktop.txt
@@ -92,8 +103,6 @@ done
 # runtime /var content. The passwd and group copies let tmpfiles resolve owner
 # names against the scratch root.
 check_root=$(mktemp -d)
-# Remove the scratch root on any exit, including a failed assertion.
-trap 'rm -rf "$check_root"' EXIT
 mkdir -p "$check_root/etc"
 cp /etc/passwd /etc/group "$check_root/etc/"
 systemd-tmpfiles --create --root="$check_root" /usr/lib/tmpfiles.d/dux-atomic-greetd.conf || {
@@ -114,13 +123,9 @@ test "$(stat -c %U:%G "$check_root/var/lib/greeter")" = "greeter:greeter" || {
   exit 1
 }
 rm -rf "$check_root"
-trap - EXIT
-
-# Leave the COPRs disabled in the final image.
-dnf5 -y copr disable duxlabs/dms
-dnf5 -y copr disable duxlabs/dux-repo
+check_root=
 
 # Enable the greeter. The package ships /etc/greetd/config.toml already
 # pointing at the greeter with the compositor; the enable helper needs a live
-# user.
+# user. The exit trap then disables the COPRs.
 systemctl enable greetd

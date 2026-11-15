@@ -28,6 +28,7 @@ fi
 
 bash_scripts=(
   build/common.sh
+  build/manifest.sh
   build/install-packages.sh
   build/package-lock.sh
   build/compare-lock.sh
@@ -44,6 +45,7 @@ bash_scripts=(
   tests/verify-kernel-signature.sh
   tests/vm/boot-smoke.sh
   tests/vm/make-disk.sh
+  overlay/desktop/usr/libexec/dux-atomic/build.d/50-desktop.sh
 )
 posix_scripts=(
   overlay/desktop/usr/libexec/dux-atomic/needs-setup.sh

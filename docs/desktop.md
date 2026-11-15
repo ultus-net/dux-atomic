@@ -16,13 +16,13 @@ The desktop is two paths and nothing else:
 the image's paths: `overlay/desktop/usr/lib/systemd/user/x.service` lands at
 `/usr/lib/systemd/user/x.service`.
 
-The shared build knows three facts about the module: the subtree may exist, the
-manifest path, and the provisioner path `/usr/libexec/dux-atomic/desktop-provision.sh`.
-It names no desktop package, unit or command. The provisioner is the module's
-build step: it enables the module's repositories, installs
-`manifests/packages-desktop.txt` through `build/manifest.sh`, applies the user
-presents, asserts the module's own wiring, leaves the repositories disabled and
-enables the greeter.
+The shared build knows two facts about the module: the subtree may exist, and a
+module may ship build steps under `/usr/libexec/dux-atomic/build.d/`, which it
+runs in name order. It names no desktop package, unit or command. The desktop's
+step is `overlay/desktop/usr/libexec/dux-atomic/build.d/50-desktop.sh`: it
+enables the module's repositories, installs `manifests/packages-desktop.txt`
+through `build/manifest.sh`, applies the user presets, asserts the module's own
+wiring, leaves the repositories disabled and enables the greeter.
 
 ## Swapping the desktop
 
@@ -31,9 +31,11 @@ A swap replaces four paths:
 1. `manifests/packages-desktop.txt`: the new package set.
 2. `overlay/desktop/`: delete the old subtree and add the new desktop's files at
    the same relative paths.
-3. `overlay/desktop/usr/libexec/dux-atomic/desktop-provision.sh`: the new
-   desktop's build step. Keep the repository enable, manifest install, preset,
-   assertion, repository disable and greeter enable in that order.
+3. `overlay/desktop/usr/libexec/dux-atomic/build.d/50-desktop.sh`: the new
+   desktop's build step. Enable its repositories, install its manifest, apply its
+   presets, assert its wiring, then enable its greeter, with an exit trap that
+   disables the repositories on every path, so a failed build cannot commit a
+   layer with third-party repositories enabled.
 4. `tests/test-static.sh` and `docs/first-login.md`: the module's fixtures (the
    product-name list the leak check uses and the first-login cases) and the
    description of what a first login does.
@@ -47,7 +49,7 @@ repositories and every shared package stay as they are.
 `tests/test-static.sh` and `tests/verify-image.sh` assert the contract, not the
 product, so these survive a swap:
 
-- the module ships both halves, and its provisioner installs its manifest;
+- the module ships both halves, and its build step installs its manifest;
 - no desktop product name appears in the shared build, the shared manifest, the
   `Containerfile` or `tests/verify-image.sh`;
 - every user unit in the module refuses root and the greeter account, and is
@@ -56,10 +58,11 @@ product, so these survive a swap:
   timeout, and writes a completion marker;
 - the greeter seed is JSON that names a session;
 - every binding in the module names an absolute unit path;
-- in the image: every unit the image's own user preset enables exists and
-  passes `systemd-analyze verify`, every binding resolves, the greeter command
-  and a session entry name executables, and first-login setup is ordered,
-  bounded and idempotent.
+- in the image: every unit the image ships outside a package, and every unit its
+  own user preset enables, passes `systemd-analyze verify`; every binding
+  resolves; the greeter command and a session entry name executables; and
+  first-login setup is gated on an executable condition, ordered before the
+  session, bounded by a start timeout, and marks completion.
 
 A swap that breaks one of those reds the suite, which is the point: the
 assertions describe what a desktop has to do, not which desktop is installed.
