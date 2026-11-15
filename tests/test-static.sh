@@ -646,14 +646,21 @@ else
   echo "ok   the overlay ships a closed firewalld baseline and the verifier reads it back"
 fi
 
+# job_block <name>: print one job from $workflow, so every job assertion reads
+# the block the same way and a renamed job cannot widen one copy silently.
 workflow=$repo_root/.github/workflows/ci.yml
+job_block() {
+  awk -v job="$1" '
+    $0 == "  " job ":" { found = 1; next }
+    found && /^  [a-z][a-z0-9-]*:/ { exit }
+    found { print }
+  ' "$workflow"
+}
 # Assert the NVIDIA CI job and its gating and flags
 if ! grep -qF 'podman build --layers -f Containerfile.nvidia -t localhost/dux-atomic:nvidia' "$workflow" ||
    # Count the verify invocation only inside the image-nvidia job block so an
-   # identical invocation in another job does not false-red this check. Extract
-   # the job with the same awk region used elsewhere in this file and count the
-   # flag inside that block only.
-   image_block=$(awk '/^  image-nvidia:$/ {f=1; next} f && /^  [a-z][a-z0-9-]*:/{exit} f {print}' "$workflow") && \
+   # identical invocation in another job does not false-red this check.
+   image_block=$(job_block image-nvidia) && \
    [[ $(grep -cF 'tests/verify-image.sh --no-package-lock' <<<"$image_block") -ne 1 ]] || \
    ! grep -qF "tests/verify-image.sh --no-package-lock localhost/dux-atomic:nvidia" "$workflow" ||
    ! grep -qF "if: needs.changes.outputs.nvidia == 'true'" "$workflow" ||
@@ -780,7 +787,7 @@ fi
 
 # The signing job runs repository test code on a PR, so it holds no write token
 # and pins every action; a floating tag would let that run change under it.
-signing_block=$(awk '/^  signing:/{f=1;next} f&&/^  [a-z]/{exit} f' "$workflow")
+signing_block=$(job_block signing)
 if [[ -z $signing_block ]]; then
   echo "FAIL ci.yml has no signing job" >&2
   failures=$((failures + 1))
@@ -832,9 +839,9 @@ fi
 # ends it. It must hold no OIDC identity, and promotion must wait for it. The
 # digest crosses the job boundary as a job output, so a lost output or a renamed
 # step id would leave verification with an empty digest.
-publish_block=$(awk '/^  publish:/{f=1;next} f&&/^  [a-z]/{exit} f' "$workflow")
-verify_block=$(awk '/^  verify:/{f=1;next} f&&/^  [a-z]/{exit} f' "$workflow")
-promote_block=$(awk '/^  promote:/{f=1;next} f&&/^  [a-z]/{exit} f' "$workflow")
+publish_block=$(job_block publish)
+verify_block=$(job_block verify)
+promote_block=$(job_block promote)
 if [[ -z $publish_block ]] ||
    ! grep -qF 'digest: ${{ steps.push.outputs.digest }}' <<<"$publish_block" ||
    ! grep -qF 'id: push' <<<"$publish_block" ||
