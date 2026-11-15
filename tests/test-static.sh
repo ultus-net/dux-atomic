@@ -659,10 +659,8 @@ job_block() {
 # Assert the NVIDIA CI job and its gating and flags
 if ! grep -qF 'podman build --layers -f Containerfile.nvidia -t localhost/dux-atomic:nvidia' "$workflow" ||
    # Count the verify invocation only inside the image-nvidia job block so an
-   # identical invocation in another job does not false-red this check. Extract
-   # the job with the same awk region used elsewhere in this file and count the
-   # flag inside that block only.
-    image_block=$(job_block image-nvidia) && \
+   # identical invocation in another job does not false-red this check.
+   image_block=$(job_block image-nvidia) && \
    [[ $(grep -cF 'tests/verify-image.sh --no-package-lock' <<<"$image_block") -ne 1 ]] || \
    ! grep -qF "tests/verify-image.sh --no-package-lock localhost/dux-atomic:nvidia" "$workflow" ||
    ! grep -qF "if: needs.changes.outputs.nvidia == 'true'" "$workflow" ||
@@ -789,7 +787,7 @@ fi
 
 # The signing job runs repository test code on a PR, so it holds no write token
 # and pins every action; a floating tag would let that run change under it.
-    signing_block=$(job_block signing)
+signing_block=$(job_block signing)
 if [[ -z $signing_block ]]; then
   echo "FAIL ci.yml has no signing job" >&2
   failures=$((failures + 1))
@@ -841,9 +839,9 @@ fi
 # ends it. It must hold no OIDC identity, and promotion must wait for it. The
 # digest crosses the job boundary as a job output, so a lost output or a renamed
 # step id would leave verification with an empty digest.
-    publish_block=$(job_block publish)
-    verify_block=$(job_block verify)
-    promote_block=$(job_block promote)
+publish_block=$(job_block publish)
+verify_block=$(job_block verify)
+promote_block=$(job_block promote)
 if [[ -z $publish_block ]] ||
    ! grep -qF 'digest: ${{ steps.push.outputs.digest }}' <<<"$publish_block" ||
    ! grep -qF 'id: push' <<<"$publish_block" ||
