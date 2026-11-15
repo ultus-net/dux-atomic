@@ -27,13 +27,13 @@ Status: active. Supersedes the unstarted tasks in `2026-11-09-dux-atomic-candida
 
 | Area | State | Evidence |
 | --- | --- | --- |
-| `main` | `5ea293d`, clean, three open work items before this roadmap (#4, #68, #69) | `git log -1` |
+| `main` | `caffce3`, clean as of 2026-11-15; open work items are #4, #68, #69, #94, #95, #96 | `git log -1` |
 | Base image | Fedora `fedora-bootc:45`, digest-pinned, signed kernel asserted in CI | #59, #65 |
 | Desktop | niri, DMS, greeter, Ghostty, Xfce fallback; first login provisions the DMS session | `docs/first-login.md` |
-| Developer tooling | In review on `feature/dev-sysadmin-tooling`: compiler, Node 22 with npm, btop, diagnostics set, Node contract in `tests/verify-image.sh` | #67 |
+| Developer tooling | Landed: compiler, Node 22 with npm, btop, diagnostics set, and the Node contract asserted in `tests/verify-image.sh` | #67 |
 | Gaming | Steam in the image; no game launched from a built image; Lutris not shipped | #69, `docs/known-gaps.md` |
 | NVIDIA variant | The variant has its own pinned `FROM`, a local build carries the five compiled modules, and it is not published; tracker #94 | #94 |
-| Agent isolation | Not built | #71 |
+| Agent isolation | Built: `build/agent-container.sh` runs an agent rootless with only the project mounted, and `tests/test-agent-container.sh` reds on a forbidden mount | #71, `docs/research/2026-11-14-agent-container.md` |
 | Home snapshots | Not built | #68 |
 | Publication | Signed digest, SBOM and provenance attested, `:latest` moves on manual promotion | #63, `docs/ci.md` |
 | Secure Boot | Policy decided, no boot with it enabled recorded | `docs/known-gaps.md` |
@@ -131,6 +131,8 @@ Files: `Containerfile.nvidia`, `manifests/packages-nvidia.txt`, `build/build-nvi
 Acceptance: the variant builds from its own pin, the module policy is recorded, and no Secure Boot claim is made until a boot is recorded.
 
 ## Task 7: project-scoped agent container (#71)
+
+Status: closed 2026-11-14 (issue #71); `build/agent-container.sh` and `tests/test-agent-container.sh` run in `tests/lint.sh`, and `docs/research/2026-11-14-agent-container.md` records a run on a built image.
 
 Files: `build/agent-container.sh`, `tests/test-agent-container.sh`, `docs/agent-container.md`, `docs/developer-tooling.md`.
 
