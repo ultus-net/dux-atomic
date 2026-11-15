@@ -267,13 +267,12 @@ jobs:
 
       - name: Check the variant manifest resolved
         run: |
-          # Query each manifest line by name (handles plain and arch-qualified names).
-          podman run --rm localhost/dux-atomic:nvidia /bin/bash -lc '
-            set -o pipefail
-            while IFS= read -r name; do
-              rpm -q "$name" >/dev/null 2>&1 || { echo "FAIL a name from manifests/packages-nvidia.txt does not resolve in the variant: $name" >&2; exit 1; }
-            done < <(grep -Ev "^[[:space:]]*(#.*)?$" manifests/packages-nvidia.txt)
-          '
+          # The manifest is read here: the final image has no manifests/ directory.
+          # rpm -q accepts name.arch, which --whatprovides does not, and exits 1
+          # naming every name that is not installed.
+          mapfile -t names < <(grep -Ev '^[[:space:]]*(#.*)?$' manifests/packages-nvidia.txt)
+          podman run --rm localhost/dux-atomic:nvidia rpm -q "${names[@]}" ||
+            { echo "FAIL a name from manifests/packages-nvidia.txt does not resolve in the variant" >&2; exit 1; }
 
   # The only job with write token and OIDC identity. It checks out the repository
   # for the shared package installer and never builds image content: it loads the

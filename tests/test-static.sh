@@ -562,11 +562,11 @@ if ! grep -qF 'podman build --layers -f Containerfile.nvidia -t localhost/dux-at
    ! grep -qF "tests/verify-image.sh --no-package-lock localhost/dux-atomic:nvidia" "$workflow" ||
    ! grep -qF "if: needs.changes.outputs.nvidia == 'true'" "$workflow" ||
    ! grep -qF "^(Containerfile\\.nvidia$|manifests/packages-nvidia\\.txt$|manifests/packages-common\\.txt$|build/|overlay/|tests/verify-image\\.sh$)" "$workflow" ||
-   # Pin the NVIDIA variant manifest check to the loop that queries each
-   # manifest line with rpm -q (handles plain and arch-qualified names).
-   ! grep -qF 'podman run --rm localhost/dux-atomic:nvidia /bin/bash -lc' "$workflow" ||
-   ! grep -qF 'while IFS= read -r name' "$workflow" ||
-    ! grep -qF 'rpm -q "$name"' "$workflow"; then
+   # The variant manifest check reads the manifest on the runner and passes its
+   # names to rpm as arguments, so an arch-qualified name resolves and a missing
+   # one names itself on stderr.
+   ! grep -qF 'mapfile -t names < <(grep -Ev' "$workflow" ||
+   ! grep -qF 'podman run --rm localhost/dux-atomic:nvidia rpm -q "${names[@]}"' "$workflow"; then
   echo "FAIL ci.yml does not carry the gated image-nvidia job, the exact filter regex, or the single --no-package-lock on its verify line" >&2
   failures=$((failures + 1))
 elif ! grep -qF 'github.event.before' "$workflow" || ! grep -qF 'if [[ -z "\$before" || "\$before" =~ ^0+$ ]]' "$workflow"; then
