@@ -2,9 +2,18 @@
 # Run the built image's own lint and unit verification, then compare the
 # installed third-party packages against manifests/packages-common.lock.
 #
-#   tests/verify-image.sh [image]
+#   tests/verify-image.sh [--no-package-lock] [image]
 
 set -euo pipefail
+
+# Parse optional leading flags
+no_lock=0
+while [[ ${1:-} == --* ]]; do
+  case "$1" in
+    --no-package-lock) no_lock=1; shift ;;
+    --*) echo "Usage: ${BASH_SOURCE[0]} [--no-package-lock] [image]" >&2; exit 2 ;;
+  esac
+done
 
 image=${1:-localhost/dux-atomic:dev}
 runtime=${CONTAINER_RUNTIME:-podman}
@@ -72,27 +81,31 @@ fi
 # Fedora updates bump must not red this gate. A +git build tracks an upstream
 # branch and cannot be pinned; the generator leaves it out and the VM boot
 # test covers a broken one.
-lock=$repo_root/manifests/packages-common.lock
-expected=$(grep -vE '^(#|$)' "$lock" || true)
-if [[ -z $expected ]]; then
-  echo "FAIL the package lock has no third-party lines to compare" >&2
-  exit 1
-fi
-# A nonzero status here means the generator or the image is broken, not that the
-# lock drifted, so keep the two diagnoses apart. The comparison lives in
-# build/compare-lock.sh so tests/test-lock-drift.sh can exercise it with no
-# image: its status 2 is the failed measurement, its status 1 is drift.
-if ! raw=$(CONTAINER_RUNTIME=$runtime "$repo_root/build/package-lock.sh" "$image"); then
-  echo "FAIL the lock measurement failed; the generator or the image is broken" >&2
-  exit 1
-fi
-compare_status=0
-compare_detail=$("$repo_root/build/compare-lock.sh" "$lock" <(printf '%s\n' "$raw") 2>&1) || compare_status=$?
-if ((compare_status == 1)); then
-  echo "FAIL the third-party package lock drifted; run 'just lock'" >&2
-  printf '%s\n' "$compare_detail" >&2
-  exit 1
-elif ((compare_status != 0)); then
-  echo "FAIL the lock measurement failed; the generator or the image is broken" >&2
-  exit 1
+if (( no_lock == 1 )); then
+  echo "ok   package lock comparison skipped (--no-package-lock)"
+else
+  lock=$repo_root/manifests/packages-common.lock
+  expected=$(grep -vE '^(#|$)' "$lock" || true)
+  if [[ -z $expected ]]; then
+    echo "FAIL the package lock has no third-party lines to compare" >&2
+    exit 1
+  fi
+  # A nonzero status here means the generator or the image is broken, not that the
+  # lock drifted, so keep the two diagnoses apart. The comparison lives in
+  # build/compare-lock.sh so tests/test-lock-drift.sh can exercise it with no
+  # image: its status 2 is the failed measurement, its status 1 is drift.
+  if ! raw=$(CONTAINER_RUNTIME=$runtime "$repo_root/build/package-lock.sh" "$image"); then
+    echo "FAIL the lock measurement failed; the generator or the image is broken" >&2
+    exit 1
+  fi
+  compare_status=0
+  compare_detail=$("$repo_root/build/compare-lock.sh" "$lock" <(printf '%s\n' "$raw") 2>&1) || compare_status=$?
+  if ((compare_status == 1)); then
+    echo "FAIL the third-party package lock drifted; run 'just lock'" >&2
+    printf '%s\n' "$compare_detail" >&2
+    exit 1
+  elif ((compare_status != 0)); then
+    echo "FAIL the lock measurement failed; the generator or the image is broken" >&2
+    exit 1
+  fi
 fi
