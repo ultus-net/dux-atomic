@@ -1,7 +1,6 @@
 #!/bin/bash
-# The one manifest installer, sourced by the shared build and by a desktop
-# module's provisioner so both take the same read-failure and word-splitting
-# rules.
+# The one manifest installer, sourced by the shared build and by a module's
+# build step so both take the same read-failure and word-splitting rules.
 
 # install_manifest <path>
 install_manifest() {

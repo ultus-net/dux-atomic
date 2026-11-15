@@ -3,7 +3,7 @@
 # /usr/libexec/dux-atomic/build.d/ in name order, so the desktop's repositories,
 # packages, presets and checks travel with the desktop and the shared build
 # names none of them. A variant replaces this file with the rest of
-# overlay/desktop/.
+# modules/desktop/.
 set -ouex pipefail
 
 # The desktop packages come from the Dux COPRs. duxlabs/dms pulls

@@ -1,17 +1,20 @@
 #!/bin/bash
 # Common image build: apply the overlay, install the shared package set, then
-# hand over to an optional desktop module. Runs inside the image with /ctx
-# holding the build context.
+# hand over to any module. Runs inside the image with /ctx holding the build
+# context.
 
 set -ouex pipefail
 
 cp -avf /ctx/overlay/. /
-# A desktop module ships its files under overlay/desktop/ and is copied last, so
-# a module provided by a variant replaces those paths wholesale. The copy is
-# skipped when the module is absent, which is what makes a headless build work.
-if [[ -d /ctx/overlay/desktop ]]; then
-  cp -avf /ctx/overlay/desktop/. /
-fi
+# A module ships a tree under modules/<name>/ that mirrors /, and each one is
+# copied onto / so a variant replaces a whole module by providing its directory.
+# Modules are copied after the shared overlay and never into it, so no module
+# tree lands in the image as a stray directory. A tree with no module copies
+# nothing and runs no extra step.
+for module in /ctx/modules/*/; do
+  [[ -d $module ]] || continue
+  cp -avf "$module." /
+done
 
 # The Fedora base ships dnf5 without its plugins, and `copr` is a plugin
 # subcommand. Install it before any repository work.
@@ -74,11 +77,10 @@ install -d /etc/flatpak/remotes.d
 curl --retry 3 -fsSLo /etc/flatpak/remotes.d/flathub.flatpakrepo \
   https://dl.flathub.org/repo/flathub.flatpakrepo
 
-# Any module may ship build-time steps under
-# overlay/*/usr/libexec/dux-atomic/build.d/. They run in name order after the
-# shared install, so a module owns its repositories, its packages, its presets
-# and its checks, and this build names none of them. A tree with no module has
-# no steps and installs no desktop.
+# A module may ship build-time steps under /usr/libexec/dux-atomic/build.d/.
+# They run in name order after the shared install, so a module owns its
+# repositories, its packages, its presets and its checks, and this build names
+# none of them. A tree with no module has no steps to run.
 for step in /usr/libexec/dux-atomic/build.d/*.sh; do
   [[ -e $step ]] || continue
   bash "$step"

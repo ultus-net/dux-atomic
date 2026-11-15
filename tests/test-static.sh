@@ -323,7 +323,7 @@ else
   echo "ok   docs/developer-tooling.md inventories all 23 Brewfile names in order and links the measurement"
 fi
 
-# The desktop is one module: manifests/packages-desktop.txt plus overlay/desktop/.
+# The desktop is one module: manifests/packages-desktop.txt plus modules/desktop/.
 # A swap replaces those two paths and a headless build deletes them, so pin the
 # seam rather than the product. The invariant: the shared build, the shared
 # manifest, the image definition and the image verifier name no desktop product;
@@ -331,11 +331,11 @@ fi
 # may. The properties below are the ones any desktop must keep, so they survive
 # a swap.
 desktop_manifest=$repo_root/manifests/packages-desktop.txt
-desktop_overlay=$repo_root/overlay/desktop
+desktop_overlay=$repo_root/modules/desktop
 desktop_names='dms|dms-greeter|niri|ghostty|quickshell|matugen|dux-search|dux-calendar|dux-files'
 leaks=
 if [[ ! -f $desktop_manifest ]] || [[ ! -d $desktop_overlay ]]; then
-  echo "FAIL the desktop module needs both manifests/packages-desktop.txt and overlay/desktop/" >&2
+  echo "FAIL the desktop module needs both manifests/packages-desktop.txt and modules/desktop/" >&2
   failures=$((failures + 1))
 elif ! grep -qx 'install_manifest /ctx/manifests/packages-desktop.txt' "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh"; then
   echo "FAIL the desktop build step does not install the desktop manifest" >&2
@@ -353,7 +353,8 @@ else
     echo "$repo_root/manifests/packages-common.txt"
     echo "$repo_root/tests/verify-image.sh"
     find "$repo_root/build" -type f -print
-    find "$repo_root/overlay" -path "$desktop_overlay" -prune -o -type f -print
+    find "$repo_root/overlay" -type f -print
+    find "$repo_root/modules" -path "$desktop_overlay" -prune -o -type f -print
   )
   if [[ -n $leaks ]]; then
     echo "FAIL the shared build names a desktop product outside the module:" >&2
@@ -447,7 +448,7 @@ fi
 # module paths reds here until the document says otherwise.
 if [[ ! -f $repo_root/docs/desktop.md ]] ||
    ! grep -qF 'manifests/packages-desktop.txt' "$repo_root/docs/desktop.md" ||
-   ! grep -qF 'overlay/desktop/' "$repo_root/docs/desktop.md"; then
+   ! grep -qF 'modules/desktop/' "$repo_root/docs/desktop.md"; then
   echo "FAIL docs/desktop.md is missing or does not name both module paths" >&2
   failures=$((failures + 1))
 else
@@ -456,7 +457,7 @@ fi
 
 # The first-login condition decides retry vs skip. Run the real script against
 # one fixture per case so a change in its logic is visible without a VM.
-condition=$repo_root/overlay/desktop/usr/libexec/dux-atomic/needs-setup.sh
+condition=$repo_root/modules/desktop/usr/libexec/dux-atomic/needs-setup.sh
 if ! grep -qF '${XDG_STATE_HOME:-$HOME/.local/state}' "$condition"; then
   echo "FAIL needs-setup.sh does not match the unit's %S marker path" >&2
   failures=$((failures + 1))

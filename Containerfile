@@ -9,13 +9,15 @@
 # trusts the whole chain with no per-machine MOK enrollment, and the base
 # carries no desktop environment to strip (#59). Every package the image needs
 # is named in a manifest under manifests/; the desktop's set is
-# manifests/packages-desktop.txt and the rest is the headless baseline.
+# manifests/packages-desktop.txt, the rest is the headless baseline, and the
+# desktop's files live under modules/desktop/.
 
 # Allow build scripts to be referenced without being copied into the final image.
 FROM scratch AS ctx
 COPY build /build
 COPY manifests /manifests
 COPY overlay /overlay
+COPY modules /modules
 
 # The base is pinned to a digest, and the tag stays for readers. The pin is a
 # literal rather than an ARG: Dependabot reads a file whose name matches

@@ -111,17 +111,17 @@ echo "ok   the desktop contract holds: image units verify, bindings resolve, the
 # overlay is proven to land where systemd and the session look. The paths come
 # from the tree, not from a list of product names, so a swapped desktop is
 # covered by the same assertion.
-module_overlay=$repo_root/overlay/desktop
+module_overlay=$repo_root/modules/desktop
 if [[ -d $module_overlay ]]; then
   mapfile -t module_paths < <(cd "$module_overlay" && find . \( -type f -o -type l \) -printf '/%P\n' | sort)
-  ((${#module_paths[@]} > 0)) || { echo "FAIL overlay/desktop/ is empty" >&2; exit 1; }
+  ((${#module_paths[@]} > 0)) || { echo "FAIL modules/desktop/ is empty" >&2; exit 1; }
   missing=$(printf '%s\n' "${module_paths[@]}" |
     "$runtime" run --rm -i "$image" bash -c 'while read -r path; do [[ -e $path ]] || echo "$path"; done')
   if [[ -n $missing ]]; then
     echo "FAIL the desktop module ships paths the image does not carry:"$'\n'"$missing" >&2
     exit 1
   fi
-  echo "ok   every path in overlay/desktop/ is present in the image (${#module_paths[@]} paths)"
+  echo "ok   every path in modules/desktop/ is present in the image (${#module_paths[@]} paths)"
 fi
 # The pinned base's /etc/dnf/dnf.conf carries only a comment and [main], and the
 # overlay replaces it with the linutil Configure DNF defaults (#111). Ask dnf5
