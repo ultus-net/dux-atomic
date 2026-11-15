@@ -35,6 +35,32 @@ jobs:
       - name: Lint and static checks
         run: tests/lint.sh
 
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      nvidia: ${{ steps.filter.outputs.nvidia }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: filter
+        name: Path filter for NVIDIA variant
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" != 'pull_request' ]]; then
+            echo "nvidia=true" >> "$GITHUB_OUTPUT"
+          else
+            # Diff the PR range against base and set the output when any path matches
+            if git diff --name-only "${{ github.event.pull_request.base.sha }}...HEAD" | grep -Eq '^(Containerfile\.nvidia$|manifests/packages-nvidia\.txt$|manifests/packages-common\.txt$|build/|overlay/|tests/verify-image\.sh$)'; then
+              echo "nvidia=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "nvidia=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
   # Proves the signature policy mechanism with a fixture key on a throwaway
   # registry. No image artifact and no OIDC identity: the shipped keyless policy
   # stays deferred, see docs/known-gaps.md.
@@ -195,6 +221,38 @@ jobs:
   # for the shared package installer and never builds image content: it loads the
   # artifact built above and pushes it. Run 43082564852 failed this job with exit
   # 127 because the install step ran with no checkout present (#52).
+  image-nvidia:
+    needs: [static, changes]
+    if: needs.changes.outputs.nvidia == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Free runner disk space
+        uses: jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 # v2.0.0
+        with:
+          preinstalled-runtimes: false
+          android: true
+          dotnet: true
+          haskell: true
+          swap-storage: true
+
+      - name: Install podman
+        run: build/install-packages.sh podman
+
+      - name: Build the NVIDIA variant
+        run: podman build --layers -f Containerfile.nvidia -t localhost/dux-atomic:nvidia .
+
+      - name: Verify the variant
+        run: tests/verify-image.sh --no-package-lock localhost/dux-atomic:nvidia
+
+      - name: Check the variant manifest resolved
+        run: |
+          # shellcheck disable=SC2046 # Word splitting is intended: the manifest is one name per line.
+          podman run --rm localhost/dux-atomic:nvidia rpm -q --whatprovides $(grep -Ev '^[[:space:]]*(#.*)?$' manifests/packages-nvidia.txt) || { echo "FAIL a name from manifests/packages-nvidia.txt does not resolve in the variant" >&2; exit 1; }
   publish:
     needs: image
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish || inputs.promote)
