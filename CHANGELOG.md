@@ -1,7 +1,6 @@
 # Changelog
 
 ## Unreleased
--
 - Audit linutil's catalogue at `2026.11.14` (`docs/research/2026-11-15-linutil-catalog-audit.md`): most entries are unreachable on a Fedora bootc image because linutil hides them behind a package-manager precondition, and three gaps are tracked as #111, #112 and #116.
 - Correct three roadmap rows that no longer matched the repository: `main` is `caffce3` with six open work items, the developer tooling layer landed in #67 instead of sitting in review, and the agent container is built with a recorded run in #71. Adds Task 7's missing status line. No behaviour change.
 - Serve the base pin from `registry.fedoraproject.org/fedora-bootc:45` instead of `quay.io/fedora/fedora-bootc:45` (#74). Quay deletes the previous daily digest about 24 hours after the next `45` build lands, so a clean pull of an older pin fails with `manifest unknown` before any build step runs. A `HEAD` for the pinned index `sha256:42259b1d…a56453` returns 404 on quay and 200 on Fedora's registry, including the `amd64` child the build pulls. The same expiry broke CI on 14 November, so this is the second day in a row. The digest is unchanged, so the image content does not move; only the registry that serves it. `tests/test-static.sh` requires the durable registry, so a later bump cannot quietly return to quay.
