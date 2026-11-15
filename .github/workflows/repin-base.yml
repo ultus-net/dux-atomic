@@ -1,0 +1,117 @@
+name: repin-base
+
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'If true, apply the resolved digest by opening a PR. Otherwise only probe.'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  repin:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install skopeo
+        run: sudo apt-get update && sudo apt-get install -y skopeo
+
+      - name: Parse pinned FROM line
+        id: parse
+        run: |
+          set -euo pipefail
+          repo_root="$GITHUB_WORKSPACE"
+          # Extract the single anchored FROM line and fail loudly if absent.
+          line=$(grep -E '^FROM registry\.fedoraproject\.org/fedora-bootc:[0-9]+@sha256:[0-9a-f]{64}$' "$repo_root/Containerfile" ) || true
+          if [[ -z "$line" ]]; then
+            echo "Containerfile missing expected pin line" >&2
+            exit 1
+          fi
+          tag=$(echo "$line" | sed -E 's/^FROM registry\.fedoraproject\.org\/fedora-bootc:([0-9]+)@sha256:.+$/\1/')
+          digest=$(echo "$line" | sed -E 's/^FROM registry\.fedoraproject\.org\/fedora-bootc:[0-9]+@sha256:([0-9a-f]{64})$/\1/')
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          # Ensure any sibling Containerfile pins the same digest.
+          if ! grep -qx "FROM registry.fedoraproject.org/fedora-bootc:${tag}@sha256:${digest}" "$repo_root/Containerfile.nvidia"; then
+            echo "Containerfile.nvidia has a different digest" >&2
+            exit 1
+          fi
+
+      - name: Probe registry for the pinned digest (read-only probe)
+        id: inspect
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          skopeo inspect --raw "docker://registry.fedoraproject.org/fedora-bootc:${{ steps.parse.outputs.tag }}@sha256:${{ steps.parse.outputs.digest }}" > /dev/null
+
+      - name: Resolved pin notice
+        if: ${{ steps.inspect.outcome == 'success' }}
+        run: |
+          echo "::notice::pin ok: ${{ steps.parse.outputs.tag }}@${{ steps.parse.outputs.digest }}"
+
+      - name: Resolve current tag digest
+        id: resolve
+        if: ${{ steps.inspect.outcome != 'success' }}
+        run: |
+          set -euo pipefail
+          new=$(skopeo inspect --format '{{.Digest}}' "docker://registry.fedoraproject.org/fedora-bootc:${{ steps.parse.outputs.tag }}")
+          echo "new=$new" >> "$GITHUB_OUTPUT"
+
+      - name: Fail probe on a dead pin when not allowed to apply
+        if: ${{ steps.inspect.outcome != 'success' && !(github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.apply == 'true')) }}
+        run: |
+          echo "dead pin detected and not allowed to apply; failing probe" >&2
+          exit 1
+
+      - name: Rewrite Containerfiles and open a PR
+        if: ${{ steps.inspect.outcome != 'success' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.apply == 'true')) }}
+        env:
+          GIT_AUTHOR_NAME: "github-actions[bot]"
+          GIT_AUTHOR_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          repo_root="$GITHUB_WORKSPACE"
+          tag="${{ steps.parse.outputs.tag }}"
+          old="${{ steps.parse.outputs.digest }}"
+          new_full="${{ steps.resolve.outputs.new }}"
+          # new_full is of the form sha256:xxxxxxxx...
+          new_short=$(printf '%s' "$new_full" | sed -E 's/^sha256:([0-9a-f]{64})$/\1/' | cut -c1-12)
+          branch="chore/repin-base-$(date -u +%Y%m%d-%H%M)"
+
+          # If the resolved digest equals the pinned digest, treat this as a transient probe error.
+          if [[ "$new_full" == "sha256:${old}" ]]; then
+            echo "Probe error: skopeo inspect failed but the tag still resolves to the pinned digest: pinned=sha256:${old}, resolved=${new_full}" >&2
+            exit 1
+          fi
+
+          # Build the commit message file (subject + blank line + body) and use it for git commit and PR body.
+          commit_msg_subject="chore: re-pin the base to ${new_short} (#102)"
+          body_file="$RUNNER_TEMP/repin_body.txt"
+          # Build the body into a variable and write it to a file so git commit -F and gh --body-file can use it.
+          printf -v body 'Old digest: %s\nNew digest: %s\nProbe: skopeo inspect --format '\''{{.Digest}}'\'' docker://registry.fedoraproject.org/fedora-bootc:%s -> %s\nRefs #102\nFailure contract: open a PR and do not merge automatically.\n' "$old" "$new_full" "$tag" "$new_full"
+          printf '%s\n\n%s\n' "$commit_msg_subject" "$body" >"$body_file"
+
+          # Rewrite both Containerfiles atomically in the workspace copy.
+          sed -E "s|^FROM registry\.fedoraproject\.org/fedora-bootc:${tag}@sha256:[0-9a-f]{64}$|FROM registry.fedoraproject.org/fedora-bootc:${tag}@${new_full}|" -i "$repo_root/Containerfile"
+          sed -E "s|^FROM registry\.fedoraproject\.org/fedora-bootc:${tag}@sha256:[0-9a-f]{64}$|FROM registry.fedoraproject.org/fedora-bootc:${tag}@${new_full}|" -i "$repo_root/Containerfile.nvidia"
+
+          git -C "$repo_root" -c user.name="$GIT_AUTHOR_NAME" -c user.email="$GIT_AUTHOR_EMAIL" checkout -b "$branch"
+          git -C "$repo_root" add Containerfile Containerfile.nvidia
+          git -C "$repo_root" commit -F "$body_file"
+
+          # Push using the job token; actions/checkout persisted no credentials.
+          git -C "$repo_root" push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" HEAD:refs/heads/${branch}
+
+          gh pr create --title "$commit_msg_subject" --body-file "$body_file" --base main
