@@ -6,7 +6,7 @@ The question this record answers: does linutil's catalogue contain procedures du
 
 ## How the catalogue was obtained
 
-`git clone --depth 1 --branch 2026.11.14 https://github.com/ChrisTitusTech/linutil`, then read `core/tabs/{system-setup,security,utils}/tab_data.toml` and the scripts they reference. Entry counts at the pin: `system-setup` 27, `security` 4, `utils` 20.
+`git clone --depth 1 --branch 2026.11.14 https://github.com/ChrisTitusTech/linutil`, then read `core/tabs/{system-setup,security,utils}/tab_data.toml` and the scripts they reference. Entry counts at the pin, counted by `script =` in each tab's `tab_data.toml`: `system-setup` 37, `security` 4, `utils` 35.
 
 The decisive structural fact is the per-entry precondition. Every Arch entry sits behind `command_exists pacman`, every Alpine entry behind `command_exists apk`, and the Debian and Ubuntu sub-tabs behind their own package managers. linutil hides those entries on a host without that package manager, so on a Fedora bootc image they are not merely unsuitable, they are unreachable. The UFW baseline is the same shape in reverse: its precondition is `command_exists firewall-cmd` matching **false**, so a host that ships firewalld never sees it.
 
@@ -31,15 +31,14 @@ Fedora is the only sub-tab that can run here, so it carries the per-entry verdic
 | Arch sub-tab, 15 entries (server setup, DWM-Titus, Hyprland JaKooLit, CachyOS repos and kernel, Chaotic-AUR, Linux Neptune, Nvidia drivers, Omarchy Rice, pacman config, paru, Snapper Snapshots, System Maintenance, Virtualization, Yay) | `core/tabs/system-setup/arch/*.sh` | pacman, bootloader and AUR changes | moot | sub-tab precondition is `command_exists pacman`; the entries are unreachable on Fedora, and the equivalents are the Fedora rows above |
 | Alpine sub-tab, 1 entry | `core/tabs/system-setup/alpine/alpine-upgrade.sh` | `/etc/apk/repositories` | moot | precondition `command_exists apk` |
 | Debian and Ubuntu sub-tabs, 2 entries | `core/tabs/system-setup/{debian,ubuntu}/*.sh` | apt installs | moot | those sub-tabs' package-manager precondition fails here |
-| Monitor Control, 12 entries | `core/tabs/utils/monitor-control/*.sh` | `displayplacer`/`xrandr` display geometry | dotfiles | per-machine display layout belongs with the operator's compositor config |
+| Monitor Control, 12 entries | `core/tabs/utils/monitor-control/*.sh` | `displayplacer`/`xrandr` display geometry | dotfiles | per-machine display layout belongs with the operator's compositor config; the sub-tab also requires an X11 session, which a niri session is not |
 | Printers, 3 entries | `core/tabs/utils/printers/*.sh` | installs CUPS, Epson and HP drivers on the running host | moot | host package installs do not persist on an immutable root; a printer set belongs in the image manifest if it is ever wanted |
-| User Account Manager, 6 entries | `core/tabs/utils/user-account-manager/*.sh` | creates users, groups, passwords | dotfiles | first-boot account actions belong to the operator's onboarding, not the image |
-| Auto Login, Bluetooth Manager, Bootable USB Creator, Crypto tool | `core/tabs/utils/*.sh` | runtime host services and tools | dotfiles | operator-side tooling on a live machine |
-| SSH Samba, US Locale Setup | `core/tabs/utils/samba-ssh-setup.sh`, `core/tabs/utils/locale-us-setup.sh` | `smb.conf`, `sshd`, `/etc/locale.conf` | dotfiles | per-machine service and locale choices, not image defaults |
+| User Account Manager, 5 entries | `core/tabs/utils/user-account-manager/*.sh` | creates users, groups, passwords | dotfiles | first-boot account actions belong to the operator's onboarding, not the image |
+| Runtime host tools, 15 entries: Auto Login, Bluetooth Manager, Bootable USB Creator, Crypto tool, Locale Setup, Numlock on Startup, Ollama, Ramalama, Ramalama Model Manager, Service Manager, SSH Commands, SSH Samba, Timeshift Backup, US Locale Setup, WiFi Manager | `core/tabs/utils/*.sh` | services, packages and per-machine tools on a live host | dotfiles | operator-side tooling, not image content; `Locale Setup` is additionally hidden by `command_exists locale-gen`, and `Timeshift Backup` by `command_exists dnf` matching **false**, which is never true on Fedora |
 
 ## Not reached
 
-The `applications-setup` and `gaming` tabs were not audited. They install application sets through the host package manager, which the `Printers` row already covers as a class, so reading them would not change a verdict. `utils` was read as a list with three entries read in full (`add_to_group.sh`, `samba-ssh-setup.sh`, `locale-us-setup.sh`); the remaining groups are graded by what their scripts install, not line by line.
+The `applications-setup` and `gaming` tabs were not audited. They install application sets through the host package manager, which the `Printers` row already covers as a class, so reading them would not change a verdict. `utils` was read as a list with three entries read in full (`add_to_group.sh`, `samba-ssh-setup.sh`, `locale-us-setup.sh`); the remaining groups are graded by what their scripts install, not line by line. All 35 `utils` entries appear in the table above, graded by class.
 
 ## Trackers
 
