@@ -2,7 +2,6 @@
 
 ## Unreleased
 
-
 - Schedule a weekly repin probe and a dispatchable write path: add `.github/workflows/repin-base.yml` to probe the pinned `Containerfile` digest weekly and open a human-reviewed PR to refresh it when the tag resolves to a different digest. The workflow probes by default and only writes on schedule or when dispatched with `apply: true`; it never merges the PR automatically. Refs #102.
 - Gate the NVIDIA variant on a path-filtered job (#94): add a `changes` path-filter step and an `image-nvidia` job that builds `Containerfile.nvidia` when any of these paths change: Containerfile.nvidia, manifests/packages-nvidia.txt, manifests/packages-common.txt, build/, overlay/, or tests/verify-image.sh. The `image-nvidia` verify step runs `tests/verify-image.sh --no-package-lock` so the common package lock comparison is skipped only for the variant until its own lock lands. The job runs on either a pull request or a push when the listed paths change; a manual dispatch always runs it. No publish, disk, boot, scan, export, or weekly scheduled run was added.
 - Correct three roadmap rows that no longer matched the repository: `main` is `caffce3` with six open work items, the developer tooling layer landed in #67 instead of sitting in review, and the agent container is built with a recorded run in #71. Adds Task 7's missing status line. No behaviour change.
