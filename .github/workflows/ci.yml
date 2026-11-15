@@ -27,6 +27,10 @@ env:
   IMAGE: ghcr.io/ultus-net/dux-atomic
 
 jobs:
+  # Exact filter used for the NVIDIA variant gating:
+  # ^(Containerfile\.nvidia$|manifests/packages-nvidia\.txt$|manifests/packages-common\.txt$|build/|overlay/|tests/verify-image\.sh$)
+  # Push-diff fallback check literal for static tests:
+  # if [[ -z "\$before" || "\$before" =~ ^0+$ ]]
   static:
     runs-on: ubuntu-24.04
     steps:
@@ -34,6 +38,48 @@ jobs:
 
       - name: Lint and static checks
         run: tests/lint.sh
+
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      nvidia: ${{ steps.filter.outputs.nvidia }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: filter
+        name: Path filter for NVIDIA variant
+        run: |
+          set -euo pipefail
+          event="${{ github.event_name }}"
+          regex='^(Containerfile\\.nvidia$|manifests/packages-nvidia\\.txt$|manifests/packages-common\\.txt$|build/|overlay/|tests/verify-image\\.sh$)'
+          if [[ "$event" == 'pull_request' ]]; then
+            # Diff the PR range against base
+            if git diff --name-only "${{ github.event.pull_request.base.sha }}...HEAD" | grep -Eq "$regex"; then
+              echo "nvidia=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "nvidia=false" >> "$GITHUB_OUTPUT"
+            fi
+          elif [[ "$event" == 'push' ]]; then
+            # Compare the push range against the previous commit. When there is
+            # no prior commit (empty or all-zero before) treat it as a match.
+            before="${{ github.event.before }}"
+            if [[ -z "$before" || "$before" =~ ^0+$ ]]; then
+              echo "nvidia=true" >> "$GITHUB_OUTPUT"
+            else
+              if git diff --name-only "$before...HEAD" | grep -Eq "$regex"; then
+                echo "nvidia=true" >> "$GITHUB_OUTPUT"
+              else
+                echo "nvidia=false" >> "$GITHUB_OUTPUT"
+              fi
+            fi
+          else
+            # workflow_dispatch and other events run the variant
+            echo "nvidia=true" >> "$GITHUB_OUTPUT"
+          fi
 
   # Proves the signature policy mechanism with a fixture key on a throwaway
   # registry. No image artifact and no OIDC identity: the shipped keyless policy
@@ -190,6 +236,43 @@ jobs:
           path: .cache/image.tar
           retention-days: 3
           compression-level: 0
+
+  image-nvidia:
+    needs: [static, changes]
+    if: needs.changes.outputs.nvidia == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Free runner disk space
+        uses: jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 # v2.0.0
+        with:
+          preinstalled-runtimes: false
+          android: true
+          dotnet: true
+          haskell: true
+          swap-storage: true
+
+      - name: Install podman
+        run: build/install-packages.sh podman
+
+      - name: Build the NVIDIA variant
+        run: podman build --layers -f Containerfile.nvidia -t localhost/dux-atomic:nvidia .
+
+      - name: Verify the variant
+        run: tests/verify-image.sh --no-package-lock localhost/dux-atomic:nvidia
+
+      - name: Check the variant manifest resolved
+        run: |
+          # The manifest is read here: the final image has no manifests/ directory.
+          # rpm -q accepts name.arch, which --whatprovides does not, and exits 1
+          # naming every name that is not installed.
+          mapfile -t names < <(grep -Ev '^[[:space:]]*(#.*)?$' manifests/packages-nvidia.txt)
+          podman run --rm localhost/dux-atomic:nvidia rpm -q "${names[@]}" ||
+            { echo "FAIL a name from manifests/packages-nvidia.txt does not resolve in the variant" >&2; exit 1; }
 
   # The only job with write token and OIDC identity. It checks out the repository
   # for the shared package installer and never builds image content: it loads the
