@@ -579,6 +579,37 @@ else
   echo "ok   the serial console karg comes from the test disk only"
 fi
 
+# The image ships dnf5, and the pinned base's /etc/dnf/dnf.conf carries only a
+# comment and [main], so every default the linutil Configure DNF entry sets is
+# absent (#111). The overlay replaces that file; the built-image readback proves
+# the values dnf5 resolves, so this check keeps the file and that readback.
+dnf_conf=$repo_root/overlay/etc/dnf/dnf.conf
+if [[ ! -f $dnf_conf ]]; then
+  echo "FAIL overlay/etc/dnf/dnf.conf is missing; the image ships dnf5 with no configured defaults" >&2
+  failures=$((failures + 1))
+elif ! awk '
+      # Only keys under [main] count: dnf5 ignores a key in another section.
+      /^\[main\]$/ { section = 1; next }
+      /^\[/ { section = 0 }
+      section && /^(max_parallel_downloads|fastestmirror|defaultyes|gpgcheck)=/ {
+        key = $0
+        sub(/=.*/, "", key)
+        seen[key] = 1
+      }
+      END {
+        exit !(seen["max_parallel_downloads"] && seen["fastestmirror"] &&
+               seen["defaultyes"] && seen["gpgcheck"])
+      }
+    ' "$dnf_conf"; then
+  echo "FAIL overlay/etc/dnf/dnf.conf does not set all four defaults under [main]" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'dnf5 --dump-main-config)' "$repo_root/tests/verify-image.sh"; then
+  echo "FAIL tests/verify-image.sh no longer reads the dnf.conf values back with dnf5 --dump-main-config" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the overlay ships the dnf.conf defaults and the verifier reads them back"
+fi
+
 workflow=$repo_root/.github/workflows/ci.yml
 # Assert the NVIDIA CI job and its gating and flags
 if ! grep -qF 'podman build --layers -f Containerfile.nvidia -t localhost/dux-atomic:nvidia' "$workflow" ||

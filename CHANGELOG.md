@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ship `/etc/dnf/dnf.conf` defaults and assert the values dnf5 resolves (#111). The pinned base carries only a comment and `[main]`, so `dnf5 --dump-main-config` in `registry.fedoraproject.org/fedora-bootc:45@sha256:42259b1d…a56453` reports `max_parallel_downloads = 3`, `fastestmirror = 0`, `defaultyes = 0` on dnf5 5.4.7.0. `overlay/etc/dnf/dnf.conf` now sets `max_parallel_downloads=10`, `fastestmirror=True`, `defaultyes=True`, and an explicit `gpgcheck=True` rather than inheriting it from a file the overlay replaces wholesale. `tests/verify-image.sh` reads the four values back from the built image with `dnf5 --dump-main-config`, so a file that parses and is never applied reds. `tests/test-static.sh` reds when the overlay file leaves, when a key leaves `[main]`, and when the verifier stops asking dnf5. No codec repository (#112), firewalld baseline (#116), or `manifests/` change.
 - Fail merges that truncate CHANGELOG.md compared to the base branch and
   scope the `tests/verify-image.sh --no-package-lock` pin to the `image-nvidia`
   job only, so an identical invocation in another job cannot false-red the

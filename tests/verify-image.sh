@@ -24,6 +24,18 @@ repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
   /usr/lib/systemd/system/dux-atomic-greeter-defaults.service \
   /usr/lib/systemd/user/dux-atomic-desktop.service \
   /usr/lib/systemd/user/dux-atomic-dms-defaults.service
+# The pinned base's /etc/dnf/dnf.conf carries only a comment and [main], and the
+# overlay replaces it with the linutil Configure DNF defaults (#111). Ask dnf5
+# for the values it resolves, so a file that parses but is not read still reds.
+dnf_conf=$("$runtime" run --rm "$image" dnf5 --dump-main-config) \
+  || { echo "FAIL dnf5 cannot dump the main configuration in the image" >&2; exit 1; }
+for want in 'max_parallel_downloads = 10' 'fastestmirror = 1' 'defaultyes = 1' 'gpgcheck = 1'; do
+  if ! grep -qxF "$want" <<<"$dnf_conf"; then
+    echo "FAIL dnf5 does not resolve '${want}' from overlay/etc/dnf/dnf.conf" >&2
+    exit 1
+  fi
+done
+echo "ok   dnf5 resolves the four overlay defaults (#111)"
 # The Fedora base carries no desktop, so every name in the manifest has to
 # resolve in the built image. Query all of them in one call, so a silently
 # dropped name fails here rather than at the first login, and a new manifest
