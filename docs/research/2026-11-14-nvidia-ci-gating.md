@@ -94,7 +94,7 @@ adds the boot smoke, an unmeasured 11m21s at PR #93's rates.
 
 ## Revision 2026-11-15: the filtered job landed
 
-- The operator approved option (b) and declined the weekly scheduled run (c) for now. The repository's CI now carries a `changes` path-filter step and an `image-nvidia` job that runs only when the listed paths change.
-- The `image-nvidia` job uses the exact path list: Containerfile.nvidia, manifests/packages-nvidia.txt, manifests/packages-common.txt, build/, overlay/, and tests/verify-image.sh.
-- The variant's verify step runs `tests/verify-image.sh --no-package-lock` until the variant's own package lock lands, so the common lock comparison is skipped only for the variant.
-- The hosted variant build time remains unmeasured until the first hosted run completes.
+ - The operator approved option (b) and declined the weekly scheduled run (c) for now. The repository's CI now carries a `changes` path-filter step and an `image-nvidia` job that runs only when the listed paths change.
+ - The `image-nvidia` job uses the exact path list: Containerfile.nvidia, manifests/packages-nvidia.txt, manifests/packages-common.txt, build/, overlay/, and tests/verify-image.sh. It runs on a pull request or on a push when those paths changed; a manual dispatch always runs it.
+ - The variant's verify step runs `tests/verify-image.sh --no-package-lock` until the variant's own package lock lands, so the common lock comparison is skipped only for the variant.
+ - The hosted variant build time remains unmeasured until the first hosted run completes.

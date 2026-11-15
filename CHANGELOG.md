@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Gate the NVIDIA variant on a path-filtered job (#94): add a `changes` path-filter step and an `image-nvidia` job that builds `Containerfile.nvidia` when any of these paths change: Containerfile.nvidia, manifests/packages-nvidia.txt, manifests/packages-common.txt, build/, overlay/, or tests/verify-image.sh. The `image-nvidia` verify step runs `tests/verify-image.sh --no-package-lock` so the common package lock comparison is skipped only for the variant until its own lock lands. No publish, disk, boot, scan, export, or weekly scheduled run was added.
+- Gate the NVIDIA variant on a path-filtered job (#94): add a `changes` path-filter step and an `image-nvidia` job that builds `Containerfile.nvidia` when any of these paths change: Containerfile.nvidia, manifests/packages-nvidia.txt, manifests/packages-common.txt, build/, overlay/, or tests/verify-image.sh. The `image-nvidia` verify step runs `tests/verify-image.sh --no-package-lock` so the common package lock comparison is skipped only for the variant until its own lock lands. The job runs on either a pull request or a push when the listed paths change; a manual dispatch always runs it. No publish, disk, boot, scan, export, or weekly scheduled run was added.
 - Record the VM measurement path for issue #68: the four btrfs measurements may
   be taken on a VM install of the image (the repo builds a qcow2 with
   `tests/vm/make-disk.sh:82`). The blocker is the install-path change plus the

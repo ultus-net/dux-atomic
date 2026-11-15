@@ -170,8 +170,6 @@ else
   failures=$((failures + 1))
 fi
 
- 
-
 # The lock records every installed package whose origin repository is not a
 # Fedora repository, so a Fedora updates bump cannot red it. tests/verify-image.sh
 # compares the whole recorded set against the generator's measurement.
@@ -558,7 +556,6 @@ else
 fi
 
 workflow=$repo_root/.github/workflows/ci.yml
-
 # Assert the NVIDIA CI job and its gating and flags
 if ! grep -qF 'podman build --layers -f Containerfile.nvidia -t localhost/dux-atomic:nvidia' "$workflow" ||
    [[ $(grep -c -- '--no-package-lock' "$workflow") -ne 1 ]] ||
@@ -567,8 +564,11 @@ if ! grep -qF 'podman build --layers -f Containerfile.nvidia -t localhost/dux-at
    ! grep -qF "^(Containerfile\\.nvidia$|manifests/packages-nvidia\\.txt$|manifests/packages-common\\.txt$|build/|overlay/|tests/verify-image\\.sh$)" "$workflow"; then
   echo "FAIL ci.yml does not carry the gated image-nvidia job, the exact filter regex, or the single --no-package-lock on its verify line" >&2
   failures=$((failures + 1))
+elif ! grep -qF 'github.event.before' "$workflow" || ! grep -qF 'if [[ -z "\$before" || "\$before" =~ ^0+$ ]]' "$workflow"; then
+  echo "FAIL ci.yml lost the push diff guard: github.event.before or the empty-before fallback is missing" >&2
+  failures=$((failures + 1))
 else
-  echo "ok   ci.yml carries a path-filtered image-nvidia job with the expected verify flag and regex"
+  echo "ok   ci.yml carries a path-filtered image-nvidia job with the expected verify flag and regex and a push guard"
 fi
 
 # A DNS or mirror blip on a hosted runner must not fail a release. Run
