@@ -1,10 +1,10 @@
 # manifests/packages-nvidia.txt — NVIDIA variant package manifest.
 #
 # The userspace stack and the kernel-module build set. Every name here was
-# verified to resolve against the image's enabled repositories (negativo17
-# fedora-multimedia plus Fedora) in the pinned base on 2026-11-14; the commands
-# and their output are in docs/research/2026-11-14-nvidia-module-signing.md and
-# docs/research/2026-11-14-nvidia-variant-build.md.
+# verified to resolve against the image's enabled repositories (RPM Fusion free
+# and nonfree plus Fedora) with dnf5 repoquery on 2026-11-15 (#112). The
+# userspace names are RPM Fusion's xorg-x11-drv-nvidia set; negativo17's
+# nvidia-driver names do not exist there.
 #
 # The module path is decided (#72): `akmod-nvidia` ships source under
 # /usr/src/akmods and `akmods` compiles it against the image's newest installed
@@ -15,9 +15,9 @@
 # build/common.sh installs this file only when Containerfile.nvidia names it in
 # PACKAGE_MANIFEST_EXTRA. The shared image does not read it.
 
-nvidia-driver
-nvidia-driver-libs
-nvidia-driver-cuda
+xorg-x11-drv-nvidia
+xorg-x11-drv-nvidia-libs
+xorg-x11-drv-nvidia-cuda
 nvidia-modprobe
 nvidia-persistenced
 nvidia-settings
@@ -35,9 +35,10 @@ kernel-devel-matched
 gcc
 make
 
-# 32-bit libraries for x86_64, for Steam. Both resolve from fedora-multimedia.
+# 32-bit libraries for x86_64, for Steam. Both resolve from RPM Fusion nonfree
+# and Fedora.
 mesa-vulkan-drivers.i686
-nvidia-driver-libs.i686
+xorg-x11-drv-nvidia-libs.i686
 
 # Deliberately absent: nvidia-container-toolkit does not resolve in the enabled
 # repositories.

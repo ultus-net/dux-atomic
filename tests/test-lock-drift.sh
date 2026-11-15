@@ -10,16 +10,18 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 failures=0
 
-# Copied verbatim from manifests/packages-common.lock lines 62, 63 and 70:
-# mesa-vulkan-drivers-1:26.2.6-1.fc45.x86_64 is a manifest name, steam is
-# another, and steam pulls the 32-bit mesa stack in transitively (see
-# tests/verify-image.sh:50-53), so the i686 line is the transitive case. The
-# real recorded version is 1:26.2.6-1.fc45.
+# This is a synthetic fixture rather than a copy of lock lines, because the
+# lock's own content moves with the provider: since the RPM Fusion migration
+# (#112), steam is recorded from rpmfusion-nonfree and mesa-vulkan-drivers is
+# Fedora-origin and therefore unrecorded. The shape is what matters.
+# mesa-vulkan-drivers is a manifest name, steam is another, and steam pulls the
+# 32-bit mesa stack in transitively (see tests/verify-image.sh:50-53), so the
+# i686 line is the transitive case.
 recorded=$work/recorded.lock
 cat >"$recorded" <<'LOCK'
-mesa-vulkan-drivers-1:26.2.6-1.fc45.i686	fedora-multimedia
-mesa-vulkan-drivers-1:26.2.6-1.fc45.x86_64	fedora-multimedia
-steam-0:1.0.0.87-4.fc45.x86_64	fedora-multimedia
+mesa-vulkan-drivers-1:26.2.6-1.fc45.i686	rpmfusion-free
+mesa-vulkan-drivers-1:26.2.6-1.fc45.x86_64	rpmfusion-free
+steam-0:1.0.0.87-4.fc45.x86_64	rpmfusion-nonfree
 LOCK
 
 status=0
@@ -34,12 +36,12 @@ else
   echo "ok   identical inputs match and print nothing"
 fi
 
-# Case 2 bumps the transitive i686 NEVRA's real release from 1 to 2.
+# Case 2 bumps the transitive i686 NEVRA's release from 1 to 2.
 drifted=$work/drifted.lock
 cat >"$drifted" <<'LOCK'
-mesa-vulkan-drivers-1:26.2.6-1.fc45.x86_64	fedora-multimedia
-mesa-vulkan-drivers-1:26.2.6-2.fc45.i686	fedora-multimedia
-steam-0:1.0.0.87-4.fc45.x86_64	fedora-multimedia
+mesa-vulkan-drivers-1:26.2.6-1.fc45.x86_64	rpmfusion-free
+mesa-vulkan-drivers-1:26.2.6-2.fc45.i686	rpmfusion-free
+steam-0:1.0.0.87-4.fc45.x86_64	rpmfusion-nonfree
 LOCK
 status=0
 "$compare" "$recorded" "$drifted" >"$work/out" 2>"$work/err" || status=$?
@@ -63,9 +65,9 @@ fi
 git_extra=$work/git-extra.lock
 cat >"$git_extra" <<'LOCK'
 dux-greeter-git-2:2.1.3+git132.7bdf4546-2.fc45.x86_64	copr:copr.fedorainfracloud.org:duxlabs:dux-repo
-mesa-vulkan-drivers-1:26.2.6-1.fc45.i686	fedora-multimedia
-mesa-vulkan-drivers-1:26.2.6-1.fc45.x86_64	fedora-multimedia
-steam-0:1.0.0.87-4.fc45.x86_64	fedora-multimedia
+mesa-vulkan-drivers-1:26.2.6-1.fc45.i686	rpmfusion-free
+mesa-vulkan-drivers-1:26.2.6-1.fc45.x86_64	rpmfusion-free
+steam-0:1.0.0.87-4.fc45.x86_64	rpmfusion-nonfree
 LOCK
 status=0
 "$compare" "$recorded" "$git_extra" >"$work/out" 2>"$work/err" || status=$?

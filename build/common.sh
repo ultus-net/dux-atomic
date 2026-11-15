@@ -15,11 +15,19 @@ dnf5 install -y dnf5-plugins
 dnf5 -y copr enable duxlabs/dms
 dnf5 -y copr enable duxlabs/dux-repo
 
-# Steam ships only from negativo17's multimedia repository, which the Fedora
-# base does not carry. Keep the priority the Universal Blue base used.
-curl --retry 3 -fsSLo /etc/yum.repos.d/fedora-multimedia.repo \
-  https://negativo17.org/repos/fedora-multimedia.repo
-sed -i '/^\[fedora-multimedia\]$/a priority=90' /etc/yum.repos.d/fedora-multimedia.repo
+# RPM Fusion free and nonfree replace negativo17's fedora-multimedia repository,
+# which the Fedora base does not carry and which states it is not RPM Fusion
+# compatible. Its priority=90 let it override Fedora's own packages; RPM Fusion
+# is multi-maintainer and replaces none of them, so it needs no priority.
+# gpgcheck=True in overlay/etc/dnf/dnf.conf is the trust anchor for both.
+release=$(rpm -E %fedora)
+release_rpms=$(mktemp -d)
+for repo in free nonfree; do
+  curl --retry 3 -fsSLo "${release_rpms}/rpmfusion-${repo}-release.rpm" \
+    "https://download1.rpmfusion.org/${repo}/fedora/rpmfusion-${repo}-release-${release}.noarch.rpm"
+  dnf5 install -y "${release_rpms}/rpmfusion-${repo}-release.rpm"
+done
+rm -rf "$release_rpms"
 
 manifest=/ctx/manifests/packages-common.txt
 
@@ -188,9 +196,8 @@ test "$(stat -c %U:%G "$check_root/var/lib/greeter")" = "greeter:greeter" || {
   exit 1
 }
 
-# Leave the COPRs disabled in the final image. The negativo17 multimedia repo
-# stays enabled on purpose: Steam's day-2 dependencies resolve from it, and the
-# Universal Blue base shipped it enabled too.
+# Leave the COPRs disabled in the final image. RPM Fusion free and nonfree stay
+# enabled on purpose: Steam's day-2 dependencies resolve from them.
 dnf5 -y copr disable duxlabs/dms
 dnf5 -y copr disable duxlabs/dux-repo
 
