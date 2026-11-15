@@ -16,3 +16,5 @@
 The SBOM step scans a flattened rootfs with a digest-pinned syft container. syft needed more than 8 GB to scan the docker archive, so the step exports the image first, and it writes the report to a file rather than buffering it in memory.
 
 `just check` mirrors the static gate. `just build`, `just lint-image`, `just disk`, and `just boot` cover the rest.
+
+repin-base: A scheduled workflow `.github/workflows/repin-base.yml` probes the digest pinned in `Containerfile` weekly and on manual dispatch. It opens a PR to refresh the pin only when run on the schedule or when dispatched with the `apply` input set to true; a manual dispatch without `apply` is a read-only probe and should be used to validate behaviour before allowing the workflow to write.

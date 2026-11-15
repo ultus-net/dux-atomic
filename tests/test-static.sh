@@ -535,6 +535,30 @@ else
   echo "ok   the hosted boot budget covers a slow TCG login"
 fi
 
+# repin-base workflow assertions: file exists, weekly cron, dispatch input, probe and rewrite gating
+repin_workflow=$repo_root/.github/workflows/repin-base.yml
+if [[ ! -f $repin_workflow ]]; then
+  echo "FAIL repin-base workflow is missing" >&2
+  failures=$((failures + 1))
+elif ! grep -qE '17 5 \* \* 1' "$repin_workflow"; then
+  echo "FAIL repin-base workflow does not schedule weekly at '17 5 * * 1'" >&2
+  failures=$((failures + 1))
+elif ! grep -qF "workflow_dispatch:" "$repin_workflow" || ! grep -qF "apply:" "$repin_workflow" || ! grep -qF "default: false" "$repin_workflow"; then
+  echo "FAIL repin-base workflow lacks workflow_dispatch input 'apply' defaulting to false" >&2
+  failures=$((failures + 1))
+elif ! grep -qF "skopeo inspect --raw" "$repin_workflow" || ! grep -qF "skopeo inspect --format '{{.Digest}}'" "$repin_workflow"; then
+  echo "FAIL repin-base workflow does not probe the registry with skopeo inspect --raw and resolve with --format '{{.Digest}}'" >&2
+  failures=$((failures + 1))
+elif ! grep -qF "github.event_name == 'schedule'" "$repin_workflow" || ! grep -qF "github.event.inputs.apply" "$repin_workflow"; then
+  echo "FAIL repin-base workflow does not gate rewrites on schedule or inputs.apply == 'true'" >&2
+  failures=$((failures + 1))
+elif grep -qE 'refs/heads/main' "$repin_workflow" || grep -qF "--force" "$repin_workflow"; then
+  echo "FAIL repin-base workflow pushes to main or force-pushes" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   repin-base workflow file present and carries the expected probes and gates"
+fi
+
 # The serial console is a test-only karg (#39): in the overlay it puts a serial
 # getty on hardware with no serial port. make-disk.sh appends it on the test
 # disk, through the same [customizations.kernel] line as the device timeout.
