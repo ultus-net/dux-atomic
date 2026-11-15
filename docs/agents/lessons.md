@@ -29,3 +29,5 @@ carrying its id in the bullet and registered below.
 
 - L004 — a substring grep is not a gate check: anchor the pattern on a character a rename cannot keep (the closing parenthesis, the flag list) and prove the negative with the edit a maintainer would make, not by deleting the file (evidence: the rename probe on `grep -qF 'dnf5 --dump-main-config'` in `tests/test-static.sh` printed `ok` and exit 0, `docs/agents/lessons/20261115T085146Z-a-substring-grep-is-not-a-gate-check.md`)
 
+- L005 — assert the whole line, not a fragment: a comment, a second call site, or a rename that keeps the fragment satisfies a substring match, so anchor both ends with `grep -qxF` over the line itself (evidence: reviewer P1 on the `grep -qF` form that kept only the command prefix, the committed `grep -qxF "$dnf_readback"`, `docs/agents/lessons/20261115T091500Z-assert-the-whole-line-not-a-fragment.md`)
+

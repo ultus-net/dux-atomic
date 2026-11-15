@@ -584,26 +584,33 @@ fi
 # absent (#111). The overlay replaces that file; the built-image readback proves
 # the values dnf5 resolves, so this check keeps the file and that readback.
 dnf_conf=$repo_root/overlay/etc/dnf/dnf.conf
+# The readback is asserted as one whole line. A fragment is satisfied by a
+# comment that mentions the command, or by a renamed call that keeps the
+# fragment, so both ends are anchored and nothing else in the script counts.
+dnf_readback='dnf_conf=$("$runtime" run --rm "$image" dnf5 --dump-main-config) \'
 if [[ ! -f $dnf_conf ]]; then
   echo "FAIL overlay/etc/dnf/dnf.conf is missing; the image ships dnf5 with no configured defaults" >&2
   failures=$((failures + 1))
 elif ! awk '
       # Only keys under [main] count: dnf5 ignores a key in another section.
+      # Each key appears exactly once, because a repeated key is a reviewable
+      # mistake even though dnf5 would silently take the last value.
       /^\[main\]$/ { section = 1; next }
       /^\[/ { section = 0 }
       section && /^(max_parallel_downloads|fastestmirror|defaultyes|gpgcheck)=/ {
         key = $0
         sub(/=.*/, "", key)
-        seen[key] = 1
+        seen[key]++
       }
       END {
-        exit !(seen["max_parallel_downloads"] && seen["fastestmirror"] &&
-               seen["defaultyes"] && seen["gpgcheck"])
+        split("max_parallel_downloads fastestmirror defaultyes gpgcheck", want, " ")
+        for (i = 1; i <= length(want); i++) if (seen[want[i]] != 1) exit 1
+        exit 0
       }
     ' "$dnf_conf"; then
-  echo "FAIL overlay/etc/dnf/dnf.conf does not set all four defaults under [main]" >&2
+  echo "FAIL overlay/etc/dnf/dnf.conf does not set each of the four defaults exactly once under [main]" >&2
   failures=$((failures + 1))
-elif ! grep -qF 'dnf5 --dump-main-config)' "$repo_root/tests/verify-image.sh"; then
+elif ! grep -qxF "$dnf_readback" "$repo_root/tests/verify-image.sh"; then
   echo "FAIL tests/verify-image.sh no longer reads the dnf.conf values back with dnf5 --dump-main-config" >&2
   failures=$((failures + 1))
 else
