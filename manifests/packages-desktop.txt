@@ -1,0 +1,15 @@
+# packages-desktop.txt — desktop-only packages. Installed only by the desktop
+# variant or when the desktop overlay subtree is present.
+
+# Compositor, shell, greeter and terminal
+niri
+dms
+dms-greeter
+quickshell
+ghostty
+
+# Dux applications the installer treats as optional dependencies
+dux-search
+dux-calendar
+dux-files
+matugen

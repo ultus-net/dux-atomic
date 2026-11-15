@@ -46,7 +46,7 @@ bash_scripts=(
   tests/vm/make-disk.sh
 )
 posix_scripts=(
-  overlay/usr/libexec/dux-atomic/needs-setup.sh
+  overlay/desktop/usr/libexec/dux-atomic/needs-setup.sh
 )
 
 cd "$repo_root"

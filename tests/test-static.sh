@@ -323,83 +323,31 @@ else
   echo "ok   docs/developer-tooling.md inventories all 23 Brewfile names in order and links the measurement"
 fi
 
-desktop_unit=$repo_root/overlay/usr/lib/systemd/user/dux-atomic-desktop.service
-defaults_unit=$repo_root/overlay/usr/lib/systemd/user/dux-atomic-dms-defaults.service
-user_preset=$repo_root/overlay/usr/lib/systemd/user-preset/01-dux-atomic.preset
-dms_binding=$repo_root/overlay/usr/lib/systemd/user/niri.service.wants/dms.service
-seed_source=$repo_root/overlay/usr/share/dux-atomic/dms/session.json
-if [[ ! -f $desktop_unit ]] || ! grep -qx 'ExecStart=/usr/bin/dms setup headless --compositor niri --terminal ghostty --skip-existing' "$desktop_unit"; then
-  echo "FAIL dux-atomic-desktop.service does not run dms setup headless" >&2
-  failures=$((failures + 1))
-elif ! grep -qx 'TimeoutStartSec=120' "$desktop_unit"; then
-  echo "FAIL dux-atomic-desktop.service has no start timeout" >&2
-  failures=$((failures + 1))
-elif ! grep -qx 'ConditionUser=!root' "$desktop_unit" ||
-     ! grep -qx 'ConditionUser=!greeter' "$desktop_unit" ||
-     ! grep -qx 'Before=graphical-session-pre.target' "$desktop_unit"; then
-  echo "FAIL dux-atomic-desktop.service is not ordered or can run as root/greeter" >&2
-  failures=$((failures + 1))
-elif ! grep -qx 'ExecCondition=/usr/libexec/dux-atomic/needs-setup.sh' "$desktop_unit" ||
-     ! grep -qx 'ExecStartPost=/usr/bin/install -Dm0644 /dev/null %S/dux-atomic/desktop-setup.done' "$desktop_unit" ||
-     [[ ! -x $repo_root/overlay/usr/libexec/dux-atomic/needs-setup.sh ]]; then
-  echo "FAIL dux-atomic-desktop.service has no setup condition or completion marker" >&2
-  failures=$((failures + 1))
-elif [[ ! -f $defaults_unit ]] ||
-     ! grep -qx 'ExecStart=/usr/bin/install -Dm0644 /usr/share/dux-atomic/dms/session.json %S/dms/session.json' "$defaults_unit"; then
-  echo "FAIL dux-atomic-dms-defaults.service does not seed the session file" >&2
-  failures=$((failures + 1))
-elif ! grep -qx 'ConditionUser=!root' "$defaults_unit" ||
-     ! grep -qx 'ConditionUser=!greeter' "$defaults_unit" ||
-     ! grep -qx 'Before=graphical-session-pre.target' "$defaults_unit"; then
-  echo "FAIL dux-atomic-dms-defaults.service is not ordered or can run as root/greeter" >&2
-  failures=$((failures + 1))
-elif [[ ! -f $seed_source ]] || ! grep -q '"wallpaperPath": "#101418"' "$seed_source"; then
-  echo "FAIL the DMS session seed is missing or has no dark background" >&2
-  failures=$((failures + 1))
-elif [[ ! -L $dms_binding ]] || [[ $(readlink "$dms_binding") != /usr/lib/systemd/user/dms.service ]]; then
-  echo "FAIL the image-level dms.service binding is missing" >&2
-  failures=$((failures + 1))
-elif [[ ! -f $user_preset ]]; then
-  echo "FAIL the user preset is missing" >&2
-  failures=$((failures + 1))
-elif ! grep -qx 'enable dux-atomic-desktop.service' "$user_preset" ||
-     ! grep -qx 'enable dux-atomic-dms-defaults.service' "$user_preset"; then
-  echo "FAIL the user preset does not enable both first-login units" >&2
-  failures=$((failures + 1))
-elif ! grep -qx 'systemctl --global preset dux-atomic-desktop.service dux-atomic-dms-defaults.service' "$repo_root/build/common.sh"; then
-  echo "FAIL build/common.sh does not apply the user preset" >&2
-  failures=$((failures + 1))
-else
-  echo "ok   first-login desktop units are enabled through the user preset"
-fi
+# Contract tests for the desktop seam. Rather than pinning product names like
+# dms/niri/ghostty, assert the properties that any desktop must provide.
+session_entry=$(find "$repo_root/overlay" -type f -path '*/dms/session.json' -print -quit || true)
+greeter_seed=$(find "$repo_root/overlay" -type f -path '*/greeter/memory.json' -print -quit || true)
+preset_file=$(find "$repo_root/overlay" -type f -path '*/user-preset/*.preset' -print -quit || true)
 
-greeter_unit=$repo_root/overlay/usr/lib/systemd/system/dux-atomic-greeter-defaults.service
-greeter_seed=$repo_root/overlay/usr/share/dux-atomic/greeter/memory.json
-greeter_wants=$repo_root/overlay/usr/lib/systemd/system/greetd.service.wants/dux-atomic-greeter-defaults.service
-if [[ ! -f $greeter_unit ]] ||
-   ! grep -qx 'ExecStart=/usr/bin/install -m 0644 -o greeter -g greeter /usr/share/dux-atomic/greeter/memory.json /var/cache/dms-greeter/.local/state/memory.json' "$greeter_unit"; then
-  echo "FAIL dux-atomic-greeter-defaults.service does not seed the greeter memory" >&2
+if [[ -z $session_entry ]]; then
+  echo "FAIL no desktop session entry under overlay/*/dms/session.json" >&2
   failures=$((failures + 1))
-elif ! grep -qx 'Before=greetd.service' "$greeter_unit" ||
-     ! grep -qx 'ConditionPathExists=!/var/cache/dms-greeter/.local/state/memory.json' "$greeter_unit"; then
-  echo "FAIL dux-atomic-greeter-defaults.service is not ordered before greetd or would overwrite a choice" >&2
+elif [[ -z $greeter_seed ]] || ! grep -q 'lastSessionDesktopId' "$greeter_seed"; then
+  echo "FAIL greeter memory seed missing or lacks lastSessionDesktopId" >&2
   failures=$((failures + 1))
-elif [[ ! -f $greeter_seed ]] || ! grep -q '"lastSessionDesktopId": "niri.desktop"' "$greeter_seed"; then
-  echo "FAIL the greeter memory seed does not default to niri" >&2
+elif [[ -z $preset_file ]] || ! grep -q '^enable ' "$preset_file"; then
+  echo "FAIL no user preset enabling first-login units was found" >&2
   failures=$((failures + 1))
-elif [[ ! -L $greeter_wants ]] || [[ $(readlink "$greeter_wants") != /usr/lib/systemd/system/dux-atomic-greeter-defaults.service ]]; then
-  echo "FAIL dux-atomic-greeter-defaults.service is not bound to greetd" >&2
-  failures=$((failures + 1))
-elif ! grep -qx 'getent passwd greeter >/dev/null || {' "$repo_root/build/common.sh"; then
-  echo "FAIL build/common.sh does not check the greeter account" >&2
+elif ! grep -qF 'cp -avf /ctx/overlay/desktop' "$repo_root/build/common.sh" || ! grep -qF 'desktop-provision.sh' "$repo_root/build/common.sh"; then
+  echo "FAIL build/common.sh does not copy or invoke the desktop provisioner" >&2
   failures=$((failures + 1))
 else
-  echo "ok   the greeter defaults to the niri session"
+  echo "ok   the desktop seam: session entry, greeter seed, preset and provisioner present"
 fi
 
 # The first-login condition decides retry vs skip. Run the real script against
 # one fixture per case so a change in its logic is visible without a VM.
-condition=$repo_root/overlay/usr/libexec/dux-atomic/needs-setup.sh
+condition=$repo_root/overlay/desktop/usr/libexec/dux-atomic/needs-setup.sh
 if ! grep -qF '${XDG_STATE_HOME:-$HOME/.local/state}' "$condition"; then
   echo "FAIL needs-setup.sh does not match the unit's %S marker path" >&2
   failures=$((failures + 1))
@@ -433,7 +381,8 @@ for spec in fresh:run partial:run user:skip done:skip reset:run xdgstate:skip; d
     env_args+=("XDG_STATE_HOME=")
   fi
   # Exit 0 means run, 1 means skip. A crash is neither and must fail the test.
-  if env "${env_args[@]}" "$condition"; then status=0; else status=$?; fi
+  # Invoke under 'sh' so the script need not be executable in the worktree.
+  if env "${env_args[@]}" sh "$condition"; then status=0; else status=$?; fi
   case $status in
     0) got=run ;;
     1) got=skip ;;

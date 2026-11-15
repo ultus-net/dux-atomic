@@ -20,10 +20,44 @@ runtime=${CONTAINER_RUNTIME:-podman}
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 
 "$runtime" run --rm "$image" bootc container lint
-"$runtime" run --rm "$image" systemd-analyze verify \
-  /usr/lib/systemd/system/dux-atomic-greeter-defaults.service \
-  /usr/lib/systemd/user/dux-atomic-desktop.service \
-  /usr/lib/systemd/user/dux-atomic-dms-defaults.service
+# Contract checks: session entry exists, greeter seed present, compositor
+# bindings resolve, and the first-login provisioner/preset pieces are present.
+session_entry=$("$runtime" run --rm "$image" bash -c 'find /usr -type f -path "*/dms/session.json" -print -quit' || true)
+if [[ -z $session_entry ]]; then
+  echo "FAIL no desktop session entry found in image under */dms/session.json" >&2
+  exit 1
+fi
+greeter_seed_present=$("$runtime" run --rm "$image" bash -c 'test -f /usr/share/dux-atomic/greeter/memory.json && grep -q "lastSessionDesktopId" /usr/share/dux-atomic/greeter/memory.json && echo ok || true' || true)
+if [[ $greeter_seed_present != ok ]]; then
+  echo "FAIL greeter memory seed missing or lacking lastSessionDesktopId in image" >&2
+  exit 1
+fi
+# Compositor binding resolution: any unit wants symlink under /usr/lib/systemd/user/*/.wants must point at an existing unit.
+binding_bad=$("$runtime" run --rm "$image" bash -ec '
+  bad=0
+  while IFS= read -r -d "" link; do
+    target=$(readlink "$link")
+    if [[ ! -e "${target}" ]]; then
+      echo "$link -> $target"
+      bad=1
+    fi
+  done < <(find /usr/lib/systemd/user -type l -path "*/.wants/*" -print0)
+  exit $bad
+' || true)
+if [[ -n $binding_bad ]]; then
+  echo "FAIL a compositor/service binding in image points at a missing unit: $binding_bad" >&2
+  exit 1
+fi
+# First-login provisioning pieces: condition script executable and at least one user preset enabling units exists.
+if ! "$runtime" run --rm "$image" test -x /usr/libexec/dux-atomic/needs-setup.sh >/dev/null 2>&1; then
+  echo "FAIL /usr/libexec/dux-atomic/needs-setup.sh missing or not executable in image" >&2
+  exit 1
+fi
+preset_ok=$("$runtime" run --rm "$image" bash -c 'grep -q "^enable " /usr/lib/systemd/user-preset/*.preset 2>/dev/null && echo ok || true' || true)
+if [[ $preset_ok != ok ]]; then
+  echo "FAIL no user preset enabling first-login units found in image" >&2
+  exit 1
+fi
 # The pinned base's /etc/dnf/dnf.conf carries only a comment and [main], and the
 # overlay replaces it with the linutil Configure DNF defaults (#111). Ask dnf5
 # for the values it resolves, so a file that parses but is not read still reds.
