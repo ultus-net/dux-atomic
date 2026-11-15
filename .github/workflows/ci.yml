@@ -267,8 +267,13 @@ jobs:
 
       - name: Check the variant manifest resolved
         run: |
-          # shellcheck disable=SC2046 # Word splitting is intended: the manifest is one name per line.
-          podman run --rm localhost/dux-atomic:nvidia rpm -q --whatprovides $(grep -Ev '^[[:space:]]*(#.*)?$' manifests/packages-nvidia.txt) || { echo "FAIL a name from manifests/packages-nvidia.txt does not resolve in the variant" >&2; exit 1; }
+          # Query each manifest line by name (handles plain and arch-qualified names).
+          podman run --rm localhost/dux-atomic:nvidia /bin/bash -lc '
+            set -o pipefail
+            while IFS= read -r name; do
+              rpm -q "$name" >/dev/null 2>&1 || { echo "FAIL a name from manifests/packages-nvidia.txt does not resolve in the variant: $name" >&2; exit 1; }
+            done < <(grep -Ev "^[[:space:]]*(#.*)?$" manifests/packages-nvidia.txt)
+          '
 
   # The only job with write token and OIDC identity. It checks out the repository
   # for the shared package installer and never builds image content: it loads the
