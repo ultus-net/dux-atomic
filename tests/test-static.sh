@@ -556,6 +556,25 @@ else
 fi
 
 workflow=$repo_root/.github/workflows/ci.yml
+# Assert the NVIDIA CI job and its gating and flags
+if ! grep -qF 'podman build --layers -f Containerfile.nvidia -t localhost/dux-atomic:nvidia' "$workflow" ||
+   [[ $(grep -cF 'tests/verify-image.sh --no-package-lock' "$workflow") -ne 1 ]] ||
+   ! grep -qF "tests/verify-image.sh --no-package-lock localhost/dux-atomic:nvidia" "$workflow" ||
+   ! grep -qF "if: needs.changes.outputs.nvidia == 'true'" "$workflow" ||
+   ! grep -qF "^(Containerfile\\.nvidia$|manifests/packages-nvidia\\.txt$|manifests/packages-common\\.txt$|build/|overlay/|tests/verify-image\\.sh$)" "$workflow" ||
+   # The variant manifest check reads the manifest on the runner and passes its
+   # names to rpm as arguments, so an arch-qualified name resolves and a missing
+   # one names itself on stderr.
+   ! grep -qF 'mapfile -t names < <(grep -Ev' "$workflow" ||
+   ! grep -qF 'podman run --rm localhost/dux-atomic:nvidia rpm -q "${names[@]}"' "$workflow"; then
+  echo "FAIL ci.yml does not carry the gated image-nvidia job, the exact filter regex, or the single --no-package-lock on its verify line" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'github.event.before' "$workflow" || ! grep -qF 'if [[ -z "\$before" || "\$before" =~ ^0+$ ]]' "$workflow"; then
+  echo "FAIL ci.yml lost the push diff guard: github.event.before or the empty-before fallback is missing" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   ci.yml carries a path-filtered image-nvidia job with the expected verify flag and regex and a push guard"
+fi
 
 # A DNS or mirror blip on a hosted runner must not fail a release. Run
 # 43033654470 spent 67 minutes in the package install before apt reported

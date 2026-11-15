@@ -4,7 +4,7 @@
 # without a driver, and akmods.service cannot build one at first boot.
 #
 # Asserts presence and non-emptiness only. The signer is not asserted: a
-# MOK-signed build (#40) must pass this check.
+# MOK-signed build (#95) must pass this check.
 #
 #   build/check-nvidia-modules.sh <kernel-nvr> [modules-root]
 

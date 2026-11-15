@@ -10,7 +10,7 @@
 # /usr/src/akmods and `akmods` compiles it against the image's newest installed
 # kernel. The resulting module is unsigned, which is the documented exception in
 # docs/research/2026-11-14-nvidia-module-path-decision.md, so this variant makes
-# no Secure Boot claim and needs a per-machine MOK enrollment (#40).
+# no Secure Boot claim and needs a per-machine MOK enrollment (#95).
 #
 # build/common.sh installs this file only when Containerfile.nvidia names it in
 # PACKAGE_MANIFEST_EXTRA. The shared image does not read it.
