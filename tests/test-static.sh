@@ -1033,29 +1033,39 @@ fi
 # Changelog truncation gate: fail if the working tree's CHANGELOG.md has fewer
 # lines than the same file on the base branch. Prefer origin/main, fall back to
 # main, and emit a clear FAIL if neither resolves.
-base_ref=$(git rev-parse --verify origin/main 2>/dev/null || true)
+base_ref=$(git -C "$repo_root" rev-parse --verify origin/main 2>/dev/null || true)
 if [[ -z $base_ref ]]; then
-  base_ref=$(git rev-parse --verify main 2>/dev/null || true)
+  base_ref=$(git -C "$repo_root" rev-parse --verify main 2>/dev/null || true)
 fi
 if [[ -z $base_ref ]]; then
   echo "FAIL cannot resolve a base ref (origin/main or main); cannot compare CHANGELOG.md" >&2
   failures=$((failures + 1))
 else
-  # Get the base branch changelog line count. git show exits non-zero if the
-  # file does not exist at that ref; treat that as a failure to compare.
-  if ! base_count=$(git show "${base_ref}:CHANGELOG.md" 2>/dev/null | wc -l); then
-    echo "FAIL ${base_ref}:CHANGELOG.md not found; cannot compare changelogs" >&2
-    failures=$((failures + 1))
-  elif [[ ! -f $repo_root/CHANGELOG.md ]]; then
-    echo "FAIL CHANGELOG.md is missing from the tree; cannot compare to ${base_ref}" >&2
+  # Use a temp file so git show's exit status decides whether the file exists
+  # at the base ref. Remove the tempdir on every path.
+  tmpd=$(mktemp -d) || tmpd=""
+  if [[ -z $tmpd ]]; then
+    echo "FAIL cannot create tempdir to compare CHANGELOG.md" >&2
     failures=$((failures + 1))
   else
-    tree_count=$(wc -l < "$repo_root/CHANGELOG.md" || true)
-    if [[ $tree_count -lt $base_count ]]; then
-      echo "FAIL CHANGELOG.md truncated: ${base_ref} has ${base_count} lines, tree has ${tree_count} lines" >&2
+    if ! git -C "$repo_root" show "${base_ref}:CHANGELOG.md" >"$tmpd/base_changelog" 2>/dev/null; then
+      echo "FAIL ${base_ref}:CHANGELOG.md not found; cannot compare changelogs" >&2
       failures=$((failures + 1))
+      rm -rf "$tmpd"
+    elif [[ ! -f $repo_root/CHANGELOG.md ]]; then
+      echo "FAIL CHANGELOG.md is missing from the tree; cannot compare to ${base_ref}" >&2
+      failures=$((failures + 1))
+      rm -rf "$tmpd"
     else
-      echo "ok   CHANGELOG.md is not shorter than ${base_ref} (tree ${tree_count}, base ${base_count})"
+      base_count=$(wc -l <"$tmpd/base_changelog" || true)
+      tree_count=$(wc -l < "$repo_root/CHANGELOG.md" || true)
+      rm -rf "$tmpd"
+      if [[ $tree_count -lt $base_count ]]; then
+        echo "FAIL CHANGELOG.md truncated: ${base_ref} has ${base_count} lines, tree has ${tree_count} lines" >&2
+        failures=$((failures + 1))
+      else
+        echo "ok   CHANGELOG.md is not shorter than ${base_ref} (tree ${tree_count}, base ${base_count})"
+      fi
     fi
   fi
 fi
