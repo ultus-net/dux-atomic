@@ -85,6 +85,11 @@ The shared build copies no module and runs no build step, and nothing else in
 the tree refers to the removed paths. That is the mechanical proof that a swap
 is bounded, and it is why the leak assertion in `tests/test-static.sh` exists.
 
+CI runs that build in the `headless` job whenever a path the seam reads changes.
+The job saves `manifests/packages-desktop.txt` before deleting it, builds the
+tree, and runs `tests/verify-headless.sh`, which asserts the image carries
+neither module path and none of the manifest's package names.
+
 ## Trying a desktop before merging
 
 Build a branch that carries the replacement module as `localhost/ultus-atomic:branch`

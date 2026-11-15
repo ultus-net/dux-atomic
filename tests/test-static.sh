@@ -730,6 +730,31 @@ job_block() {
     found { print }
   ' "$workflow"
 }
+# The module's acceptance criterion is a build without it (#129), so the suite
+# carries a job that deletes the module and then reads the image. A job that
+# deletes the module and never reads the image proves only that dnf works.
+headless_block=$(job_block headless)
+if [[ -z $headless_block ]]; then
+  echo "FAIL ci.yml has no headless job, so nothing proves the image builds without the desktop module" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'needs.changes.outputs.desktop' <<<"$headless_block"; then
+  echo "FAIL the headless job is not gated on a desktop path filter" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'steps.desktop.outputs.desktop' "$workflow"; then
+  echo "FAIL the changes job publishes no desktop output, so the headless job never runs" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'rm -rf modules/desktop manifests/packages-desktop.txt' <<<"$headless_block"; then
+  echo "FAIL the headless job does not delete both module paths before its build" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'tests/verify-headless.sh localhost/dux-atomic:headless' <<<"$headless_block"; then
+  echo "FAIL the headless job builds without asserting the image carries no desktop" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'tests/verify-headless.sh' "$repo_root/tests/lint.sh"; then
+  echo "FAIL tests/lint.sh does not lint the headless verifier" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   ci.yml builds headless without the desktop module and asserts the image"
+fi
 # Assert the NVIDIA CI job and its gating and flags
 if ! grep -qF 'podman build --layers -f Containerfile.nvidia -t localhost/dux-atomic:nvidia' "$workflow" ||
    # Count the verify invocation only inside the image-nvidia job block so an

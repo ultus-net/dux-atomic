@@ -49,6 +49,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       nvidia: ${{ steps.filter.outputs.nvidia }}
+      desktop: ${{ steps.desktop.outputs.desktop }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -85,6 +86,31 @@ jobs:
             # workflow_dispatch and other events run the variant
             echo "nvidia=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - id: desktop
+        name: Path filter for the desktop module
+        run: |
+          set -euo pipefail
+          event="${{ github.event_name }}"
+          # Every path the shared build or the module tree reads. A change to one
+          # of them is what can make a headless build stop working.
+          regex='^(Containerfile$|build/|overlay/|modules/|manifests/packages-desktop[.]txt$|tests/verify-headless[.]sh$)'
+          matched=false
+          if [[ "$event" == 'pull_request' ]]; then
+            if git diff --name-only "${{ github.event.pull_request.base.sha }}...HEAD" | grep -Eq "$regex"; then
+              matched=true
+            fi
+          elif [[ "$event" == 'push' ]]; then
+            before="${{ github.event.before }}"
+            if [[ -z "$before" || "$before" =~ ^0+$ ]]; then
+              matched=true
+            elif git diff --name-only "$before...HEAD" | grep -Eq "$regex"; then
+              matched=true
+            fi
+          else
+            matched=true
+          fi
+          echo "desktop=$matched" >> "$GITHUB_OUTPUT"
 
   # Proves the signature policy mechanism with a fixture key on a throwaway
   # registry. No image artifact and no OIDC identity: the shipped keyless policy
@@ -278,6 +304,45 @@ jobs:
           mapfile -t names < <(grep -Ev '^[[:space:]]*(#.*)?$' manifests/packages-nvidia.txt)
           podman run --rm localhost/dux-atomic:nvidia rpm -q "${names[@]}" ||
             { echo "FAIL a name from manifests/packages-nvidia.txt does not resolve in the variant" >&2; exit 1; }
+
+  # The desktop is a module (#129). Build the tree with the module deleted, so a
+  # change that puts a desktop path back into the shared build reds here instead
+  # of shipping a tree that only builds with its desktop present.
+  headless:
+    needs: [static, changes]
+    if: needs.changes.outputs.desktop == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Free runner disk space
+        uses: jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 # v2.0.0
+        with:
+          preinstalled-runtimes: false
+          android: true
+          dotnet: true
+          haskell: true
+          swap-storage: true
+
+      - name: Install podman
+        run: build/install-packages.sh podman
+
+      - name: Remove the desktop module
+        run: |
+          # Keep the manifest so the verifier can assert none of its names landed.
+          git show HEAD:manifests/packages-desktop.txt > "$RUNNER_TEMP/packages-desktop.txt"
+          rm -rf modules/desktop manifests/packages-desktop.txt
+          test ! -e modules/desktop
+          test ! -e manifests/packages-desktop.txt
+
+      - name: Build headless
+        run: podman build --layers -t localhost/dux-atomic:headless .
+
+      - name: Verify the headless image carries no desktop
+        run: tests/verify-headless.sh localhost/dux-atomic:headless "$RUNNER_TEMP/packages-desktop.txt"
 
   # The only job with write token and OIDC identity. It checks out the repository
   # for the shared package installer and never builds image content: it loads the

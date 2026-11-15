@@ -42,6 +42,7 @@ bash_scripts=(
   tests/test-agent-container.sh
   tests/test-lock-drift.sh
   tests/verify-image.sh
+  tests/verify-headless.sh
   tests/verify-kernel-signature.sh
   tests/vm/boot-smoke.sh
   tests/vm/make-disk.sh
