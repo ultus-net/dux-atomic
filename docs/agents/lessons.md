@@ -35,3 +35,5 @@ carrying its id in the bullet and registered below.
 
 - L007 — a closing keyword in code formatting does not close the issue: the forge reads the rendered body, so `Fixes #123` in backticks leaves the work item open, and the check is the issue's state after the merge (evidence: PR #124 merged 2026-11-15T06:31:51Z, `#123` closed by hand at 2026-11-15T08:39:21Z, `docs/agents/lessons/20261115T090646Z-a-closing-keyword-in-code-formatting-does-not-close.md`)
 
+- L008 — a green single script is not a green suite: before calling a gate bypassable, run the command CI runs and read its order, because a false green in a later step is unreachable when an earlier step rejects the input (evidence: `bash tests/test-static.sh` exit 0 on a workflow `tests/lint.sh` rejects with `.github/workflows/ci.yml:275:0: could not parse as YAML`, `docs/agents/lessons/20261115T093500Z-a-green-single-script-is-not-a-green-suite.md`)
+
