@@ -19,8 +19,9 @@ COPY overlay /overlay
 # The base is pinned to a digest, and the tag stays for readers. The pin is a
 # literal rather than an ARG: Dependabot reads a file whose name matches
 # containerfile|dockerfile, and never expands an ARG into FROM.
-# tests/test-static.sh asserts the tag+digest form.
-FROM quay.io/fedora/fedora-bootc:45@sha256:42259b1db41a7f792a19cfd28e0c66e3e415392109a7d7095f292ad1e2a56453
+# tests/test-static.sh asserts the tag+digest form and the registry: quay deletes
+# the previous daily digest, Fedora's registry keeps it.
+FROM registry.fedoraproject.org/fedora-bootc:45@sha256:42259b1db41a7f792a19cfd28e0c66e3e415392109a7d7095f292ad1e2a56453
 
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache \
