@@ -1,11 +1,23 @@
 #!/bin/bash
-# Build-time desktop provisioning: run only inside the image build when the
-# desktop overlay subtree is present. This script preserves the previous
-# assertions and presets that used to live in build/common.sh.
-set -eu
+# Build-time desktop provisioning. The shared build runs this only when the
+# module ships it, so everything a desktop needs lives with the desktop. It
+# reads the module's manifest from the build context, so the desktop's
+# repositories, packages and presets are one unit. A variant replaces this file
+# together with the rest of overlay/desktop/.
+set -ouex pipefail
 
-# Apply the user preset for the first-login units and assert their enabled
-# state for new accounts.
+# The desktop packages come from the Dux COPRs. duxlabs/dms pulls
+# duxlabs/dux-repo, which also carries the terminal and the shell.
+dnf5 -y copr enable duxlabs/dms
+dnf5 -y copr enable duxlabs/dux-repo
+
+source /ctx/build/manifest.sh
+install_manifest /ctx/manifests/packages-desktop.txt
+
+# A new account gets the desktop on its first graphical login. A user preset
+# enables both units, and the image-level compositor binding keeps the shell
+# running for an account that already owns a config and skips setup. The
+# fallback session never starts the compositor.
 systemctl --global preset dux-atomic-desktop.service dux-atomic-dms-defaults.service
 for unit in dux-atomic-desktop dux-atomic-dms-defaults; do
   test -L "/etc/systemd/user/graphical-session-pre.target.wants/${unit}.service" || {
@@ -13,8 +25,6 @@ for unit in dux-atomic-desktop dux-atomic-dms-defaults; do
     exit 1
   }
 done
-
-# Ensure the session-level units and bindings that make the desktop work exist.
 for unit in /usr/lib/systemd/user/dms.service /usr/lib/systemd/user/niri.service; do
   test -f "$unit" || {
     echo "missing ${unit}; the first-login binding would dangle" >&2
@@ -22,13 +32,11 @@ for unit in /usr/lib/systemd/user/dms.service /usr/lib/systemd/user/niri.service
   }
 done
 test -L /usr/lib/systemd/user/niri.service.wants/dms.service || {
-  echo "a compositor binding (niri -> dms) is not present for new accounts" >&2
+  echo "the shell is not bound to the compositor for new accounts" >&2
   exit 1
 }
-
-# The desktop's CLI must exist so first-login setup can run.
 test -f /usr/bin/dms || {
-  echo "the desktop's session binary is missing; first-login setup would fail" >&2
+  echo "the desktop CLI is missing; first-login setup would fail" >&2
   exit 1
 }
 test -x /usr/libexec/dux-atomic/needs-setup.sh || {
@@ -45,12 +53,12 @@ grep -qx 'ExecStartPost=/usr/bin/install -Dm0644 /dev/null %S/dux-atomic/desktop
   exit 1
 }
 test -f /usr/share/dux-atomic/dms/session.json || {
-  echo "the DMS session seed is missing" >&2
+  echo "the session state seed is missing" >&2
   exit 1
 }
 
-# Greeter seeding: ensure the greeter defaults, its wants, and the memory seed
-# exist so a fresh boot deterministically selects the desktop session.
+# The greeter picks session index 0 when it has no memory, and the desktop-file
+# order is asynchronous. Seed the compositor's session as the first login.
 for path in \
   /usr/lib/systemd/system/dux-atomic-greeter-defaults.service \
   /usr/lib/systemd/system/greetd.service.wants/dux-atomic-greeter-defaults.service \
@@ -66,6 +74,9 @@ getent passwd greeter >/dev/null || {
 }
 
 # The greeter compositor needs the video, render, and input device groups.
+# shadow-utils reads only /etc/group, so copy the vendor groups from
+# /usr/lib/group into /etc/group first. usermod exits 0 for a group it cannot
+# find, so assert the membership afterwards.
 for group in video render input; do
   grep -q "^${group}:" /etc/group || grep "^${group}:" /usr/lib/group >> /etc/group
 done
@@ -77,15 +88,39 @@ for group in video render input; do
   }
 done
 
-# Desktop-specific greeter seeding and memberships are handled by this
-# provisioner; tmpfiles and ownership checks are performed at the common
-# build level to keep runtime /var assertions in a single place.
+# Check the greeter tmpfiles rule in a scratch root, so the image keeps no
+# runtime /var content. The passwd and group copies let tmpfiles resolve owner
+# names against the scratch root.
+check_root=$(mktemp -d)
+# Remove the scratch root on any exit, including a failed assertion.
+trap 'rm -rf "$check_root"' EXIT
+mkdir -p "$check_root/etc"
+cp /etc/passwd /etc/group "$check_root/etc/"
+systemd-tmpfiles --create --root="$check_root" /usr/lib/tmpfiles.d/dux-atomic-greetd.conf || {
+  echo "greeter tmpfiles rule failed" >&2
+  exit 1
+}
+portal_mask=$check_root/var/lib/greeter/.config/systemd/user/xdg-desktop-portal.service
+test -L "$portal_mask" || {
+  echo "greeter portal mask was not created" >&2
+  exit 1
+}
+test "$(readlink "$portal_mask")" = /dev/null || {
+  echo "greeter portal mask does not point at /dev/null" >&2
+  exit 1
+}
+test "$(stat -c %U:%G "$check_root/var/lib/greeter")" = "greeter:greeter" || {
+  echo "greeter home is not owned by greeter" >&2
+  exit 1
+}
+rm -rf "$check_root"
+trap - EXIT
 
-# Leave the COPRs disabled in the final image. RPM Fusion free and nonfree stay
-# enabled on purpose: Steam's day-2 dependencies resolve from them.
+# Leave the COPRs disabled in the final image.
 dnf5 -y copr disable duxlabs/dms
 dnf5 -y copr disable duxlabs/dux-repo
 
 # Enable the greeter. The package ships /etc/greetd/config.toml already
-# pointing at dms-greeter with niri; the enable helper needs a live user.
+# pointing at the greeter with the compositor; the enable helper needs a live
+# user.
 systemctl enable greetd

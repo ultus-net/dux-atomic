@@ -1,13 +1,14 @@
 #!/bin/bash
-# Common image build: apply the overlay, enable the Dux COPRs, then install the
-# shared package set. Runs inside the image with /ctx holding the build context.
+# Common image build: apply the overlay, install the shared package set, then
+# hand over to an optional desktop module. Runs inside the image with /ctx
+# holding the build context.
 
 set -ouex pipefail
 
 cp -avf /ctx/overlay/. /
-# If a desktop subtree is present, copy it separately so a variant can replace
-# the desktop wholesale by providing overlay/desktop/ instead of files at the
-# overlay root.
+# A desktop module ships its files under overlay/desktop/ and is copied last, so
+# a module provided by a variant replaces those paths wholesale. The copy is
+# skipped when the module is absent, which is what makes a headless build work.
 if [[ -d /ctx/overlay/desktop ]]; then
   cp -avf /ctx/overlay/desktop/. /
 fi
@@ -15,11 +16,6 @@ fi
 # The Fedora base ships dnf5 without its plugins, and `copr` is a plugin
 # subcommand. Install it before any repository work.
 dnf5 install -y dnf5-plugins
-
-# Dux shell and greeter come from duxlabs. duxlabs/dms pulls duxlabs/dux-repo,
-# which also carries ghostty and quickshell.
-dnf5 -y copr enable duxlabs/dms
-dnf5 -y copr enable duxlabs/dux-repo
 
 # RPM Fusion free and nonfree replace negativo17's fedora-multimedia repository,
 # which the Fedora base does not carry and which states it is not RPM Fusion
@@ -39,31 +35,7 @@ manifest=/ctx/manifests/packages-common.txt
 
 # One installer for every manifest, so a variant's extra set takes the same
 # read-failure and word-splitting rules as the shared set.
-install_manifest() {
-  local path=$1 packages status
-  if [[ ! -r $path ]]; then
-    echo "cannot read ${path}" >&2
-    exit 1
-  fi
-  # grep exits 1 for an all-comment manifest, which is not an error. Any other
-  # non-zero exit is a read failure and must fail the build.
-  if packages=$(grep -Ev '^[[:space:]]*(#.*)?$' "$path"); then
-    :
-  else
-    status=$?
-    if ((status != 1)); then
-      echo "cannot read ${path} (grep exit ${status})" >&2
-      exit 1
-    fi
-    packages=
-  fi
-  if [[ -n $packages ]]; then
-    # Word splitting is intended: the manifest is one package per line.
-    dnf5 install -y $packages
-  else
-    echo "no packages in ${path} yet"
-  fi
-}
+source /ctx/build/manifest.sh
 
 install_manifest "$manifest"
 
@@ -102,42 +74,10 @@ install -d /etc/flatpak/remotes.d
 curl --retry 3 -fsSLo /etc/flatpak/remotes.d/flathub.flatpakrepo \
   https://dl.flathub.org/repo/flathub.flatpakrepo
 
+# The desktop is optional and entirely its own: the module ships this
+# provisioner inside overlay/desktop/, so a tree without that subtree installs
+# no desktop and runs nothing here. The shared build knows the path and no
+# desktop package, unit or command.
 if [[ -f /usr/libexec/dux-atomic/desktop-provision.sh ]]; then
   bash /usr/libexec/dux-atomic/desktop-provision.sh
 fi
-
-# Check the greeter tmpfiles rule in a scratch root, so the image keeps no
-# runtime /var content. The passwd and group copies let tmpfiles resolve owner
-# names against the scratch root. This is a build-level check, not a desktop
-# product assertion, so keep it in the common build path.
-check_root=$(mktemp -d)
-# Remove the scratch root on any exit, including a failed assertion.
-trap 'rm -rf "$check_root"' EXIT
-mkdir -p "$check_root/etc"
-cp /etc/passwd /etc/group "$check_root/etc/"
-systemd-tmpfiles --create --root="$check_root" /usr/lib/tmpfiles.d/dux-atomic-greetd.conf || {
-  echo "greeter tmpfiles rule failed" >&2
-  exit 1
-}
-portal_mask=$check_root/var/lib/greeter/.config/systemd/user/xdg-desktop-portal.service
-test -L "$portal_mask" || {
-  echo "greeter portal mask was not created" >&2
-  exit 1
-}
-test "$(readlink "$portal_mask")" = /dev/null || {
-  echo "greeter portal mask does not point at /dev/null" >&2
-  exit 1
-}
-test "$(stat -c %U:%G "$check_root/var/lib/greeter")" = "greeter:greeter" || {
-  echo "greeter home is not owned by greeter" >&2
-  exit 1
-}
-
-# Leave the COPRs disabled in the final image. RPM Fusion free and nonfree stay
-# enabled on purpose: Steam's day-2 dependencies resolve from them.
-dnf5 -y copr disable duxlabs/dms
-dnf5 -y copr disable duxlabs/dux-repo
-
-# Enable the greeter. The package ships /etc/greetd/config.toml already
-# pointing at dms-greeter with niri; the enable helper needs a live user.
-systemctl enable greetd

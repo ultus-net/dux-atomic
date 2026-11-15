@@ -20,44 +20,82 @@ runtime=${CONTAINER_RUNTIME:-podman}
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 
 "$runtime" run --rm "$image" bootc container lint
-# Contract checks: session entry exists, greeter seed present, compositor
-# bindings resolve, and the first-login provisioner/preset pieces are present.
-session_entry=$("$runtime" run --rm "$image" bash -c 'find /usr -type f -path "*/dms/session.json" -print -quit' || true)
-if [[ -z $session_entry ]]; then
-  echo "FAIL no desktop session entry found in image under */dms/session.json" >&2
-  exit 1
-fi
-greeter_seed_present=$("$runtime" run --rm "$image" bash -c 'test -f /usr/share/dux-atomic/greeter/memory.json && grep -q "lastSessionDesktopId" /usr/share/dux-atomic/greeter/memory.json && echo ok || true' || true)
-if [[ $greeter_seed_present != ok ]]; then
-  echo "FAIL greeter memory seed missing or lacking lastSessionDesktopId in image" >&2
-  exit 1
-fi
-# Compositor binding resolution: any unit wants symlink under /usr/lib/systemd/user/*/.wants must point at an existing unit.
-binding_bad=$("$runtime" run --rm "$image" bash -ec '
-  bad=0
-  while IFS= read -r -d "" link; do
-    target=$(readlink "$link")
-    if [[ ! -e "${target}" ]]; then
-      echo "$link -> $target"
-      bad=1
+# The desktop contract, expressed in terms any desktop satisfies: the units the
+# image's own presets enable exist and verify, every binding resolves, the
+# greeter command and a session entry name executables, and first-login setup is
+# ordered, bounded and idempotent. Nothing below names the shipped desktop, so
+# these assertions survive a swap.
+"$runtime" run --rm -i "$image" bash -s <<'IN_IMAGE'
+set -euo pipefail
+fail() { echo "$*" >&2; exit 1; }
+
+# A file in the preset or unit directories that no package owns is the image's
+# own, which is the product-neutral way to find the desktop's wiring.
+image_own() {
+  local dir=$1 file
+  for file in "$dir"/*; do
+    rpm -qf "$file" >/dev/null 2>&1 || echo "$file"
+  done
+}
+
+mapfile -t own_presets < <(image_own /usr/lib/systemd/user-preset)
+((${#own_presets[@]} > 0)) || fail "FAIL the image ships no user preset of its own"
+mapfile -t preset_units < <(awk '$1 == "enable" { print $2 }' "${own_presets[@]}")
+((${#preset_units[@]} > 0)) || fail "FAIL the image's own user preset enables no unit"
+for unit in "${preset_units[@]}"; do
+  [[ -f /usr/lib/systemd/user/$unit ]] || fail "FAIL the preset enables $unit, which the image does not ship"
+done
+systemd-analyze verify "${preset_units[@]/#//usr/lib/systemd/user/}" ||
+  fail "FAIL a unit the image enables for new accounts does not verify"
+
+# Every binding in the image resolves, so no session starts against a missing
+# unit.
+bad=
+while IFS= read -r -d '' link; do
+  target=$(readlink "$link")
+  [[ -e $target ]] || bad+="$link -> $target"$'\n'
+done < <(find /usr/lib/systemd/system /usr/lib/systemd/user -type l \
+  \( -path '*/.wants/*' -o -path '*/.requires/*' \) -print0)
+[[ -z $bad ]] || fail "FAIL bindings point at missing units:"$'\n'"$bad"
+
+# The greeter is configured and its command resolves.
+[[ -f /etc/greetd/config.toml ]] || fail "FAIL the image ships no greeter configuration"
+greeter_cmd=$(sed -n 's/^[[:space:]]*command[[:space:]]*=[[:space:]]*//p' /etc/greetd/config.toml | head -1)
+greeter_cmd=${greeter_cmd//\"/}
+greeter_cmd=${greeter_cmd%% *}
+[[ -n $greeter_cmd ]] || fail "FAIL the greeter configuration names no command"
+command -v "$greeter_cmd" >/dev/null || fail "FAIL the greeter command '$greeter_cmd' does not resolve"
+
+# A session entry exists and names an executable, so the greeter can start one.
+session=
+for dir in /usr/share/wayland-sessions /usr/share/xsessions; do
+  for entry in "$dir"/*.desktop; do
+    [[ -f $entry ]] || continue
+    session_cmd=$(sed -n 's/^Exec=//p' "$entry" | head -1)
+    session_cmd=${session_cmd%% *}
+    if [[ -n $session_cmd ]] && command -v "$session_cmd" >/dev/null 2>&1; then
+      session=$entry
     fi
-  done < <(find /usr/lib/systemd/user -type l -path "*/.wants/*" -print0)
-  exit $bad
-' || true)
-if [[ -n $binding_bad ]]; then
-  echo "FAIL a compositor/service binding in image points at a missing unit: $binding_bad" >&2
-  exit 1
-fi
-# First-login provisioning pieces: condition script executable and at least one user preset enabling units exists.
-if ! "$runtime" run --rm "$image" test -x /usr/libexec/dux-atomic/needs-setup.sh >/dev/null 2>&1; then
-  echo "FAIL /usr/libexec/dux-atomic/needs-setup.sh missing or not executable in image" >&2
-  exit 1
-fi
-preset_ok=$("$runtime" run --rm "$image" bash -c 'grep -q "^enable " /usr/lib/systemd/user-preset/*.preset 2>/dev/null && echo ok || true' || true)
-if [[ $preset_ok != ok ]]; then
-  echo "FAIL no user preset enabling first-login units found in image" >&2
-  exit 1
-fi
+  done
+done
+[[ -n $session ]] || fail "FAIL no session entry names an executable"
+
+# First-login setup is gated, ordered, bounded and marks completion, so a crash
+# retries and a hang cannot hold the session open.
+mapfile -t own_units < <(image_own /usr/lib/systemd/user)
+setup_unit=
+for unit in "${own_units[@]}"; do
+  grep -q '^ExecCondition=' "$unit" && setup_unit=$unit
+done
+[[ -n $setup_unit ]] || fail "FAIL no user unit gates first-login setup on a condition"
+condition=$(sed -n 's/^ExecCondition=//p' "$setup_unit" | head -1)
+[[ -x $condition ]] || fail "FAIL the first-login condition $condition is not executable"
+grep -q '^Before=graphical-session-pre.target' "$setup_unit" ||
+  fail "FAIL the first-login unit is not ordered before the session"
+grep -q '^TimeoutStartSec=' "$setup_unit" || fail "FAIL the first-login unit has no start timeout"
+grep -q '^ExecStartPost=' "$setup_unit" || fail "FAIL the first-login unit writes no completion marker"
+IN_IMAGE
+echo "ok   the desktop contract holds: preset units verify, bindings resolve, the greeter and a session start, first-login is bounded"
 # The pinned base's /etc/dnf/dnf.conf carries only a comment and [main], and the
 # overlay replaces it with the linutil Configure DNF defaults (#111). Ask dnf5
 # for the values it resolves, so a file that parses but is not read still reds.
@@ -83,16 +121,19 @@ if [[ $zone_services != 'dhcpv6-client ssh' ]]; then
   exit 1
 fi
 echo "ok   the public zone allows exactly dhcpv6-client and ssh (#116)"
-# The Fedora base carries no desktop, so every name in the manifest has to
-# resolve in the built image. Query all of them in one call, so a silently
-# dropped name fails here rather than at the first login, and a new manifest
-# entry is covered without touching this script. Two entries are provides
-# (dms-greeter, xinit), so query by whatprovides rather than package name.
-packages=$(grep -Ev '^[[:space:]]*(#.*)?$' "$repo_root/manifests/packages-common.txt")
+# Every name in every manifest has to resolve in the built image. Query them in
+# one call, so a silently dropped name fails here rather than at the first
+# login, and a new manifest entry is covered without touching this script. Some
+# entries are provides rather than package names (xinit), so query by
+# whatprovides.
+manifests=("$repo_root/manifests/packages-common.txt")
+desktop_manifest=$repo_root/manifests/packages-desktop.txt
+[[ -f $desktop_manifest ]] && manifests+=("$desktop_manifest")
+packages=$(grep -hEv '^[[:space:]]*(#.*)?$' "${manifests[@]}")
 # shellcheck disable=SC2086 # Word splitting is intended: the manifest is one name per line.
 if ! "$runtime" run --rm "$image" rpm -q --whatprovides $packages >/dev/null; then
   "$runtime" run --rm "$image" rpm -q --whatprovides $packages >&2 || true
-  echo "FAIL a name from manifests/packages-common.txt does not resolve in the image" >&2
+  echo "FAIL a name from a manifest does not resolve in the image" >&2
   exit 1
 fi
 # The Fedora base enables sshd.service, and this image documents that a fresh

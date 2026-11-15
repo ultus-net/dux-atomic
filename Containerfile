@@ -7,8 +7,9 @@
 # The base is Fedora's own bootc image rather than a Universal Blue desktop
 # image. Fedora signs the kernel and its modules, so a Secure Boot machine
 # trusts the whole chain with no per-machine MOK enrollment, and the base
-# carries no desktop environment to strip (#59). Every desktop package the
-# image needs is named in manifests/packages-common.txt.
+# carries no desktop environment to strip (#59). Every package the image needs
+# is named in a manifest under manifests/; the desktop's set is
+# manifests/packages-desktop.txt and the rest is the headless baseline.
 
 # Allow build scripts to be referenced without being copied into the final image.
 FROM scratch AS ctx

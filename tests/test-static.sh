@@ -323,26 +323,135 @@ else
   echo "ok   docs/developer-tooling.md inventories all 23 Brewfile names in order and links the measurement"
 fi
 
-# Contract tests for the desktop seam. Rather than pinning product names like
-# dms/niri/ghostty, assert the properties that any desktop must provide.
-session_entry=$(find "$repo_root/overlay" -type f -path '*/dms/session.json' -print -quit || true)
-greeter_seed=$(find "$repo_root/overlay" -type f -path '*/greeter/memory.json' -print -quit || true)
-preset_file=$(find "$repo_root/overlay" -type f -path '*/user-preset/*.preset' -print -quit || true)
-
-if [[ -z $session_entry ]]; then
-  echo "FAIL no desktop session entry under overlay/*/dms/session.json" >&2
+# The desktop is one module: manifests/packages-desktop.txt plus overlay/desktop/.
+# A swap replaces those two paths and a headless build deletes them, so pin the
+# seam rather than the product. The invariant: the shared build, the shared
+# manifest, the image definition and the image verifier name no desktop product;
+# only the module, the tests that exercise it and the documents that describe it
+# may. The properties below are the ones any desktop must keep, so they survive
+# a swap.
+desktop_manifest=$repo_root/manifests/packages-desktop.txt
+desktop_overlay=$repo_root/overlay/desktop
+desktop_names='dms|dms-greeter|niri|ghostty|quickshell|matugen|dux-search|dux-calendar|dux-files'
+leaks=
+if [[ ! -f $desktop_manifest ]] || [[ ! -d $desktop_overlay ]]; then
+  echo "FAIL the desktop module needs both manifests/packages-desktop.txt and overlay/desktop/" >&2
   failures=$((failures + 1))
-elif [[ -z $greeter_seed ]] || ! grep -q 'lastSessionDesktopId' "$greeter_seed"; then
-  echo "FAIL greeter memory seed missing or lacks lastSessionDesktopId" >&2
-  failures=$((failures + 1))
-elif [[ -z $preset_file ]] || ! grep -q '^enable ' "$preset_file"; then
-  echo "FAIL no user preset enabling first-login units was found" >&2
-  failures=$((failures + 1))
-elif ! grep -qF 'cp -avf /ctx/overlay/desktop' "$repo_root/build/common.sh" || ! grep -qF 'desktop-provision.sh' "$repo_root/build/common.sh"; then
-  echo "FAIL build/common.sh does not copy or invoke the desktop provisioner" >&2
+elif ! grep -qx 'install_manifest /ctx/manifests/packages-desktop.txt' "$desktop_overlay/usr/libexec/dux-atomic/desktop-provision.sh"; then
+  echo "FAIL the desktop provisioner does not install the desktop manifest" >&2
   failures=$((failures + 1))
 else
-  echo "ok   the desktop seam: session entry, greeter seed, preset and provisioner present"
+  # Reachable shared files only. manifests/packages-common.lock records the
+  # origin of what landed and the changelog records history, so both keep the
+  # old names.
+  while IFS= read -r shared; do
+    if grep -qE "(^|[^[:alnum:]_-])(${desktop_names})([^[:alnum:]_-]|$)" "$shared"; then
+      leaks+="${shared#"$repo_root"/}"$'\n'
+    fi
+  done < <(
+    echo "$repo_root/Containerfile"
+    echo "$repo_root/manifests/packages-common.txt"
+    echo "$repo_root/tests/verify-image.sh"
+    find "$repo_root/build" -type f -print
+    find "$repo_root/overlay" -path "$desktop_overlay" -prune -o -type f -print
+  )
+  if [[ -n $leaks ]]; then
+    echo "FAIL the shared build names a desktop product outside the module:" >&2
+    printf '%s' "$leaks" >&2
+    failures=$((failures + 1))
+  else
+    echo "ok   no desktop product name leaks outside the module"
+  fi
+fi
+
+# First-login setup keeps its safety contract: no unit runs as root or as the
+# greeter, every one is ordered into the session, and the setup unit is bounded,
+# gated on a condition script, and marks completion so a retry cannot redo it.
+module_units=$(find "$desktop_overlay/usr/lib/systemd" -type f -name '*.service' -path '*/user/*' 2>/dev/null || true)
+if [[ -z $module_units ]]; then
+  echo "FAIL the desktop module ships no user unit" >&2
+  failures=$((failures + 1))
+else
+  unit_failures=0
+  for unit in $module_units; do
+    for line in 'ConditionUser=!root' 'ConditionUser=!greeter' 'Before='; do
+      grep -q "^${line}" "$unit" || {
+        echo "FAIL ${unit#"$repo_root"/} does not carry ${line}" >&2
+        unit_failures=1
+      }
+    done
+  done
+  setup_unit=$(grep -l '^ExecCondition=' $module_units 2>/dev/null | head -1 || true)
+  if [[ -z $setup_unit ]]; then
+    echo "FAIL no desktop user unit gates first-login setup on a condition script" >&2
+    unit_failures=1
+  else
+    condition=$(sed -n 's/^ExecCondition=//p' "$setup_unit" | head -1)
+    grep -q '^TimeoutStartSec=' "$setup_unit" || {
+      echo "FAIL ${setup_unit#"$repo_root"/} has no start timeout" >&2
+      unit_failures=1
+    }
+    grep -q '^ExecStartPost=' "$setup_unit" || {
+      echo "FAIL ${setup_unit#"$repo_root"/} writes no completion marker" >&2
+      unit_failures=1
+    }
+    [[ -n $condition && -x $desktop_overlay$condition ]] || {
+      echo "FAIL the first-login condition script '${condition}' is missing or not executable in the module" >&2
+      unit_failures=1
+    }
+  fi
+  if ((unit_failures == 0)); then
+    echo "ok   the desktop units refuse root and the greeter, are ordered, and bound first-login setup"
+  else
+    failures=$((failures + 1))
+  fi
+fi
+
+# The greeter seeds a session choice before greetd starts, and a seeded file is
+# JSON the greeter can read.
+all_module_units=$(find "$desktop_overlay/usr/lib/systemd" -type f -name '*.service' 2>/dev/null || true)
+greeter_unit=$(grep -l '^Before=greetd.service' $all_module_units 2>/dev/null | head -1 || true)
+seed=$(find "$desktop_overlay" -name 'memory.json' -print -quit 2>/dev/null || true)
+if [[ -z $greeter_unit ]]; then
+  echo "FAIL no desktop unit seeds the greeter before it starts" >&2
+  failures=$((failures + 1))
+elif [[ -z $seed ]] || ! python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$seed" 2>/dev/null; then
+  echo "FAIL the greeter seed is missing or is not JSON" >&2
+  failures=$((failures + 1))
+elif ! grep -q 'Session' "$seed"; then
+  echo "FAIL the greeter seed names no session" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the greeter seed is JSON and pins a session name"
+fi
+
+# Bindings travel with the module and name an absolute unit path, so a swap
+# cannot leave a link pointing at a name only the old desktop shipped. The
+# image test proves each target resolves after installation.
+binding_failures=0
+while IFS= read -r link; do
+  target=$(readlink "$link")
+  case $target in
+    /usr/lib/systemd/*) ;;
+    *) echo "FAIL ${link#"$repo_root"/} points at '${target}', not an absolute unit path" >&2
+       binding_failures=1 ;;
+  esac
+done < <(find "$desktop_overlay" -type l)
+if ((binding_failures == 0)); then
+  echo "ok   every desktop binding names an absolute unit path inside the module's overlay"
+else
+  failures=$((failures + 1))
+fi
+
+# The swap procedure is documentation, so a swap that costs more than the two
+# module paths reds here until the document says otherwise.
+if [[ ! -f $repo_root/docs/desktop.md ]] ||
+   ! grep -qF 'manifests/packages-desktop.txt' "$repo_root/docs/desktop.md" ||
+   ! grep -qF 'overlay/desktop/' "$repo_root/docs/desktop.md"; then
+  echo "FAIL docs/desktop.md is missing or does not name both module paths" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   docs/desktop.md names the two paths a desktop swap replaces"
 fi
 
 # The first-login condition decides retry vs skip. Run the real script against
@@ -381,8 +490,7 @@ for spec in fresh:run partial:run user:skip done:skip reset:run xdgstate:skip; d
     env_args+=("XDG_STATE_HOME=")
   fi
   # Exit 0 means run, 1 means skip. A crash is neither and must fail the test.
-  # Invoke under 'sh' so the script need not be executable in the worktree.
-  if env "${env_args[@]}" sh "$condition"; then status=0; else status=$?; fi
+  if env "${env_args[@]}" "$condition"; then status=0; else status=$?; fi
   case $status in
     0) got=run ;;
     1) got=skip ;;
@@ -432,16 +540,17 @@ if ! grep -qF 'wait_for "DUX_USER:${test_user}"' "$boot_smoke" ||
    grep -qF "wait_for 'DUX_PROBE_END'" "$boot_smoke"; then
   echo "FAIL boot-smoke waits on an echoed marker instead of printf output" >&2
   failures=$((failures + 1))
-elif ! grep -qF 'readlink "$portal_mask"' "$common" ||
-     ! grep -qF '= /dev/null' "$common" ||
-     ! grep -qF "trap 'rm -rf \"\$check_root\"' EXIT" "$common" ||
-     ! grep -qF 'cannot read ${path}' "$common" ||
+elif ! grep -qF 'readlink "$portal_mask"' "$desktop_overlay/usr/libexec/dux-atomic/desktop-provision.sh" ||
+     ! grep -qF '= /dev/null' "$desktop_overlay/usr/libexec/dux-atomic/desktop-provision.sh" ||
+     ! grep -qF "trap 'rm -rf \"\$check_root\"' EXIT" "$desktop_overlay/usr/libexec/dux-atomic/desktop-provision.sh" ||
+     ! grep -qF 'cannot read ${path}' "$repo_root/build/manifest.sh" ||
      ! grep -qF 'install_manifest "$manifest"' "$common" ||
+     ! grep -qF 'install_manifest /ctx/manifests/packages-desktop.txt' "$desktop_overlay/usr/libexec/dux-atomic/desktop-provision.sh" ||
      grep -qF 'packages-common.txt || true' "$common"; then
-  echo "FAIL build/common.sh does not assert the portal mask target, trap the scratch root, or read every manifest fail-closed" >&2
+  echo "FAIL the greeter mask, the manifest reader or a manifest install does not fail closed" >&2
   failures=$((failures + 1))
 else
-  echo "ok   the vm login probes and greeter mask fail closed"
+  echo "ok   the greeter mask and both manifest installs fail closed"
 fi
 
 # boot-smoke.sh gained an opt-in POST_LOGIN_CMD hook for automated post-login
