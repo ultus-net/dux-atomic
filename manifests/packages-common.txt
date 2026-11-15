@@ -62,6 +62,7 @@ xorg-x11-server-Xwayland
 libva-intel-media-driver
 gstreamer1-plugins-good
 gstreamer1-plugin-libav
+ffmpeg
 google-noto-color-emoji-fonts
 
 # Terminal tools, containers and Flatpak

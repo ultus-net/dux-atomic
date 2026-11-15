@@ -17,10 +17,10 @@ The image ships the applications that need the operating system: Steam and its g
 
 ## Steam licence
 
-Steam is proprietary. The Steam spec in RPM Fusion permits redistribution of the Linux client, so the image may ship the RPM; redistribution does not relicense it, and the client stays under Valve's terms. `steam-1.0.0.87-4.fc45` comes from the already-enabled `fedora-multimedia` repository, which rebuilds that same spec, so the redistribution permission carries over. Fedora's own repositories do not carry the client.
+Steam is proprietary. The Steam spec in RPM Fusion permits redistribution of the Linux client, so the image may ship the RPM; redistribution does not relicense it, and the client stays under Valve's terms. `steam-1.0.0.87-4.fc45` comes from RPM Fusion nonfree, so the permission travels with the package the image installs. Fedora's own repositories do not carry the client. Until #112 the image took that package from negativo17's `fedora-multimedia`, whose rebuild of the same spec carried the same permission.
 
 ## Measured cost
 
-`dnf5 install --assumeno steam` resolves to 249 packages, 226 MiB downloaded and 779 MiB installed, with 4 upgrades and 5 replacements, so the download is not purely additive on disk. Steam needs a 32-bit userspace, which Fedora 45 ships, and `fedora-multimedia` publishes matched i686 and x86_64 mesa 26.2.6, so the 32-bit Vulkan driver tracks the 64-bit one. `tests/verify-image.sh` asserts that every package the gaming group names is installed in the built image: `steam`, `gamescope`, `mangohud`, `steam-devices`, and `mesa-vulkan-drivers.i686`.
+`dnf5 install --assumeno steam` on the pinned base with RPM Fusion free and nonfree enabled resolves 462 packages, 190 of them i686, for 393 MiB of inbound packages and about 1 GiB of extra disk, with one replacement of `dbus-libs`, so the install is not purely additive. Steam needs a 32-bit userspace, which Fedora 45 ships, and Fedora publishes `mesa-vulkan-drivers` for both i686 and x86_64, so the 32-bit Vulkan driver tracks the 64-bit one. The figure replaces the pre-migration one, which was measured against a repository the image no longer enables and a base state the RPM Fusion transaction does not reproduce. `tests/verify-image.sh` asserts that every package the gaming group names is installed in the built image: `steam`, `gamescope`, `mangohud`, `steam-devices`, and `mesa-vulkan-drivers.i686`.
 
 Lutris follows in a later commit, after the gaming dogfood. The NVIDIA variant is a separate change.
