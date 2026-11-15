@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Correct three roadmap rows that no longer matched the repository: `main` is `caffce3` with six open work items, the developer tooling layer landed in #67 instead of sitting in review, and the agent container is built with a recorded run in #71. Adds Task 7's missing status line. No behaviour change.
 - Record the VM measurement path for issue #68: the four btrfs measurements may
   be taken on a VM install of the image (the repo builds a qcow2 with
   `tests/vm/make-disk.sh:82`). The blocker is the install-path change plus the
