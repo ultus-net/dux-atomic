@@ -14,7 +14,7 @@ if [[ ! -f $repo_root/Containerfile ]]; then
 elif grep -q 'ARG BASE_IMAGE' "$repo_root/Containerfile"; then
   echo "FAIL Containerfile still declares BASE_IMAGE; Dependabot cannot expand an ARG into FROM" >&2
   failures=$((failures + 1))
-elif base=$(grep -E '^FROM quay\.io/fedora/fedora-bootc:[0-9]+@sha256:[0-9a-f]{64}$' "$repo_root/Containerfile"); then
+elif base=$(grep -E '^FROM registry\.fedoraproject\.org/fedora-bootc:[0-9]+@sha256:[0-9a-f]{64}$' "$repo_root/Containerfile"); then
   # The primary Containerfile must pin the fedora-bootc base by tag+digest.
   base_total=$(grep -cE '^FROM ' "$repo_root/Containerfile" || true)
   base_scratch=$(grep -cE '^FROM scratch( AS [A-Za-z0-9_.-]+)?$' "$repo_root/Containerfile" || true)
@@ -46,7 +46,7 @@ elif base=$(grep -E '^FROM quay\.io/fedora/fedora-bootc:[0-9]+@sha256:[0-9a-f]{6
     done
   fi
 else
-  echo "FAIL Containerfile does not pin the base as FROM quay.io/fedora/fedora-bootc:<tag>@sha256:<digest>" >&2
+  echo "FAIL Containerfile does not pin the base as FROM registry.fedoraproject.org/fedora-bootc:<tag>@sha256:<digest>; quay.io/fedora deletes the previous daily digest" >&2
   failures=$((failures + 1))
 fi
 
