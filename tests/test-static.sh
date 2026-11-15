@@ -108,6 +108,19 @@ else
   echo "ok   the NVIDIA variant names its own manifest and the shared image does not"
 fi
 
+# build/common.sh reads the shared overlay and every modules/*/ tree, and skips
+# a tree the build context lacks. A variant that omits one COPY therefore builds
+# without it and still exits 0, so compare the ctx stages rather than trust the
+# two files to stay in step.
+ctx_trees=$(grep -oE '^COPY (build|manifests|overlay|modules) ' "$repo_root/Containerfile")
+variant_ctx_trees=$(grep -oE '^COPY (build|manifests|overlay|modules) ' "$variant_containerfile")
+if [[ $ctx_trees != "$variant_ctx_trees" ]]; then
+  echo "FAIL Containerfile.nvidia exposes different build-context trees than Containerfile, so a variant can build without a tree the shared build reads" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   every Containerfile exposes the same build-context trees"
+fi
+
 # The two helpers the variant path adds are decision functions, so exercise
 # them here: a matching devel must pass, a mismatched or absent one must fail
 # with its message, a manifest name must become a path under manifests/, and a

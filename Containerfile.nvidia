@@ -9,6 +9,7 @@ FROM scratch AS ctx
 COPY build /build
 COPY manifests /manifests
 COPY overlay /overlay
+COPY modules /modules
 
 # The base is pinned to a digest, and the tag stays for readers. The pin is a
 # literal rather than an ARG: Dependabot reads a file whose name matches
