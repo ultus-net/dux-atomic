@@ -582,7 +582,12 @@ fi
 workflow=$repo_root/.github/workflows/ci.yml
 # Assert the NVIDIA CI job and its gating and flags
 if ! grep -qF 'podman build --layers -f Containerfile.nvidia -t localhost/dux-atomic:nvidia' "$workflow" ||
-   [[ $(grep -cF 'tests/verify-image.sh --no-package-lock' "$workflow") -ne 1 ]] ||
+   # Count the verify invocation only inside the image-nvidia job block so an
+   # identical invocation in another job does not false-red this check. Extract
+   # the job with the same awk region used elsewhere in this file and count the
+   # flag inside that block only.
+   image_block=$(awk '/^  image-nvidia:$/ {f=1; next} f && /^  [a-z][a-z0-9-]*:/{exit} f {print}' "$workflow") && \
+   [[ $(grep -cF 'tests/verify-image.sh --no-package-lock' <<<"$image_block") -ne 1 ]] || \
    ! grep -qF "tests/verify-image.sh --no-package-lock localhost/dux-atomic:nvidia" "$workflow" ||
    ! grep -qF "if: needs.changes.outputs.nvidia == 'true'" "$workflow" ||
    ! grep -qF "^(Containerfile\\.nvidia$|manifests/packages-nvidia\\.txt$|manifests/packages-common\\.txt$|build/|overlay/|tests/verify-image\\.sh$)" "$workflow" ||
@@ -1022,6 +1027,36 @@ else
     failures=$((failures + 1))
   else
     echo "ok   the trivy scan is blocking, reads expiring ignores, and keeps the report on failure"
+  fi
+fi
+
+# Changelog truncation gate: fail if the working tree's CHANGELOG.md has fewer
+# lines than the same file on the base branch. Prefer origin/main, fall back to
+# main, and emit a clear FAIL if neither resolves.
+base_ref=$(git rev-parse --verify origin/main 2>/dev/null || true)
+if [[ -z $base_ref ]]; then
+  base_ref=$(git rev-parse --verify main 2>/dev/null || true)
+fi
+if [[ -z $base_ref ]]; then
+  echo "FAIL cannot resolve a base ref (origin/main or main); cannot compare CHANGELOG.md" >&2
+  failures=$((failures + 1))
+else
+  # Get the base branch changelog line count. git show exits non-zero if the
+  # file does not exist at that ref; treat that as a failure to compare.
+  if ! base_count=$(git show "${base_ref}:CHANGELOG.md" 2>/dev/null | wc -l); then
+    echo "FAIL ${base_ref}:CHANGELOG.md not found; cannot compare changelogs" >&2
+    failures=$((failures + 1))
+  elif [[ ! -f $repo_root/CHANGELOG.md ]]; then
+    echo "FAIL CHANGELOG.md is missing from the tree; cannot compare to ${base_ref}" >&2
+    failures=$((failures + 1))
+  else
+    tree_count=$(wc -l < "$repo_root/CHANGELOG.md" || true)
+    if [[ $tree_count -lt $base_count ]]; then
+      echo "FAIL CHANGELOG.md truncated: ${base_ref} has ${base_count} lines, tree has ${tree_count} lines" >&2
+      failures=$((failures + 1))
+    else
+      echo "ok   CHANGELOG.md is not shorter than ${base_ref} (tree ${tree_count}, base ${base_count})"
+    fi
   fi
 fi
 
