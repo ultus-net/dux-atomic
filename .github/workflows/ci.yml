@@ -35,6 +35,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # tests/test-static.sh compares CHANGELOG.md against origin/main, so the
+          # clone needs the remote-tracking base branch. The default depth of 1
+          # fetches no such ref and the gate fails closed.
+          fetch-depth: 0
 
       - name: Lint and static checks
         run: tests/lint.sh
