@@ -746,8 +746,17 @@ elif ! grep -qF 'steps.desktop.outputs.desktop' "$workflow"; then
 elif ! grep -qF 'rm -rf modules/desktop manifests/packages-desktop.txt' <<<"$headless_block"; then
   echo "FAIL the headless job does not delete both module paths before its build" >&2
   failures=$((failures + 1))
+elif ! grep -qF 'git ls-tree -r --name-only HEAD modules/desktop' <<<"$headless_block"; then
+  echo "FAIL the headless job saves no list of the files the module ships" >&2
+  failures=$((failures + 1))
 elif ! grep -qF 'tests/verify-headless.sh localhost/dux-atomic:headless' <<<"$headless_block"; then
   echo "FAIL the headless job builds without asserting the image carries no desktop" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'tests/verify-image.sh" --headless --no-package-lock' "$repo_root/tests/verify-headless.sh"; then
+  echo "FAIL the headless verifier does not run the shared image assertions" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'path_list=$3' "$repo_root/tests/verify-headless.sh"; then
+  echo "FAIL the headless verifier does not read the module path list the job saves" >&2
   failures=$((failures + 1))
 elif ! grep -qF 'tests/verify-headless.sh' "$repo_root/tests/lint.sh"; then
   echo "FAIL tests/lint.sh does not lint the headless verifier" >&2

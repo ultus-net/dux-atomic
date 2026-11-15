@@ -8,9 +8,8 @@ set -ouex pipefail
 cp -avf /ctx/overlay/. /
 # A module ships a tree under modules/<name>/ that mirrors /, and each tree is
 # copied onto / so a variant replaces a whole module with one directory. The
-# copy targets / directly and never copies modules/ itself, so nothing here can
-# leave a module-looking directory behind. An unmatched glob skips the loop,
-# which is what lets a tree with no module build.
+# copy targets / directly and never copies modules/ itself, so no directory
+# named after a module is created. An unmatched glob skips the loop.
 for module in /ctx/modules/*/; do
   [[ -d $module ]] || continue
   cp -avf "$module." /
@@ -80,8 +79,7 @@ curl --retry 3 -fsSLo /etc/flatpak/remotes.d/flathub.flatpakrepo \
 # A module may ship build-time steps under /usr/libexec/dux-atomic/build.d/.
 # They run in name order after the shared install, so a module owns its
 # repositories, its packages, its presets and its checks, and this build names
-# none of them. An unmatched glob leaves the test below to skip the loop, so a
-# tree with no module runs no step.
+# none of them. An unmatched glob leaves the test below to skip the loop.
 for step in /usr/libexec/dux-atomic/build.d/*.sh; do
   [[ -e $step ]] || continue
   bash "$step"

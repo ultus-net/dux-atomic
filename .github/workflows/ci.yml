@@ -332,8 +332,11 @@ jobs:
 
       - name: Remove the desktop module
         run: |
-          # Keep the manifest so the verifier can assert none of its names landed.
+          # Keep both lists so the verifier can assert that nothing the module
+          # ships, or names, is present in the image.
           git show HEAD:manifests/packages-desktop.txt > "$RUNNER_TEMP/packages-desktop.txt"
+          git ls-tree -r --name-only HEAD modules/desktop |
+            sed 's|^modules/desktop||' > "$RUNNER_TEMP/module-paths.txt"
           rm -rf modules/desktop manifests/packages-desktop.txt
           test ! -e modules/desktop
           test ! -e manifests/packages-desktop.txt
@@ -342,7 +345,7 @@ jobs:
         run: podman build --layers -t localhost/dux-atomic:headless .
 
       - name: Verify the headless image carries no desktop
-        run: tests/verify-headless.sh localhost/dux-atomic:headless "$RUNNER_TEMP/packages-desktop.txt"
+        run: tests/verify-headless.sh localhost/dux-atomic:headless "$RUNNER_TEMP/packages-desktop.txt" "$RUNNER_TEMP/module-paths.txt"
 
   # The only job with write token and OIDC identity. It checks out the repository
   # for the shared package installer and never builds image content: it loads the

@@ -2,16 +2,18 @@
 # Run the built image's own lint and unit verification, then compare the
 # installed third-party packages against manifests/packages-common.lock.
 #
-#   tests/verify-image.sh [--no-package-lock] [image]
+#   tests/verify-image.sh [--no-package-lock] [--headless] [image]
 
 set -euo pipefail
 
 # Parse optional leading flags
 no_lock=0
+headless=0
 while [[ ${1:-} == --* ]]; do
   case "$1" in
     --no-package-lock) no_lock=1; shift ;;
-    --*) echo "Usage: ${BASH_SOURCE[0]} [--no-package-lock] [image]" >&2; exit 2 ;;
+    --headless) headless=1; shift ;;
+    --*) echo "Usage: ${BASH_SOURCE[0]} [--no-package-lock] [--headless] [image]" >&2; exit 2 ;;
   esac
 done
 
@@ -25,7 +27,8 @@ repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 # every binding resolves; the greeter command and a session entry name
 # executables; and first-login setup is gated, ordered, bounded and marks
 # completion. Nothing below names the shipped desktop, so these assertions
-# survive a swap.
+# survive a swap. A headless image has none of it, so --headless skips the block.
+if ((!headless)); then
 "$runtime" run --rm -i "$image" bash -s <<'IN_IMAGE'
 set -euo pipefail
 fail() { echo "$*" >&2; exit 1; }
@@ -106,13 +109,14 @@ grep -q '^TimeoutStartSec=' "$setup_unit" || fail "FAIL the first-login unit has
 grep -q '^ExecStartPost=' "$setup_unit" || fail "FAIL the first-login unit writes no completion marker"
 IN_IMAGE
 echo "ok   the desktop contract holds: image units verify, bindings resolve, the greeter and a session start, first-login is bounded"
+fi
 
 # Every path the module ships must be present in the image, so the relocated
 # overlay is proven to land where systemd and the session look. The paths come
 # from the tree, not from a list of product names, so a swapped desktop is
 # covered by the same assertion.
 module_overlay=$repo_root/modules/desktop
-if [[ -d $module_overlay ]]; then
+if ((!headless)) && [[ -d $module_overlay ]]; then
   mapfile -t module_paths < <(cd "$module_overlay" && find . \( -type f -o -type l \) -printf '/%P\n' | sort)
   ((${#module_paths[@]} > 0)) || { echo "FAIL modules/desktop/ is empty" >&2; exit 1; }
   missing=$(printf '%s\n' "${module_paths[@]}" |
@@ -155,7 +159,9 @@ echo "ok   the public zone allows exactly dhcpv6-client and ssh (#116)"
 # whatprovides.
 manifests=("$repo_root/manifests/packages-common.txt")
 desktop_manifest=$repo_root/manifests/packages-desktop.txt
-[[ -f $desktop_manifest ]] && manifests+=("$desktop_manifest")
+# A headless build installs the shared set only, so the module's manifest is not
+# part of what has to resolve.
+[[ -f $desktop_manifest && $headless -eq 0 ]] && manifests+=("$desktop_manifest")
 packages=$(grep -hEv '^[[:space:]]*(#.*)?$' "${manifests[@]}")
 # shellcheck disable=SC2086 # Word splitting is intended: the manifest is one name per line.
 if ! "$runtime" run --rm "$image" rpm -q --whatprovides $packages >/dev/null; then
@@ -179,10 +185,13 @@ fi
   bash /opt/tests/verify-kernel-signature.sh
 # xdg-desktop-portal reads /etc before /usr/share, so the override is what
 # routes FileChooser to gtk instead of nautilus, which this image does not ship.
-"$runtime" run --rm "$image" grep -qx \
-  'org.freedesktop.impl.portal.FileChooser=gtk;' \
-  /etc/xdg-desktop-portal/niri-portals.conf \
-  || { echo "FAIL the file-chooser portal override is missing or wrong" >&2; exit 1; }
+# The override is a module file, so a headless image has none.
+if ((!headless)); then
+  "$runtime" run --rm "$image" grep -qx \
+    'org.freedesktop.impl.portal.FileChooser=gtk;' \
+    /etc/xdg-desktop-portal/niri-portals.conf \
+    || { echo "FAIL the file-chooser portal override is missing or wrong" >&2; exit 1; }
+fi
 # Steam pulls the 32-bit graphics stack through its own dependencies, so this
 # driver is not a manifest name and needs its own assertion.
 "$runtime" run --rm "$image" rpm -q mesa-vulkan-drivers.i686 \
