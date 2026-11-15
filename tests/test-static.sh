@@ -620,9 +620,12 @@ fi
 # The image enables firewalld and the overlay replaces the public zone with a
 # closed baseline: SSH for the operator and DHCPv6 for the network (#116). The
 # distribution default also allows mDNS, so a file naming it reds rather than
-# restoring the advertisement, and the verifier's zone readback is kept whole.
+# restoring the advertisement. The verifier's readback and its expected value are
+# both kept whole: a readback whose comparison is deleted would otherwise red
+# only in the hosted job, where it cannot red at all.
 firewalld_zone=$repo_root/overlay/etc/firewalld/zones/public.xml
 firewalld_readback='zone_services=$("$runtime" run --rm "$image" firewall-offline-cmd --zone=public --list-services) \'
+firewalld_expect="if [[ \$zone_services != 'dhcpv6-client ssh' ]]; then"
 if [[ ! -f $firewalld_zone ]]; then
   echo "FAIL overlay/etc/firewalld/zones/public.xml is missing; the image enables firewalld with no managed zone" >&2
   failures=$((failures + 1))
@@ -635,6 +638,9 @@ elif grep -qE '<service name="(mdns|http|https|samba-client|cockpit)"' "$firewal
   failures=$((failures + 1))
 elif ! grep -qxF "$firewalld_readback" "$repo_root/tests/verify-image.sh"; then
   echo "FAIL tests/verify-image.sh no longer reads the firewalld zone back with firewall-offline-cmd" >&2
+  failures=$((failures + 1))
+elif ! grep -qxF "$firewalld_expect" "$repo_root/tests/verify-image.sh"; then
+  echo "FAIL tests/verify-image.sh reads the zone back but no longer compares it to 'dhcpv6-client ssh'" >&2
   failures=$((failures + 1))
 else
   echo "ok   the overlay ships a closed firewalld baseline and the verifier reads it back"
