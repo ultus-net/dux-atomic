@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Serve the base pin from `registry.fedoraproject.org/fedora-bootc:45` instead of `quay.io/fedora/fedora-bootc:45` (#74). Quay deletes the previous daily digest about 24 hours after the next `45` build lands, so a clean pull of an older pin fails with `manifest unknown` before any build step runs. A `HEAD` for the pinned index `sha256:42259b1d…a56453` returns 404 on quay and 200 on Fedora's registry, including the `amd64` child the build pulls. The same expiry broke CI on 14 November, so this is the second day in a row. The digest is unchanged, so the image content does not move; only the registry that serves it. `tests/test-static.sh` requires the durable registry, so a later bump cannot quietly return to quay.
 - Record the VM measurement path for issue #68: the four btrfs measurements may
   be taken on a VM install of the image (the repo builds a qcow2 with
   `tests/vm/make-disk.sh:82`). The blocker is the install-path change plus the
