@@ -1257,6 +1257,23 @@ else
   fi
 fi
 
+# Ensure the old repository/image token `dux-atomic` does not appear in live
+# files. Allow it only in historic records (docs/research/, docs/agents/,
+# docs/superpowers/) and CHANGELOG.md, and allow the one tmpfiles rule that
+# targets the legacy on-disk motd file used for upgrade cleanup.
+bad=$(git grep -Il "dux-atomic" || true)
+if [[ -n $bad ]]; then
+  # Filter allowed historical locations and the deliberate tmpfiles cleanup rule
+  filtered=$(printf "%s\n" "$bad" | grep -Ev '^docs/research/|^docs/agents/|^docs/superpowers/|^CHANGELOG.md$|^modules/desktop/usr/lib/tmpfiles.d/ultus-atomic-upgrade.conf$' || true)
+  if [[ -n $filtered ]]; then
+    echo "FAIL legacy token 'dux-atomic' found in live files outside allowlist:" >&2
+    printf "%s\n" "$filtered" >&2
+    failures=$((failures + 1))
+  else
+    echo "ok   no stray 'dux-atomic' outside allowed historical records and the tmpfiles cleanup rule"
+  fi
+fi
+
 if ((failures > 0)); then
   exit 1
 fi
