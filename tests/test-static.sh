@@ -761,6 +761,11 @@ elif ! grep -qF 'path_list=$3' "$repo_root/tests/verify-headless.sh"; then
 elif ! grep -qF 'tests/verify-headless.sh' "$repo_root/tests/lint.sh"; then
   echo "FAIL tests/lint.sh does not lint the headless verifier" >&2
   failures=$((failures + 1))
+elif ! git -C "$repo_root" ls-files -s -- tests/verify-headless.sh | grep -q '^100755 '; then
+  # The job runs the verifier directly, so a committed 100644 fails the job with
+  # exit 126 before it asserts anything.
+  echo "FAIL tests/verify-headless.sh is not committed executable, so the headless job cannot run it" >&2
+  failures=$((failures + 1))
 else
   echo "ok   ci.yml builds headless without the desktop module and asserts the image"
 fi
