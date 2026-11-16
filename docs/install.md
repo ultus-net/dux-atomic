@@ -119,6 +119,16 @@ A fresh install has one deployment, so `bootc rollback` has nothing to switch to
 sudo bootc rollback --apply
 ```
 
+## Upgrading an existing machine to the new image identity
+
+If you already run the old image and want to switch to the renamed published image identity, run (one-time):
+
+```bash
+sudo bootc switch ghcr.io/ultus-net/ultus-atomic:latest --target-imgref ghcr.io/ultus-net/ultus-atomic:latest
+```
+
+This updates the boot selection to the new image reference; it does not change files under /etc left by the previous image. See the upgrade-cleanup tmpfiles rule described in the module for the one-time removal of historical legacy files such as /etc/motd.d/dux-atomic.
+
 ## Sources
 
 - `lsblk`: https://man7.org/linux/man-pages/man8/lsblk.8.html
