@@ -1264,7 +1264,7 @@ fi
 bad=$(git grep -Il "dux-atomic" || true)
 if [[ -n $bad ]]; then
   # Filter allowed historical locations and the deliberate tmpfiles cleanup rule
-  filtered=$(printf "%s\n" "$bad" | grep -Ev '^docs/research/|^docs/agents/|^docs/superpowers/|^CHANGELOG.md$|^modules/desktop/usr/lib/tmpfiles.d/ultus-atomic-upgrade.conf$' || true)
+  filtered=$(printf "%s\n" "$bad" | grep -Ev '^docs/research/|^docs/agents/|^docs/superpowers/|^CHANGELOG.md$|^modules/desktop/usr/lib/tmpfiles.d/ultus-atomic-upgrade.conf$|^tests/test-static.sh$' || true)
   if [[ -n $filtered ]]; then
     echo "FAIL legacy token 'dux-atomic' found in live files outside allowlist:" >&2
     printf "%s\n" "$filtered" >&2
