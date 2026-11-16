@@ -127,7 +127,7 @@ If you already run the old image and want to switch to the renamed published ima
 sudo bootc switch ghcr.io/ultus-net/ultus-atomic:latest --target-imgref ghcr.io/ultus-net/ultus-atomic:latest
 ```
 
-This updates the boot selection to the new image reference; it does not change files under /etc left by the previous image. See the upgrade-cleanup tmpfiles rule described in the module for the one-time removal of historical legacy files such as /etc/motd.d/dux-atomic.
+This updates the boot selection to the new image reference; it does not change files under /etc left by the previous image. See the upgrade-cleanup tmpfiles rule described in the module for the one-time removal of historical legacy files (for example, a legacy /etc/motd.d entry written by an earlier image).
 
 ## Sources
 
