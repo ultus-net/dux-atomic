@@ -127,7 +127,7 @@ If you already run the image under its previous name, switch once to the renamed
 sudo bootc switch --apply ghcr.io/ultus-net/ultus-atomic:latest
 ```
 
-A switch changes the booted image, not the files under `/etc`, because an upgrade preserves that tree. The shared overlay ships `/usr/lib/tmpfiles.d/ultus-atomic-upgrade.conf`, which removes the three entries the earlier image identity wrote there: its message-of-the-day file, and the two user-unit links its preset made in `graphical-session-pre.target.wants/`, which would dangle once the units are renamed. `systemd-tmpfiles` applies the rule at boot, so the stale entries survive only until the first boot of this image. The image's own preset owns the current user units.
+A switch changes the booted image, not the files under `/etc`, because an upgrade preserves that tree. The new image ships `/usr/lib/tmpfiles.d/ultus-atomic-upgrade.conf`, which removes the three entries the earlier image identity wrote there: its message-of-the-day file, and the two user-unit links its preset made in `graphical-session-pre.target.wants/`, which would dangle once the units are renamed. `systemd-tmpfiles-setup.service` runs `systemd-tmpfiles --create --remove --boot` before `sysinit.target` on every boot, so the rule takes effect on the first boot of the new image and stays harmless after it. The image's own preset owns the current user units.
 
 The first-login completion marker moves to the new identity's directory under `~/.local/state/`. An existing account has no marker at the new path, so the setup runs once more; `dms setup --skip-existing` leaves an existing config alone.
 

@@ -139,38 +139,44 @@ if [[ -z $upgrade_got || $upgrade_got != "$upgrade_want" ]]; then
   exit 1
 fi
 echo "ok   the image carries the overlay rule that cleans the previous identity's /etc entries"
-# Prove what the rule does on a throwaway root: every path it names must go and
-# the current motd must survive. The probe reads the removals from the rule
-# itself, so it cannot drift from it. A real in-place upgrade needs a VM, so this
-# pins the rule's behaviour in every image build instead.
+# Prove what the rule does on a throwaway root, for both kinds of entry the
+# previous identity left behind: a regular file and a symlink. The probe reads
+# the removals from the rule itself, so it cannot drift from it. A real in-place
+# upgrade needs a VM, so this pins the rule's effect in every image build.
 upgrade_probe=$("$runtime" run --rm "$image" bash -c '
   set -eu
-  root=/tmp/tmpfiles-probe
   rule=/usr/lib/tmpfiles.d/ultus-atomic-upgrade.conf
   mapfile -t legacy < <(sed -n "s/^r \\([^ ]*\\) .*/\\1/p" "$rule")
   # The previous identity wrote exactly three entries under /etc: its motd file
   # and the two user-unit links its preset made.
   if (( ${#legacy[@]} != 3 )); then echo "expected-3-removals-found-${#legacy[@]}"; exit 0; fi
-  mkdir -p "$root/usr/lib/tmpfiles.d" "$root/etc/motd.d"
-  cp "$rule" "$root$rule"
-  for path in "${legacy[@]}"; do
-    mkdir -p "$root$(dirname "$path")"
-    : > "$root$path"
-  done
-  : > "$root/etc/motd.d/ultus-atomic"
-  systemd-tmpfiles --remove --root="$root" >/dev/null
   status=ok
-  for path in "${legacy[@]}"; do
-    if [[ -e $root$path ]]; then status="kept-$path"; fi
+  for kind in file link; do
+    root=/tmp/tmpfiles-probe-$kind
+    mkdir -p "$root/usr/lib/tmpfiles.d"
+    cp "$rule" "$root$rule"
+    for path in "${legacy[@]}"; do
+      mkdir -p "$root$(dirname "$path")"
+      if [[ $kind == file ]]; then
+        : > "$root$path"
+      else
+        ln -s /usr/lib/systemd/user/gone.service "$root$path"
+      fi
+    done
+    : > "$root/etc/motd.d/ultus-atomic"
+    systemd-tmpfiles --remove --root="$root" >/dev/null
+    for path in "${legacy[@]}"; do
+      if [[ -e $root$path || -L $root$path ]]; then status="kept-$kind-$path"; fi
+    done
+    if [[ ! -e $root/etc/motd.d/ultus-atomic ]]; then status=current-motd-removed; fi
   done
-  if [[ ! -e $root/etc/motd.d/ultus-atomic ]]; then status=current-motd-removed; fi
   echo "$status"
 ') || { echo "FAIL the upgrade rule probe did not run in the image" >&2; exit 1; }
 if [[ $upgrade_probe != ok ]]; then
   echo "FAIL the upgrade rule left the wrong state: ${upgrade_probe}" >&2
   exit 1
 fi
-echo "ok   the upgrade rule removes the previous identity's /etc entries and keeps the current motd"
+echo "ok   the upgrade rule removes the previous identity's /etc entries, file and symlink, and keeps the current motd"
 # The pinned base's /etc/dnf/dnf.conf carries only a comment and [main], and the
 # overlay replaces it with the linutil Configure DNF defaults (#111). Ask dnf5
 # for the values it resolves, so a file that parses but is not read still reds.

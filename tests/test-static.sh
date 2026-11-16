@@ -439,6 +439,11 @@ else
   echo "ok   the greeter seed is JSON and pins a session name"
 fi
 
+# The identity token this branch retired. Every check below reads it from this
+# one line, so the token assertion can allow that line and nothing else in this
+# file.
+legacy_token=dux-atomic
+
 # Bindings travel with the module and name an absolute unit path, so a swap
 # cannot leave a link pointing at a name only the old desktop shipped. A target
 # that still names the old identity is the failure a rename leaves behind, and
@@ -454,7 +459,7 @@ while IFS= read -r link; do
        binding_failures=1
        continue ;;
   esac
-  if [[ $target == *dux-atomic* ]]; then
+  if [[ $target == *$legacy_token* ]]; then
     echo "FAIL ${link#"$repo_root"/} still points at '${target}', which names the old identity" >&2
     binding_failures=1
   fi
@@ -1268,14 +1273,16 @@ fi
 # The old repository/image token belongs to the historical record now. A live
 # file may still name a historical path, and the upgrade rule must name the /etc
 # file it removes, but nothing else may carry the token. git grep reads tracked
-# file content only; the binding check above covers symlink targets.
-allowed_paths='^(docs/research/|docs/agents/|docs/superpowers/|CHANGELOG\.md:|overlay/usr/lib/tmpfiles\.d/ultus-atomic-upgrade\.conf:|tests/test-static\.sh:)'
+# file content only; the binding check above covers symlink targets. The only
+# line allowed inside a live script is the definition above, so a stray use in
+# this file still reds.
+allowed_paths='^(docs/research/|docs/agents/|docs/superpowers/|CHANGELOG\.md:|overlay/usr/lib/tmpfiles\.d/ultus-atomic-upgrade\.conf:|tests/test-static\.sh:[0-9]+:legacy_token=)'
 # A live doc cites the approved spec or plan by the filename it was recorded
 # under, so that one citation stays.
-allowed_citation='docs/superpowers/(specs|plans)/2026-11-09-dux-atomic'
-bad=$(git grep -In "dux-atomic" | grep -Ev "$allowed_paths" | grep -Ev "$allowed_citation" || true)
+allowed_citation="docs/superpowers/(specs|plans)/2026-11-09-$legacy_token"
+bad=$(git grep -In -F -e "$legacy_token" | grep -Ev "$allowed_paths" | grep -Ev "$allowed_citation" || true)
 if [[ -n $bad ]]; then
-  echo "FAIL legacy token 'dux-atomic' found outside the historical record:" >&2
+  echo "FAIL legacy token '${legacy_token}' found outside the historical record:" >&2
   printf "%s\n" "$bad" >&2
   failures=$((failures + 1))
 else
