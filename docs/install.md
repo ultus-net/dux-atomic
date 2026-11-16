@@ -1,6 +1,6 @@
 # Install
 
-The published image installs to a physical disk with `bootc install to-disk` from a Fedora live environment. That path needs no install media artifact, which matters because this repo builds only a qcow2 for the VM test (`tests/vm/make-disk.sh:81`). Read the gates before wiping either target: neither machine gets an encrypted root by policy (#54), the laptop's Secure Boot state is unrecorded, and the desktop needs the NVIDIA variant tracked in [#94](https://github.com/ultus-net/dux-atomic/issues/94), with MOK enrollment in [#95](https://github.com/ultus-net/dux-atomic/issues/95).
+The published image installs to a physical disk with `bootc install to-disk` from a Fedora live environment. That path needs no install media artifact, which matters because this repo builds only a qcow2 for the VM test (`tests/vm/make-disk.sh:81`). Read the gates before wiping either target: neither machine gets an encrypted root by policy (#54), the laptop's Secure Boot state is unrecorded, and the desktop needs the NVIDIA variant tracked in [#94](https://github.com/ultus-net/ultus-atomic/issues/94), with MOK enrollment in [#95](https://github.com/ultus-net/ultus-atomic/issues/95).
 
 ## What the image provides
 
@@ -29,9 +29,9 @@ sudo podman run --rm --privileged --pid=host --ipc=host \
   -v /var/lib/containers:/var/lib/containers \
   -v /dev:/dev \
   --security-opt label=type:unconfined_t \
-  ghcr.io/ultus-net/dux-atomic:latest \
+  ghcr.io/ultus-net/ultus-atomic:latest \
   bootc install to-disk --wipe --filesystem btrfs \
-  --target-imgref ghcr.io/ultus-net/dux-atomic:latest \
+  --target-imgref ghcr.io/ultus-net/ultus-atomic:latest \
   /dev/nvme0n1
 ```
 
@@ -52,7 +52,7 @@ sudo podman run --rm --privileged \
   -v "$PWD/output:/output" \
   -v /var/lib/containers/storage:/var/lib/containers/storage \
   quay.io/centos-bootc/bootc-image-builder@sha256:a0ee98db5bfb8337e45efb92f0c5d1a19179c85ce80a3360abc628fd1a17cc5c \
-  build ghcr.io/ultus-net/dux-atomic:latest \
+  build ghcr.io/ultus-net/ultus-atomic:latest \
   --type iso --rootfs btrfs --output /output
 ```
 
@@ -83,7 +83,7 @@ No target is installed with an encrypted root. That is the recorded policy, not 
 
 Secure Boot needs no per-machine enrollment on this image. The chain is Fedora's end to end: `shim-x64` and `grub2-efi-x64` are Fedora-signed, and the pinned base keeps Fedora's kernel, whose signature is issued by `CN=fedoraca, OU=Fedora Secure Boot CA 20200709` with subject `CN=kernel-signer`. In-tree modules are signed by `Fedora kernel signing key`, so they load from the kernel's builtin keyring. Verified on the built image on 2026-11-12: the kernel's PE certificate table holds that PKCS#7 signature, and `modinfo -F signer` reports the Fedora key for `nf_tables.ko.xz` and `nouveau.ko.xz`.
 
-No boot with Secure Boot enabled has been recorded on either target. Record `mokutil --sb-state` per machine before the install, then record the boot result after it. The desktop has Secure Boot disabled today (`docs/superpowers/specs/2026-11-09-dux-atomic-design.md:73`); enabling it should need no enrollment step, but that is unproven until one boot is recorded.
+No boot with Secure Boot enabled has been recorded on either target. Record `mokutil --sb-state` per machine before the install, then record the boot result after it. The desktop has Secure Boot disabled today (`docs/superpowers/specs/2026-11-09-ultus-atomic-design.md:73`); enabling it should need no enrollment step, but that is unproven until one boot is recorded.
 
 Fedora's shim is signed through Microsoft's third-party UEFI CA, so the firmware must trust that CA. Most machines ship with it enabled. Some Lenovo ThinkPad models ship with it off, and there the firmware setting has to be turned on once; that is a trust setting in firmware, not a key enrolled in the MOK list, and it survives upgrades without repeating. A Secure Boot violation at first boot on those machines points at this setting before anything else.
 
@@ -98,11 +98,11 @@ No target has run this order yet. It exists so the first install produces the ev
 
 Installing with Secure Boot off first separates a firmware refusal, which stops the boot before the kernel loads, from a defect in the image, which shows up after it. The disk does not depend on the answer: the install writes no key, so the same image boots either way.
 
-The desktop's NVIDIA modules are unsigned, so that machine needs Secure Boot off or a locally signed module, which [#95](https://github.com/ultus-net/dux-atomic/issues/95) covers. The `image` job checks the kernel's signature on every build (`tests/verify-kernel-signature.sh`), so a base that stopped shipping Fedora's kernel would red CI rather than fail at first boot. The evidence, the base swap that removed the old enrollment path, and the remaining check are in [Disk encryption and Secure Boot policy](research/2026-11-12-luks-secureboot-policy.md) (#54).
+The desktop's NVIDIA modules are unsigned, so that machine needs Secure Boot off or a locally signed module, which [#95](https://github.com/ultus-net/ultus-atomic/issues/95) covers. The `image` job checks the kernel's signature on every build (`tests/verify-kernel-signature.sh`), so a base that stopped shipping Fedora's kernel would red CI rather than fail at first boot. The evidence, the base swap that removed the old enrollment path, and the remaining check are in [Disk encryption and Secure Boot policy](research/2026-11-12-luks-secureboot-policy.md) (#54).
 
 ## The desktop
 
-The generic image does not drive the desktop's monitors. Both active displays are on the RTX 3070 (`docs/superpowers/specs/2026-11-09-dux-atomic-design.md:73`), and the image has no NVIDIA kernel driver. Arch cannot switch to bootc in place (`docs/superpowers/specs/2026-11-09-dux-atomic-design.md:81`), so the desktop needs a fresh atomic install of an NVIDIA variant that does not exist yet. Do not install the generic image on the desktop. [#94](https://github.com/ultus-net/dux-atomic/issues/94) builds and publishes the variant.
+The generic image does not drive the desktop's monitors. Both active displays are on the RTX 3070 (`docs/superpowers/specs/2026-11-09-ultus-atomic-design.md:73`), and the image has no NVIDIA kernel driver. Arch cannot switch to bootc in place (`docs/superpowers/specs/2026-11-09-ultus-atomic-design.md:81`), so the desktop needs a fresh atomic install of an NVIDIA variant that does not exist yet. Do not install the generic image on the desktop. [#94](https://github.com/ultus-net/ultus-atomic/issues/94) builds and publishes the variant.
 
 ## After first boot
 

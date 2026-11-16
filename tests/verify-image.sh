@@ -17,7 +17,7 @@ while [[ ${1:-} == --* ]]; do
   esac
 done
 
-image=${1:-localhost/dux-atomic:dev}
+image=${1:-localhost/ultus-atomic:dev}
 runtime=${CONTAINER_RUNTIME:-podman}
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 

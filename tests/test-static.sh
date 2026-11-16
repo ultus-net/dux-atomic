@@ -350,7 +350,7 @@ leaks=
 if [[ ! -f $desktop_manifest ]] || [[ ! -d $desktop_overlay ]]; then
   echo "FAIL the desktop module needs both manifests/packages-desktop.txt and modules/desktop/" >&2
   failures=$((failures + 1))
-elif ! grep -qx 'install_manifest /ctx/manifests/packages-desktop.txt' "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh"; then
+elif ! grep -qx 'install_manifest /ctx/manifests/packages-desktop.txt' "$desktop_overlay/usr/libexec/ultus-atomic/build.d/50-desktop.sh"; then
   echo "FAIL the desktop build step does not install the desktop manifest" >&2
   failures=$((failures + 1))
 else
@@ -470,7 +470,7 @@ fi
 
 # The first-login condition decides retry vs skip. Run the real script against
 # one fixture per case so a change in its logic is visible without a VM.
-condition=$repo_root/modules/desktop/usr/libexec/dux-atomic/needs-setup.sh
+condition=$repo_root/modules/desktop/usr/libexec/ultus-atomic/needs-setup.sh
 if ! grep -qF '${XDG_STATE_HOME:-$HOME/.local/state}' "$condition"; then
   echo "FAIL needs-setup.sh does not match the unit's %S marker path" >&2
   failures=$((failures + 1))
@@ -480,18 +480,18 @@ trap 'rm -rf "$cond_root"' EXIT
 mkdir -p "$cond_root/fresh" \
   "$cond_root/partial/.config/niri" \
   "$cond_root/user/.config/niri" \
-  "$cond_root/done/.config/niri" "$cond_root/done/.local/state/dux-atomic" \
-  "$cond_root/reset/.local/state/dux-atomic" \
-  "$cond_root/xdgstate/.config/niri" "$cond_root/xdgstate-state/dux-atomic"
+  "$cond_root/done/.config/niri" "$cond_root/done/.local/state/ultus-atomic" \
+  "$cond_root/reset/.local/state/ultus-atomic" \
+  "$cond_root/xdgstate/.config/niri" "$cond_root/xdgstate-state/ultus-atomic"
 # Copied from ~/.config/niri/config.kdl after `dms setup headless` in image
 # 3e886bc33a30; see docs/research/2026-11-10-dms-first-login.md.
 printf 'include optional=true "dms/colors.kdl"\n' >"$cond_root/partial/.config/niri/config.kdl"
 printf '// user config\n' >"$cond_root/user/.config/niri/config.kdl"
 printf 'include optional=true "dms/colors.kdl"\n' >"$cond_root/done/.config/niri/config.kdl"
 printf 'include optional=true "dms/colors.kdl"\n' >"$cond_root/xdgstate/.config/niri/config.kdl"
-: >"$cond_root/done/.local/state/dux-atomic/desktop-setup.done"
-: >"$cond_root/reset/.local/state/dux-atomic/desktop-setup.done"
-: >"$cond_root/xdgstate-state/dux-atomic/desktop-setup.done"
+: >"$cond_root/done/.local/state/ultus-atomic/desktop-setup.done"
+: >"$cond_root/reset/.local/state/ultus-atomic/desktop-setup.done"
+: >"$cond_root/xdgstate-state/ultus-atomic/desktop-setup.done"
 condition_failed=0
 for spec in fresh:run partial:run user:skip done:skip reset:run xdgstate:skip; do
   name=${spec%%:*}
@@ -554,14 +554,14 @@ if ! grep -qF 'wait_for "DUX_USER:${test_user}"' "$boot_smoke" ||
    grep -qF "wait_for 'DUX_PROBE_END'" "$boot_smoke"; then
   echo "FAIL boot-smoke waits on an echoed marker instead of printf output" >&2
   failures=$((failures + 1))
-elif ! grep -qF 'readlink "$portal_mask"' "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh" ||
-     ! grep -qF '= /dev/null' "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh" ||
-     ! grep -qF "trap desktop_cleanup EXIT" "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh" ||
-     ! grep -qF 'copr disable duxlabs/dms' "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh" ||
+elif ! grep -qF 'readlink "$portal_mask"' "$desktop_overlay/usr/libexec/ultus-atomic/build.d/50-desktop.sh" ||
+     ! grep -qF '= /dev/null' "$desktop_overlay/usr/libexec/ultus-atomic/build.d/50-desktop.sh" ||
+     ! grep -qF "trap desktop_cleanup EXIT" "$desktop_overlay/usr/libexec/ultus-atomic/build.d/50-desktop.sh" ||
+     ! grep -qF 'copr disable duxlabs/dms' "$desktop_overlay/usr/libexec/ultus-atomic/build.d/50-desktop.sh" ||
      ! grep -qF 'cannot read ${path}' "$repo_root/build/manifest.sh" ||
      ! grep -qF 'install_manifest "$manifest"' "$common" ||
-     ! grep -qF 'install_manifest /ctx/manifests/packages-desktop.txt' "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh" ||
-     ! grep -qF '/usr/libexec/dux-atomic/build.d/*.sh' "$common" ||
+     ! grep -qF 'install_manifest /ctx/manifests/packages-desktop.txt' "$desktop_overlay/usr/libexec/ultus-atomic/build.d/50-desktop.sh" ||
+     ! grep -qF '/usr/libexec/ultus-atomic/build.d/*.sh' "$common" ||
      grep -qF 'packages-common.txt || true' "$common"; then
   echo "FAIL the greeter mask, the manifest reader or a manifest install does not fail closed" >&2
   failures=$((failures + 1))
@@ -749,7 +749,7 @@ elif ! grep -qF 'rm -rf modules/desktop manifests/packages-desktop.txt' <<<"$hea
 elif ! grep -qF 'git ls-tree -r --name-only HEAD modules/desktop' <<<"$headless_block"; then
   echo "FAIL the headless job saves no list of the files the module ships" >&2
   failures=$((failures + 1))
-elif ! grep -qF 'tests/verify-headless.sh localhost/dux-atomic:headless' <<<"$headless_block"; then
+elif ! grep -qF 'tests/verify-headless.sh localhost/ultus-atomic:headless' <<<"$headless_block"; then
   echo "FAIL the headless job builds without asserting the image carries no desktop" >&2
   failures=$((failures + 1))
 elif ! grep -qF 'tests/verify-image.sh" --headless --no-package-lock' "$repo_root/tests/verify-headless.sh"; then
@@ -770,19 +770,19 @@ else
   echo "ok   ci.yml builds headless without the desktop module and asserts the image"
 fi
 # Assert the NVIDIA CI job and its gating and flags
-if ! grep -qF 'podman build --layers -f Containerfile.nvidia -t localhost/dux-atomic:nvidia' "$workflow" ||
+if ! grep -qF 'podman build --layers -f Containerfile.nvidia -t localhost/ultus-atomic:nvidia' "$workflow" ||
    # Count the verify invocation only inside the image-nvidia job block so an
    # identical invocation in another job does not false-red this check.
    image_block=$(job_block image-nvidia) && \
    [[ $(grep -cF 'tests/verify-image.sh --no-package-lock' <<<"$image_block") -ne 1 ]] || \
-   ! grep -qF "tests/verify-image.sh --no-package-lock localhost/dux-atomic:nvidia" "$workflow" ||
+   ! grep -qF "tests/verify-image.sh --no-package-lock localhost/ultus-atomic:nvidia" "$workflow" ||
    ! grep -qF "if: needs.changes.outputs.nvidia == 'true'" "$workflow" ||
    ! grep -qF "^(Containerfile\\.nvidia$|manifests/packages-nvidia\\.txt$|manifests/packages-common\\.txt$|build/|overlay/|tests/verify-image\\.sh$)" "$workflow" ||
    # The variant manifest check reads the manifest on the runner and passes its
    # names to rpm as arguments, so an arch-qualified name resolves and a missing
    # one names itself on stderr.
    ! grep -qF 'mapfile -t names < <(grep -Ev' "$workflow" ||
-   ! grep -qF 'podman run --rm localhost/dux-atomic:nvidia rpm -q "${names[@]}"' "$workflow"; then
+   ! grep -qF 'podman run --rm localhost/ultus-atomic:nvidia rpm -q "${names[@]}"' "$workflow"; then
   echo "FAIL ci.yml does not carry the gated image-nvidia job, the exact filter regex, or the single --no-package-lock on its verify line" >&2
   failures=$((failures + 1))
 elif ! grep -qF 'github.event.before' "$workflow" || ! grep -qF 'if [[ -z "\$before" || "\$before" =~ ^0+$ ]]' "$workflow"; then
@@ -1023,7 +1023,7 @@ elif ! grep -qF 'attestations: write' <<<"$publish_block" ||
   echo "FAIL ci.yml does not attest build provenance for the pushed digest, or asks for a permission the step does not need" >&2
   failures=$((failures + 1))
 elif ! grep -qF 'retry cosign attest --yes --new-bundle-format' <<<"$publish_block" ||
-     ! grep -qF -- '--predicate sbom/dux-atomic.spdx.json --type spdxjson' <<<"$publish_block"; then
+     ! grep -qF -- '--predicate sbom/ultus-atomic.spdx.json --type spdxjson' <<<"$publish_block"; then
   # A legacy tag attachment becomes invisible once any Sigstore bundle
   # references the digest, because cosign then verifies in bundle mode only.
   # Run 43106659542 failed verify that way after the provenance bundle landed.
@@ -1032,7 +1032,7 @@ elif ! grep -qF 'retry cosign attest --yes --new-bundle-format' <<<"$publish_blo
 elif [[ -z $verify_block ]] ||
      ! grep -qF 'gh attestation verify "oci://$IMAGE@$DIGEST"' <<<"$verify_block" ||
      ! grep -qF -- '--bundle-from-oci' <<<"$verify_block" ||
-     ! grep -qF -- '--cert-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main"' <<<"$verify_block" ||
+     ! grep -qF -- '--cert-identity "https://github.com/ultus-net/ultus-atomic/.github/workflows/ci.yml@refs/heads/main"' <<<"$verify_block" ||
      ! grep -qF '>"$RUNNER_TEMP/verify-provenance.log" 2>&1 || status=$?' <<<"$verify_block"; then
   echo "FAIL ci.yml does not verify the provenance of the digest it published" >&2
   failures=$((failures + 1))
@@ -1181,8 +1181,8 @@ elif [[ $(jq '.files | length' "$sbom_root/out.json") != 0 ]] ||
   echo "FAIL the SBOM filter keeps files, their relationships, or a package that still claims analysis" >&2
   failures=$((failures + 1))
 elif ! grep -qF 'jq -c -f build/sbom-packages-only.jq' "$workflow" ||
-     ! grep -qF '> dux-atomic.spdx.json' "$workflow" ||
-     ! grep -qF 'path: dux-atomic.spdx.json' "$workflow"; then
+     ! grep -qF '> ultus-atomic.spdx.json' "$workflow" ||
+     ! grep -qF 'path: ultus-atomic.spdx.json' "$workflow"; then
   echo "FAIL ci.yml does not filter the SBOM into the uploaded file" >&2
   failures=$((failures + 1))
 else

@@ -3,7 +3,7 @@
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-image := "localhost/dux-atomic:dev"
+image := "localhost/ultus-atomic:dev"
 
 # Same script and the same pinned linter containers as the CI static job.
 check:

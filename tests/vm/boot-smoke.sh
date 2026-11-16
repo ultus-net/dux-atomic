@@ -251,18 +251,18 @@ if [[ $login == 1 ]]; then
   serial_write 'echo "DUX_DEPLOYMENT:$(ostree admin status 2>/dev/null | head -2 | tr "\n" " ")"'
   # Run the first-login units the way graphical-session-pre.target would, then
   # check the provisioned files. The unit conditions skip a provisioned home.
-  serial_write 'systemctl --user start dux-atomic-desktop.service dux-atomic-dms-defaults.service; printf "DUX_UNITS:%s\n" "$?"'
+  serial_write 'systemctl --user start ultus-atomic-desktop.service ultus-atomic-dms-defaults.service; printf "DUX_UNITS:%s\n" "$?"'
   serial_write 'printf "DUX_NIRI_CONFIG:%s\n" "$(test -f "$HOME/.config/niri/config.kdl" && echo ok || echo missing)"'
   serial_write 'printf "DUX_DMS_BINDS:%s\n" "$(test -f "$HOME/.config/niri/dms/binds.kdl" && echo ok || echo missing)"'
   serial_write 'printf "DUX_SESSION_SEED:%s\n" "$(grep -q 101418 "$HOME/.local/state/dms/session.json" 2>/dev/null && echo ok || echo missing)"'
-  serial_write 'printf "DUX_SETUP_MARKER:%s\n" "$(test -f "${XDG_STATE_HOME:-$HOME/.local/state}/dux-atomic/desktop-setup.done" && echo ok || echo missing)"'
+  serial_write 'printf "DUX_SETUP_MARKER:%s\n" "$(test -f "${XDG_STATE_HOME:-$HOME/.local/state}/ultus-atomic/desktop-setup.done" && echo ok || echo missing)"'
   serial_write 'printf "DUX_USER_DMS_LINK:%s\n" "$(test -L "$HOME/.config/systemd/user/niri.service.wants/dms.service" && echo ok || echo missing)"'
   serial_write 'printf "DUX_DMS_WANTED:%s\n" "$(systemctl --user show -p Wants niri.service | grep -q dms.service && echo ok || echo missing)"'
   serial_write 'printf "DUX_PRE_WANTED:%s\n" "$(systemctl --user show -p Wants niri.service | grep -q graphical-session-pre.target && echo ok || echo missing)"'
-  serial_write 'printf "DUX_DESKTOP_ENABLED:%s\n" "$(systemctl --user is-enabled dux-atomic-desktop.service 2>/dev/null | grep -qx enabled && echo ok || echo missing)"'
+  serial_write 'printf "DUX_DESKTOP_ENABLED:%s\n" "$(systemctl --user is-enabled ultus-atomic-desktop.service 2>/dev/null | grep -qx enabled && echo ok || echo missing)"'
   # The greeter cache is 0750 greeter:greeter, so the test user cannot read
   # memory.json. Assert the seed unit's state over the system bus instead.
-  serial_write 'probe=$(systemctl show -p ConditionResult -p Result dux-atomic-greeter-defaults.service); printf "DUX_GREETER_SEED:%s\n" "$(echo "$probe" | grep -q "ConditionResult=yes" && echo "$probe" | grep -q "Result=success" && echo ok || echo missing)"'
+  serial_write 'probe=$(systemctl show -p ConditionResult -p Result ultus-atomic-greeter-defaults.service); printf "DUX_GREETER_SEED:%s\n" "$(echo "$probe" | grep -q "ConditionResult=yes" && echo "$probe" | grep -q "Result=success" && echo ok || echo missing)"'
   serial_write 'printf "DUX_PROBE_END:%s\n" ok'
 
   if ! wait_for "DUX_USER:${test_user}" 20; then

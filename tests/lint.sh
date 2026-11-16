@@ -46,10 +46,10 @@ bash_scripts=(
   tests/verify-kernel-signature.sh
   tests/vm/boot-smoke.sh
   tests/vm/make-disk.sh
-  modules/desktop/usr/libexec/dux-atomic/build.d/50-desktop.sh
+  modules/desktop/usr/libexec/ultus-atomic/build.d/50-desktop.sh
 )
 posix_scripts=(
-  modules/desktop/usr/libexec/dux-atomic/needs-setup.sh
+  modules/desktop/usr/libexec/ultus-atomic/needs-setup.sh
 )
 
 cd "$repo_root"

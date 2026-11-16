@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-image=${1:-localhost/dux-atomic:dev}
+image=${1:-localhost/ultus-atomic:dev}
 runtime=${CONTAINER_RUNTIME:-podman}
 
 cat <<'HEADER'

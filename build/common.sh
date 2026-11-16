@@ -76,11 +76,11 @@ install -d /etc/flatpak/remotes.d
 curl --retry 3 -fsSLo /etc/flatpak/remotes.d/flathub.flatpakrepo \
   https://dl.flathub.org/repo/flathub.flatpakrepo
 
-# A module may ship build-time steps under /usr/libexec/dux-atomic/build.d/.
+# A module may ship build-time steps under /usr/libexec/ultus-atomic/build.d/.
 # They run in name order after the shared install, so a module owns its
 # repositories, its packages, its presets and its checks, and this build names
 # none of them. An unmatched glob leaves the test below to skip the loop.
-for step in /usr/libexec/dux-atomic/build.d/*.sh; do
+for step in /usr/libexec/ultus-atomic/build.d/*.sh; do
   [[ -e $step ]] || continue
   bash "$step"
 done

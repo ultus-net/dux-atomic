@@ -21,9 +21,9 @@ cannot accidentally keep half of the old desktop.
 
 The shared build knows two facts about modules: any `modules/*/` tree is copied
 onto `/`, and any module may ship build steps under
-`/usr/libexec/dux-atomic/build.d/`, which it runs in name order. It names no
+`/usr/libexec/ultus-atomic/build.d/`, which it runs in name order. It names no
 desktop package, unit or command. The desktop's step is
-`modules/desktop/usr/libexec/dux-atomic/build.d/50-desktop.sh`: it enables the
+`modules/desktop/usr/libexec/ultus-atomic/build.d/50-desktop.sh`: it enables the
 module's repositories, installs `manifests/packages-desktop.txt` through
 `build/manifest.sh`, applies the user presets, asserts the module's own wiring,
 disables the repositories from an exit trap and enables the greeter.
@@ -35,7 +35,7 @@ A swap replaces four paths:
 1. `manifests/packages-desktop.txt`: the new package set.
 2. `modules/desktop/`: delete the old subtree and add the new desktop's files at
    the same relative paths.
-3. `modules/desktop/usr/libexec/dux-atomic/build.d/50-desktop.sh`: the new
+3. `modules/desktop/usr/libexec/ultus-atomic/build.d/50-desktop.sh`: the new
    desktop's build step. Enable its repositories, install its manifest, apply its
    presets, assert its wiring, then enable its greeter, with an exit trap that
    disables the repositories on every path, so a failed build cannot commit a

@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  IMAGE: ghcr.io/ultus-net/dux-atomic
+  IMAGE: ghcr.io/ultus-net/ultus-atomic
 
 jobs:
   # Exact filter used for the NVIDIA variant gating:
@@ -166,15 +166,15 @@ jobs:
         run: build/install-packages.sh podman qemu-system-x86 qemu-utils ovmf
 
       - name: Build image
-        run: podman build --layers -t localhost/dux-atomic:ci .
+        run: podman build --layers -t localhost/ultus-atomic:ci .
 
       - name: Image lint and unit verify
-        run: tests/verify-image.sh localhost/dux-atomic:ci
+        run: tests/verify-image.sh localhost/ultus-atomic:ci
 
       - name: Export image
         run: |
           mkdir -p .cache
-          podman save localhost/dux-atomic:ci -o .cache/image.tar
+          podman save localhost/ultus-atomic:ci -o .cache/image.tar
 
       - name: SBOM
         # A digest-pinned syft scans a flattened rootfs and writes the report
@@ -183,32 +183,32 @@ jobs:
         # heap died, which left the step with no error line.
         run: |
           set -o pipefail
-          podman create --name sbom-rootfs localhost/dux-atomic:ci
+          podman create --name sbom-rootfs localhost/ultus-atomic:ci
           mkdir -p "$RUNNER_TEMP/rootfs"
           podman export sbom-rootfs | tar -x -C "$RUNNER_TEMP/rootfs"
           podman rm sbom-rootfs
           podman run --rm -v "$RUNNER_TEMP/rootfs:/rootfs:ro" \
             ghcr.io/anchore/syft:v1.42.3@sha256:5999d209a342e55e9edf70bf8930fb5b86d8f2a783fa401178372c50e21b1d36 \
             scan dir:/rootfs \
-            --source-name dux-atomic --source-version "$GITHUB_SHA" \
+            --source-name ultus-atomic --source-version "$GITHUB_SHA" \
             -o spdx-json > "$RUNNER_TEMP/syft-full.spdx.json"
           # Rekor's public instance answered 502 for the 86 MB attestation body
           # in run 42810574149, so the attested document keeps packages only.
           # The same run's SBOM was 64181348 bytes and is 6508304 after this.
           jq -c -f build/sbom-packages-only.jq \
-            "$RUNNER_TEMP/syft-full.spdx.json" > dux-atomic.spdx.json
+            "$RUNNER_TEMP/syft-full.spdx.json" > ultus-atomic.spdx.json
 
       - name: Upload SBOM
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sbom
-          path: dux-atomic.spdx.json
+          path: ultus-atomic.spdx.json
           retention-days: 14
 
       - name: Build disk
         run: |
           sudo podman load -i .cache/image.tar
-          sudo tests/vm/make-disk.sh localhost/dux-atomic:ci "$GITHUB_WORKSPACE/output"
+          sudo tests/vm/make-disk.sh localhost/ultus-atomic:ci "$GITHUB_WORKSPACE/output"
 
       - name: Boot smoke test
         # Hosted runners have no /dev/kvm and no host GPU, so this is TCG and
@@ -291,10 +291,10 @@ jobs:
         run: build/install-packages.sh podman
 
       - name: Build the NVIDIA variant
-        run: podman build --layers -f Containerfile.nvidia -t localhost/dux-atomic:nvidia .
+        run: podman build --layers -f Containerfile.nvidia -t localhost/ultus-atomic:nvidia .
 
       - name: Verify the variant
-        run: tests/verify-image.sh --no-package-lock localhost/dux-atomic:nvidia
+        run: tests/verify-image.sh --no-package-lock localhost/ultus-atomic:nvidia
 
       - name: Check the variant manifest resolved
         run: |
@@ -302,7 +302,7 @@ jobs:
           # rpm -q accepts name.arch, which --whatprovides does not, and exits 1
           # naming every name that is not installed.
           mapfile -t names < <(grep -Ev '^[[:space:]]*(#.*)?$' manifests/packages-nvidia.txt)
-          podman run --rm localhost/dux-atomic:nvidia rpm -q "${names[@]}" ||
+          podman run --rm localhost/ultus-atomic:nvidia rpm -q "${names[@]}" ||
             { echo "FAIL a name from manifests/packages-nvidia.txt does not resolve in the variant" >&2; exit 1; }
 
   # The desktop is a module (#129). Build the tree with the module deleted, so a
@@ -342,10 +342,10 @@ jobs:
           test ! -e manifests/packages-desktop.txt
 
       - name: Build headless
-        run: podman build --layers -t localhost/dux-atomic:headless .
+        run: podman build --layers -t localhost/ultus-atomic:headless .
 
       - name: Verify the headless image carries no desktop
-        run: tests/verify-headless.sh localhost/dux-atomic:headless "$RUNNER_TEMP/packages-desktop.txt" "$RUNNER_TEMP/module-paths.txt"
+        run: tests/verify-headless.sh localhost/ultus-atomic:headless "$RUNNER_TEMP/packages-desktop.txt" "$RUNNER_TEMP/module-paths.txt"
 
   # The only job with write token and OIDC identity. It checks out the repository
   # for the shared package installer and never builds image content: it loads the
@@ -399,7 +399,7 @@ jobs:
           SHA_TAG: sha-${{ github.sha }}
         run: |
           podman load -i .cache/image.tar
-          podman tag localhost/dux-atomic:ci "$IMAGE:$SHA_TAG"
+          podman tag localhost/ultus-atomic:ci "$IMAGE:$SHA_TAG"
           podman push --digestfile "$RUNNER_TEMP/digest" "$IMAGE:$SHA_TAG"
           echo "digest=$(cat "$RUNNER_TEMP/digest")" >> "$GITHUB_OUTPUT"
 
@@ -500,7 +500,7 @@ jobs:
         run: |
           source "$RUNNER_TEMP/helpers.sh"
           digest=$(cat "$RUNNER_TEMP/digest")
-          with_log "$RUNNER_TEMP/attest.log" retry cosign attest --yes --new-bundle-format --predicate sbom/dux-atomic.spdx.json --type spdxjson "$IMAGE@$digest"
+          with_log "$RUNNER_TEMP/attest.log" retry cosign attest --yes --new-bundle-format --predicate sbom/ultus-atomic.spdx.json --type spdxjson "$IMAGE@$digest"
 
       - name: Attest build provenance
         # The SBOM attestation says what is inside the image, not who built it.
@@ -565,7 +565,7 @@ jobs:
         run: |
           status=0
           timeout --kill-after=10 180 cosign verify \
-            --certificate-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
+            --certificate-identity "https://github.com/ultus-net/ultus-atomic/.github/workflows/ci.yml@refs/heads/main" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             "$IMAGE@$DIGEST" >"$RUNNER_TEMP/verify.log" || status=$?
           timeout 10 head -c 20000 "$RUNNER_TEMP/verify.log" || true
@@ -583,7 +583,7 @@ jobs:
           status=0
           timeout --kill-after=10 180 cosign verify-attestation \
             --type spdxjson \
-            --certificate-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
+            --certificate-identity "https://github.com/ultus-net/ultus-atomic/.github/workflows/ci.yml@refs/heads/main" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             "$IMAGE@$DIGEST" >"$RUNNER_TEMP/verify-attestation.log" || status=$?
           timeout 10 head -c 20000 "$RUNNER_TEMP/verify-attestation.log" || true
@@ -604,9 +604,9 @@ jobs:
           command -v gh >/dev/null || { echo "gh is not on PATH" >&2; exit 1; }
           [[ -n $GH_TOKEN ]] || { echo "GH_TOKEN is empty" >&2; exit 1; }
           timeout --kill-after=10 180 gh attestation verify "oci://$IMAGE@$DIGEST" \
-            --repo ultus-net/dux-atomic \
+            --repo ultus-net/ultus-atomic \
             --bundle-from-oci \
-            --cert-identity "https://github.com/ultus-net/dux-atomic/.github/workflows/ci.yml@refs/heads/main" \
+            --cert-identity "https://github.com/ultus-net/ultus-atomic/.github/workflows/ci.yml@refs/heads/main" \
             >"$RUNNER_TEMP/verify-provenance.log" 2>&1 || status=$?
           timeout 10 head -c 20000 "$RUNNER_TEMP/verify-provenance.log" || true
           exit "$status"
