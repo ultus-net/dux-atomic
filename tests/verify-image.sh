@@ -177,6 +177,26 @@ if [[ $upgrade_probe != ok ]]; then
   exit 1
 fi
 echo "ok   the upgrade rule removes the previous identity's /etc entries, file and symlink, and keeps the current motd"
+# The probe proves the rule's effect on a root. This proves the boot path that
+# applies it: the unit must be wanted by sysinit.target, ordered before it, and
+# invoke systemd-tmpfiles with --remove, which is what reaches a preserved /etc.
+upgrade_boot=$("$runtime" run --rm "$image" bash -c '
+  set -eu
+  unit=/usr/lib/systemd/system/systemd-tmpfiles-setup.service
+  want=/usr/lib/systemd/system/sysinit.target.wants/systemd-tmpfiles-setup.service
+  if [[ ! -e $want ]]; then echo not-wanted-by-sysinit; exit 0; fi
+  if ! grep -qxF "ExecStart=systemd-tmpfiles --create --remove --boot --exclude-prefix=/dev" "$unit"; then
+    echo no-remove-boot-run
+    exit 0
+  fi
+  if ! grep -qxF "Before=sysinit.target" "$unit"; then echo no-sysinit-ordering; exit 0; fi
+  echo ok
+') || { echo "FAIL the upgrade rule's boot path did not run in the image" >&2; exit 1; }
+if [[ $upgrade_boot != ok ]]; then
+  echo "FAIL the upgrade rule's boot path is not wired: ${upgrade_boot}" >&2
+  exit 1
+fi
+echo "ok   systemd-tmpfiles-setup.service is wanted by sysinit.target and runs systemd-tmpfiles --remove --boot"
 # The pinned base's /etc/dnf/dnf.conf carries only a comment and [main], and the
 # overlay replaces it with the linutil Configure DNF defaults (#111). Ask dnf5
 # for the values it resolves, so a file that parses but is not read still reds.
