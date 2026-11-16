@@ -108,6 +108,19 @@ else
   echo "ok   the NVIDIA variant names its own manifest and the shared image does not"
 fi
 
+# build/common.sh reads the shared overlay and every modules/*/ tree, and skips
+# a tree the build context lacks. A variant that omits one COPY therefore builds
+# without it and still exits 0, so compare the ctx stages rather than trust the
+# two files to stay in step.
+ctx_trees=$(grep -oE '^COPY (build|manifests|overlay|modules) ' "$repo_root/Containerfile")
+variant_ctx_trees=$(grep -oE '^COPY (build|manifests|overlay|modules) ' "$variant_containerfile")
+if [[ $ctx_trees != "$variant_ctx_trees" ]]; then
+  echo "FAIL Containerfile.nvidia exposes different build-context trees than Containerfile, so a variant can build without a tree the shared build reads" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   every Containerfile exposes the same build-context trees"
+fi
+
 # The two helpers the variant path adds are decision functions, so exercise
 # them here: a matching devel must pass, a mismatched or absent one must fail
 # with its message, a manifest name must become a path under manifests/, and a
@@ -323,83 +336,141 @@ else
   echo "ok   docs/developer-tooling.md inventories all 23 Brewfile names in order and links the measurement"
 fi
 
-desktop_unit=$repo_root/overlay/usr/lib/systemd/user/dux-atomic-desktop.service
-defaults_unit=$repo_root/overlay/usr/lib/systemd/user/dux-atomic-dms-defaults.service
-user_preset=$repo_root/overlay/usr/lib/systemd/user-preset/01-dux-atomic.preset
-dms_binding=$repo_root/overlay/usr/lib/systemd/user/niri.service.wants/dms.service
-seed_source=$repo_root/overlay/usr/share/dux-atomic/dms/session.json
-if [[ ! -f $desktop_unit ]] || ! grep -qx 'ExecStart=/usr/bin/dms setup headless --compositor niri --terminal ghostty --skip-existing' "$desktop_unit"; then
-  echo "FAIL dux-atomic-desktop.service does not run dms setup headless" >&2
+# The desktop is one module: manifests/packages-desktop.txt plus modules/desktop/.
+# A swap replaces those two paths and a headless build deletes them, so pin the
+# seam rather than the product. The invariant: the shared build, the shared
+# manifest, the image definition and the image verifier name no desktop product;
+# only the module, the tests that exercise it and the documents that describe it
+# may. The properties below are the ones any desktop must keep, so they survive
+# a swap.
+desktop_manifest=$repo_root/manifests/packages-desktop.txt
+desktop_overlay=$repo_root/modules/desktop
+desktop_names='dms|dms-greeter|niri|ghostty|quickshell|matugen|dux-search|dux-calendar|dux-files'
+leaks=
+if [[ ! -f $desktop_manifest ]] || [[ ! -d $desktop_overlay ]]; then
+  echo "FAIL the desktop module needs both manifests/packages-desktop.txt and modules/desktop/" >&2
   failures=$((failures + 1))
-elif ! grep -qx 'TimeoutStartSec=120' "$desktop_unit"; then
-  echo "FAIL dux-atomic-desktop.service has no start timeout" >&2
-  failures=$((failures + 1))
-elif ! grep -qx 'ConditionUser=!root' "$desktop_unit" ||
-     ! grep -qx 'ConditionUser=!greeter' "$desktop_unit" ||
-     ! grep -qx 'Before=graphical-session-pre.target' "$desktop_unit"; then
-  echo "FAIL dux-atomic-desktop.service is not ordered or can run as root/greeter" >&2
-  failures=$((failures + 1))
-elif ! grep -qx 'ExecCondition=/usr/libexec/dux-atomic/needs-setup.sh' "$desktop_unit" ||
-     ! grep -qx 'ExecStartPost=/usr/bin/install -Dm0644 /dev/null %S/dux-atomic/desktop-setup.done' "$desktop_unit" ||
-     [[ ! -x $repo_root/overlay/usr/libexec/dux-atomic/needs-setup.sh ]]; then
-  echo "FAIL dux-atomic-desktop.service has no setup condition or completion marker" >&2
-  failures=$((failures + 1))
-elif [[ ! -f $defaults_unit ]] ||
-     ! grep -qx 'ExecStart=/usr/bin/install -Dm0644 /usr/share/dux-atomic/dms/session.json %S/dms/session.json' "$defaults_unit"; then
-  echo "FAIL dux-atomic-dms-defaults.service does not seed the session file" >&2
-  failures=$((failures + 1))
-elif ! grep -qx 'ConditionUser=!root' "$defaults_unit" ||
-     ! grep -qx 'ConditionUser=!greeter' "$defaults_unit" ||
-     ! grep -qx 'Before=graphical-session-pre.target' "$defaults_unit"; then
-  echo "FAIL dux-atomic-dms-defaults.service is not ordered or can run as root/greeter" >&2
-  failures=$((failures + 1))
-elif [[ ! -f $seed_source ]] || ! grep -q '"wallpaperPath": "#101418"' "$seed_source"; then
-  echo "FAIL the DMS session seed is missing or has no dark background" >&2
-  failures=$((failures + 1))
-elif [[ ! -L $dms_binding ]] || [[ $(readlink "$dms_binding") != /usr/lib/systemd/user/dms.service ]]; then
-  echo "FAIL the image-level dms.service binding is missing" >&2
-  failures=$((failures + 1))
-elif [[ ! -f $user_preset ]]; then
-  echo "FAIL the user preset is missing" >&2
-  failures=$((failures + 1))
-elif ! grep -qx 'enable dux-atomic-desktop.service' "$user_preset" ||
-     ! grep -qx 'enable dux-atomic-dms-defaults.service' "$user_preset"; then
-  echo "FAIL the user preset does not enable both first-login units" >&2
-  failures=$((failures + 1))
-elif ! grep -qx 'systemctl --global preset dux-atomic-desktop.service dux-atomic-dms-defaults.service' "$repo_root/build/common.sh"; then
-  echo "FAIL build/common.sh does not apply the user preset" >&2
+elif ! grep -qx 'install_manifest /ctx/manifests/packages-desktop.txt' "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh"; then
+  echo "FAIL the desktop build step does not install the desktop manifest" >&2
   failures=$((failures + 1))
 else
-  echo "ok   first-login desktop units are enabled through the user preset"
+  # Reachable shared files only. manifests/packages-common.lock records the
+  # origin of what landed and the changelog records history, so both keep the
+  # old names.
+  while IFS= read -r shared; do
+    if grep -qE "(^|[^[:alnum:]_-])(${desktop_names})([^[:alnum:]_-]|$)" "$shared"; then
+      leaks+="${shared#"$repo_root"/}"$'\n'
+    fi
+  done < <(
+    echo "$repo_root/Containerfile"
+    echo "$repo_root/manifests/packages-common.txt"
+    echo "$repo_root/tests/verify-image.sh"
+    find "$repo_root/build" -type f -print
+    find "$repo_root/overlay" -type f -print
+    find "$repo_root/modules" -path "$desktop_overlay" -prune -o -type f -print
+  )
+  if [[ -n $leaks ]]; then
+    echo "FAIL the shared build names a desktop product outside the module:" >&2
+    printf '%s' "$leaks" >&2
+    failures=$((failures + 1))
+  else
+    echo "ok   no desktop product name leaks outside the module"
+  fi
 fi
 
-greeter_unit=$repo_root/overlay/usr/lib/systemd/system/dux-atomic-greeter-defaults.service
-greeter_seed=$repo_root/overlay/usr/share/dux-atomic/greeter/memory.json
-greeter_wants=$repo_root/overlay/usr/lib/systemd/system/greetd.service.wants/dux-atomic-greeter-defaults.service
-if [[ ! -f $greeter_unit ]] ||
-   ! grep -qx 'ExecStart=/usr/bin/install -m 0644 -o greeter -g greeter /usr/share/dux-atomic/greeter/memory.json /var/cache/dms-greeter/.local/state/memory.json' "$greeter_unit"; then
-  echo "FAIL dux-atomic-greeter-defaults.service does not seed the greeter memory" >&2
-  failures=$((failures + 1))
-elif ! grep -qx 'Before=greetd.service' "$greeter_unit" ||
-     ! grep -qx 'ConditionPathExists=!/var/cache/dms-greeter/.local/state/memory.json' "$greeter_unit"; then
-  echo "FAIL dux-atomic-greeter-defaults.service is not ordered before greetd or would overwrite a choice" >&2
-  failures=$((failures + 1))
-elif [[ ! -f $greeter_seed ]] || ! grep -q '"lastSessionDesktopId": "niri.desktop"' "$greeter_seed"; then
-  echo "FAIL the greeter memory seed does not default to niri" >&2
-  failures=$((failures + 1))
-elif [[ ! -L $greeter_wants ]] || [[ $(readlink "$greeter_wants") != /usr/lib/systemd/system/dux-atomic-greeter-defaults.service ]]; then
-  echo "FAIL dux-atomic-greeter-defaults.service is not bound to greetd" >&2
-  failures=$((failures + 1))
-elif ! grep -qx 'getent passwd greeter >/dev/null || {' "$repo_root/build/common.sh"; then
-  echo "FAIL build/common.sh does not check the greeter account" >&2
+# First-login setup keeps its safety contract: no unit runs as root or as the
+# greeter, every one is ordered into the session, and the setup unit is bounded,
+# gated on a condition script, and marks completion so a retry cannot redo it.
+module_units=$(find "$desktop_overlay/usr/lib/systemd" -type f -name '*.service' -path '*/user/*' 2>/dev/null || true)
+if [[ -z $module_units ]]; then
+  echo "FAIL the desktop module ships no user unit" >&2
   failures=$((failures + 1))
 else
-  echo "ok   the greeter defaults to the niri session"
+  unit_failures=0
+  for unit in $module_units; do
+    for line in 'ConditionUser=!root' 'ConditionUser=!greeter' 'Before='; do
+      grep -q "^${line}" "$unit" || {
+        echo "FAIL ${unit#"$repo_root"/} does not carry ${line}" >&2
+        unit_failures=1
+      }
+    done
+  done
+  setup_unit=$(grep -l '^ExecCondition=' $module_units 2>/dev/null | head -1 || true)
+  if [[ -z $setup_unit ]]; then
+    echo "FAIL no desktop user unit gates first-login setup on a condition script" >&2
+    unit_failures=1
+  else
+    condition=$(sed -n 's/^ExecCondition=//p' "$setup_unit" | head -1)
+    grep -q '^TimeoutStartSec=' "$setup_unit" || {
+      echo "FAIL ${setup_unit#"$repo_root"/} has no start timeout" >&2
+      unit_failures=1
+    }
+    grep -q '^ExecStartPost=' "$setup_unit" || {
+      echo "FAIL ${setup_unit#"$repo_root"/} writes no completion marker" >&2
+      unit_failures=1
+    }
+    [[ -n $condition && -x $desktop_overlay$condition ]] || {
+      echo "FAIL the first-login condition script '${condition}' is missing or not executable in the module" >&2
+      unit_failures=1
+    }
+  fi
+  if ((unit_failures == 0)); then
+    echo "ok   the desktop units refuse root and the greeter, are ordered, and bound first-login setup"
+  else
+    failures=$((failures + 1))
+  fi
+fi
+
+# The greeter seeds a session choice before greetd starts, and a seeded file is
+# JSON the greeter can read.
+all_module_units=$(find "$desktop_overlay/usr/lib/systemd" -type f -name '*.service' 2>/dev/null || true)
+greeter_unit=$(grep -l '^Before=greetd.service' $all_module_units 2>/dev/null | head -1 || true)
+seed=$(find "$desktop_overlay" -name 'memory.json' -print -quit 2>/dev/null || true)
+if [[ -z $greeter_unit ]]; then
+  echo "FAIL no desktop unit seeds the greeter before it starts" >&2
+  failures=$((failures + 1))
+elif [[ -z $seed ]] || ! python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$seed" 2>/dev/null; then
+  echo "FAIL the greeter seed is missing or is not JSON" >&2
+  failures=$((failures + 1))
+elif ! grep -q 'Session' "$seed"; then
+  echo "FAIL the greeter seed names no session" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the greeter seed is JSON and pins a session name"
+fi
+
+# Bindings travel with the module and name an absolute unit path, so a swap
+# cannot leave a link pointing at a name only the old desktop shipped. The
+# image test proves each target resolves after installation.
+binding_failures=0
+while IFS= read -r link; do
+  target=$(readlink "$link")
+  case $target in
+    /usr/lib/systemd/*) ;;
+    *) echo "FAIL ${link#"$repo_root"/} points at '${target}', not an absolute unit path" >&2
+       binding_failures=1 ;;
+  esac
+done < <(find "$desktop_overlay" -type l)
+if ((binding_failures == 0)); then
+  echo "ok   every desktop binding names an absolute unit path inside the module's overlay"
+else
+  failures=$((failures + 1))
+fi
+
+# The swap procedure is documentation, so a swap that costs more than the two
+# module paths reds here until the document says otherwise.
+if [[ ! -f $repo_root/docs/desktop.md ]] ||
+   ! grep -qF 'manifests/packages-desktop.txt' "$repo_root/docs/desktop.md" ||
+   ! grep -qF 'modules/desktop/' "$repo_root/docs/desktop.md"; then
+  echo "FAIL docs/desktop.md is missing or does not name both module paths" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   docs/desktop.md names the two paths a desktop swap replaces"
 fi
 
 # The first-login condition decides retry vs skip. Run the real script against
 # one fixture per case so a change in its logic is visible without a VM.
-condition=$repo_root/overlay/usr/libexec/dux-atomic/needs-setup.sh
+condition=$repo_root/modules/desktop/usr/libexec/dux-atomic/needs-setup.sh
 if ! grep -qF '${XDG_STATE_HOME:-$HOME/.local/state}' "$condition"; then
   echo "FAIL needs-setup.sh does not match the unit's %S marker path" >&2
   failures=$((failures + 1))
@@ -483,16 +554,19 @@ if ! grep -qF 'wait_for "DUX_USER:${test_user}"' "$boot_smoke" ||
    grep -qF "wait_for 'DUX_PROBE_END'" "$boot_smoke"; then
   echo "FAIL boot-smoke waits on an echoed marker instead of printf output" >&2
   failures=$((failures + 1))
-elif ! grep -qF 'readlink "$portal_mask"' "$common" ||
-     ! grep -qF '= /dev/null' "$common" ||
-     ! grep -qF "trap 'rm -rf \"\$check_root\"' EXIT" "$common" ||
-     ! grep -qF 'cannot read ${path}' "$common" ||
+elif ! grep -qF 'readlink "$portal_mask"' "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh" ||
+     ! grep -qF '= /dev/null' "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh" ||
+     ! grep -qF "trap desktop_cleanup EXIT" "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh" ||
+     ! grep -qF 'copr disable duxlabs/dms' "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh" ||
+     ! grep -qF 'cannot read ${path}' "$repo_root/build/manifest.sh" ||
      ! grep -qF 'install_manifest "$manifest"' "$common" ||
+     ! grep -qF 'install_manifest /ctx/manifests/packages-desktop.txt' "$desktop_overlay/usr/libexec/dux-atomic/build.d/50-desktop.sh" ||
+     ! grep -qF '/usr/libexec/dux-atomic/build.d/*.sh' "$common" ||
      grep -qF 'packages-common.txt || true' "$common"; then
-  echo "FAIL build/common.sh does not assert the portal mask target, trap the scratch root, or read every manifest fail-closed" >&2
+  echo "FAIL the greeter mask, the manifest reader or a manifest install does not fail closed" >&2
   failures=$((failures + 1))
 else
-  echo "ok   the vm login probes and greeter mask fail closed"
+  echo "ok   the greeter mask and both manifest installs fail closed"
 fi
 
 # boot-smoke.sh gained an opt-in POST_LOGIN_CMD hook for automated post-login
@@ -656,6 +730,45 @@ job_block() {
     found { print }
   ' "$workflow"
 }
+# The module's acceptance criterion is a build without it (#129), so the suite
+# carries a job that deletes the module and then reads the image. A job that
+# deletes the module and never reads the image proves only that dnf works.
+headless_block=$(job_block headless)
+if [[ -z $headless_block ]]; then
+  echo "FAIL ci.yml has no headless job, so nothing proves the image builds without the desktop module" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'needs.changes.outputs.desktop' <<<"$headless_block"; then
+  echo "FAIL the headless job is not gated on a desktop path filter" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'steps.desktop.outputs.desktop' "$workflow"; then
+  echo "FAIL the changes job publishes no desktop output, so the headless job never runs" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'rm -rf modules/desktop manifests/packages-desktop.txt' <<<"$headless_block"; then
+  echo "FAIL the headless job does not delete both module paths before its build" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'git ls-tree -r --name-only HEAD modules/desktop' <<<"$headless_block"; then
+  echo "FAIL the headless job saves no list of the files the module ships" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'tests/verify-headless.sh localhost/dux-atomic:headless' <<<"$headless_block"; then
+  echo "FAIL the headless job builds without asserting the image carries no desktop" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'tests/verify-image.sh" --headless --no-package-lock' "$repo_root/tests/verify-headless.sh"; then
+  echo "FAIL the headless verifier does not run the shared image assertions" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'path_list=$3' "$repo_root/tests/verify-headless.sh"; then
+  echo "FAIL the headless verifier does not read the module path list the job saves" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'tests/verify-headless.sh' "$repo_root/tests/lint.sh"; then
+  echo "FAIL tests/lint.sh does not lint the headless verifier" >&2
+  failures=$((failures + 1))
+elif ! git -C "$repo_root" ls-files -s -- tests/verify-headless.sh | grep -q '^100755 '; then
+  # The job runs the verifier directly, so a committed 100644 fails the job with
+  # exit 126 before it asserts anything.
+  echo "FAIL tests/verify-headless.sh is not committed executable, so the headless job cannot run it" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   ci.yml builds headless without the desktop module and asserts the image"
+fi
 # Assert the NVIDIA CI job and its gating and flags
 if ! grep -qF 'podman build --layers -f Containerfile.nvidia -t localhost/dux-atomic:nvidia' "$workflow" ||
    # Count the verify invocation only inside the image-nvidia job block so an

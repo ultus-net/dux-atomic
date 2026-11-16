@@ -2,16 +2,18 @@
 # Run the built image's own lint and unit verification, then compare the
 # installed third-party packages against manifests/packages-common.lock.
 #
-#   tests/verify-image.sh [--no-package-lock] [image]
+#   tests/verify-image.sh [--no-package-lock] [--headless] [image]
 
 set -euo pipefail
 
 # Parse optional leading flags
 no_lock=0
+headless=0
 while [[ ${1:-} == --* ]]; do
   case "$1" in
     --no-package-lock) no_lock=1; shift ;;
-    --*) echo "Usage: ${BASH_SOURCE[0]} [--no-package-lock] [image]" >&2; exit 2 ;;
+    --headless) headless=1; shift ;;
+    --*) echo "Usage: ${BASH_SOURCE[0]} [--no-package-lock] [--headless] [image]" >&2; exit 2 ;;
   esac
 done
 
@@ -20,10 +22,111 @@ runtime=${CONTAINER_RUNTIME:-podman}
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 
 "$runtime" run --rm "$image" bootc container lint
-"$runtime" run --rm "$image" systemd-analyze verify \
-  /usr/lib/systemd/system/dux-atomic-greeter-defaults.service \
-  /usr/lib/systemd/user/dux-atomic-desktop.service \
-  /usr/lib/systemd/user/dux-atomic-dms-defaults.service
+# The desktop contract, expressed in terms any desktop satisfies: every unit the
+# image ships outside a package, and every unit its own preset enables, verifies;
+# every binding resolves; the greeter command and a session entry name
+# executables; and first-login setup is gated, ordered, bounded and marks
+# completion. Nothing below names the shipped desktop, so these assertions
+# survive a swap. A headless image has none of it, so --headless skips the block.
+if ((!headless)); then
+"$runtime" run --rm -i "$image" bash -s <<'IN_IMAGE'
+set -euo pipefail
+fail() { echo "$*" >&2; exit 1; }
+
+# A file in the preset or unit directories that no package owns is the image's
+# own, which is the product-neutral way to find the desktop's wiring.
+image_own() {
+  local dir=$1 file
+  for file in "$dir"/*; do
+    [[ -f $file ]] || continue
+    rpm -qf "$file" >/dev/null 2>&1 || echo "$file"
+  done
+}
+
+mapfile -t own_presets < <(image_own /usr/lib/systemd/user-preset)
+((${#own_presets[@]} > 0)) || fail "FAIL the image ships no user preset of its own"
+mapfile -t preset_units < <(awk '$1 == "enable" { print $2 }' "${own_presets[@]}")
+((${#preset_units[@]} > 0)) || fail "FAIL the image's own user preset enables no unit"
+for unit in "${preset_units[@]}"; do
+  [[ -f /usr/lib/systemd/user/$unit ]] || fail "FAIL the preset enables $unit, which the image does not ship"
+done
+
+# Every unit the image ships outside a package must verify, and so must every
+# unit its own preset enables. This covers the module's units by ownership
+# rather than by name, so a swapped desktop is verified without the verifier
+# naming it.
+mapfile -t own_system_units < <(image_own /usr/lib/systemd/system)
+mapfile -t own_user_units < <(image_own /usr/lib/systemd/user)
+verify_units=("${own_system_units[@]}" "${own_user_units[@]}" "${preset_units[@]/#//usr/lib/systemd/user/}")
+((${#verify_units[@]} > 0)) || fail "FAIL the image ships no unit of its own"
+systemd-analyze verify "${verify_units[@]}" ||
+  fail "FAIL a unit the image ships or enables does not verify"
+
+# Every binding in the image resolves, so no session starts against a missing
+# unit.
+bad=
+while IFS= read -r -d '' link; do
+  target=$(readlink "$link")
+  [[ -e $target ]] || bad+="$link -> $target"$'\n'
+done < <(find /usr/lib/systemd/system /usr/lib/systemd/user -type l \
+  \( -path '*/.wants/*' -o -path '*/.requires/*' \) -print0)
+[[ -z $bad ]] || fail "FAIL bindings point at missing units:"$'\n'"$bad"
+
+# The greeter is configured and its command resolves.
+[[ -f /etc/greetd/config.toml ]] || fail "FAIL the image ships no greeter configuration"
+greeter_cmd=$(sed -n 's/^[[:space:]]*command[[:space:]]*=[[:space:]]*//p' /etc/greetd/config.toml | head -1)
+greeter_cmd=${greeter_cmd//\"/}
+greeter_cmd=${greeter_cmd%% *}
+[[ -n $greeter_cmd ]] || fail "FAIL the greeter configuration names no command"
+command -v "$greeter_cmd" >/dev/null || fail "FAIL the greeter command '$greeter_cmd' does not resolve"
+
+# A session entry exists and names an executable, so the greeter can start one.
+session=
+for dir in /usr/share/wayland-sessions /usr/share/xsessions; do
+  for entry in "$dir"/*.desktop; do
+    [[ -f $entry ]] || continue
+    session_cmd=$(sed -n 's/^Exec=//p' "$entry" | head -1)
+    session_cmd=${session_cmd%% *}
+    if [[ -n $session_cmd ]] && command -v "$session_cmd" >/dev/null 2>&1; then
+      session=$entry
+    fi
+  done
+done
+[[ -n $session ]] || fail "FAIL no session entry names an executable"
+
+# First-login setup is gated on a condition script, ordered, bounded and marks
+# completion, so a crash retries and a hang cannot hold the session open.
+setup_unit=
+for unit in "${own_user_units[@]}"; do
+  grep -q '^ExecCondition=' "$unit" && setup_unit=$unit
+done
+[[ -n $setup_unit ]] || fail "FAIL no user unit gates first-login setup on a condition"
+condition=$(sed -n 's/^ExecCondition=//p' "$setup_unit" | head -1)
+[[ -x $condition ]] || fail "FAIL the first-login condition $condition is not executable"
+grep -q '^Before=graphical-session-pre.target' "$setup_unit" ||
+  fail "FAIL the first-login unit is not ordered before the session"
+grep -q '^TimeoutStartSec=' "$setup_unit" || fail "FAIL the first-login unit has no start timeout"
+grep -q '^ExecStartPost=' "$setup_unit" || fail "FAIL the first-login unit writes no completion marker"
+IN_IMAGE
+echo "ok   the desktop contract holds: image units verify, bindings resolve, the greeter and a session start, first-login is bounded"
+fi
+
+# Every path the module ships must be present in the image, so the relocated
+# overlay is proven to land where systemd and the session look. The paths come
+# from the tree, not from a list of product names, so a swapped desktop is
+# covered by the same assertion.
+module_overlay=$repo_root/modules/desktop
+if ((!headless)) && [[ -d $module_overlay ]]; then
+  mapfile -t module_paths < <(cd "$module_overlay" && find . \( -type f -o -type l \) -printf '/%P\n' | sort)
+  ((${#module_paths[@]} > 0)) || { echo "FAIL modules/desktop/ is empty" >&2; exit 1; }
+  missing=$(printf '%s\n' "${module_paths[@]}" |
+    "$runtime" run --rm -i "$image" bash -c 'while read -r path; do [[ -e $path ]] || echo "$path"; done')
+  if [[ -n $missing ]]; then
+    echo "FAIL the desktop module ships paths the image does not carry:"$'\n'"$missing" >&2
+    exit 1
+  fi
+  echo "ok   every path in modules/desktop/ is present in the image (${#module_paths[@]} paths)"
+fi
 # The pinned base's /etc/dnf/dnf.conf carries only a comment and [main], and the
 # overlay replaces it with the linutil Configure DNF defaults (#111). Ask dnf5
 # for the values it resolves, so a file that parses but is not read still reds.
@@ -49,16 +152,21 @@ if [[ $zone_services != 'dhcpv6-client ssh' ]]; then
   exit 1
 fi
 echo "ok   the public zone allows exactly dhcpv6-client and ssh (#116)"
-# The Fedora base carries no desktop, so every name in the manifest has to
-# resolve in the built image. Query all of them in one call, so a silently
-# dropped name fails here rather than at the first login, and a new manifest
-# entry is covered without touching this script. Two entries are provides
-# (dms-greeter, xinit), so query by whatprovides rather than package name.
-packages=$(grep -Ev '^[[:space:]]*(#.*)?$' "$repo_root/manifests/packages-common.txt")
+# Every name in every manifest has to resolve in the built image. Query them in
+# one call, so a silently dropped name fails here rather than at the first
+# login, and a new manifest entry is covered without touching this script. Some
+# entries are provides rather than package names (xinit), so query by
+# whatprovides.
+manifests=("$repo_root/manifests/packages-common.txt")
+desktop_manifest=$repo_root/manifests/packages-desktop.txt
+# A headless build installs the shared set only, so the module's manifest is not
+# part of what has to resolve.
+[[ -f $desktop_manifest && $headless -eq 0 ]] && manifests+=("$desktop_manifest")
+packages=$(grep -hEv '^[[:space:]]*(#.*)?$' "${manifests[@]}")
 # shellcheck disable=SC2086 # Word splitting is intended: the manifest is one name per line.
 if ! "$runtime" run --rm "$image" rpm -q --whatprovides $packages >/dev/null; then
   "$runtime" run --rm "$image" rpm -q --whatprovides $packages >&2 || true
-  echo "FAIL a name from manifests/packages-common.txt does not resolve in the image" >&2
+  echo "FAIL a name from a manifest does not resolve in the image" >&2
   exit 1
 fi
 # The Fedora base enables sshd.service, and this image documents that a fresh
@@ -77,10 +185,13 @@ fi
   bash /opt/tests/verify-kernel-signature.sh
 # xdg-desktop-portal reads /etc before /usr/share, so the override is what
 # routes FileChooser to gtk instead of nautilus, which this image does not ship.
-"$runtime" run --rm "$image" grep -qx \
-  'org.freedesktop.impl.portal.FileChooser=gtk;' \
-  /etc/xdg-desktop-portal/niri-portals.conf \
-  || { echo "FAIL the file-chooser portal override is missing or wrong" >&2; exit 1; }
+# The override is a module file, so a headless image has none.
+if ((!headless)); then
+  "$runtime" run --rm "$image" grep -qx \
+    'org.freedesktop.impl.portal.FileChooser=gtk;' \
+    /etc/xdg-desktop-portal/niri-portals.conf \
+    || { echo "FAIL the file-chooser portal override is missing or wrong" >&2; exit 1; }
+fi
 # Steam pulls the 32-bit graphics stack through its own dependencies, so this
 # driver is not a manifest name and needs its own assertion.
 "$runtime" run --rm "$image" rpm -q mesa-vulkan-drivers.i686 \

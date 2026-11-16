@@ -3,18 +3,7 @@
 # here. The queue that ships these is Fedora's bootc image, so a package the
 # session needs at runtime has to be named: the base carries no desktop.
 
-# Compositor, shell, greeter and terminal
-niri
-dms
-dms-greeter
-quickshell
-ghostty
-
-# Dux applications the installer treats as optional dependencies
-dux-search
-dux-calendar
-dux-files
-matugen
+# (Desktop packages moved to manifests/packages-desktop.txt)
 
 # Wayland portals, keyring, policy agent and session services
 xdg-desktop-portal

@@ -49,6 +49,7 @@ The image ships no interactive user. A real install creates the operator account
 - [Build](docs/build.md)
 - [Install](docs/install.md)
 - [First login](docs/first-login.md)
+- [Desktop](docs/desktop.md)
 - [Applications](docs/applications.md)
 - [Developer and sysadmin tooling](docs/developer-tooling.md)
 - [Testing](docs/testing.md)

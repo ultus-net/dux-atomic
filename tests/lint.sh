@@ -28,6 +28,7 @@ fi
 
 bash_scripts=(
   build/common.sh
+  build/manifest.sh
   build/install-packages.sh
   build/package-lock.sh
   build/compare-lock.sh
@@ -41,12 +42,14 @@ bash_scripts=(
   tests/test-agent-container.sh
   tests/test-lock-drift.sh
   tests/verify-image.sh
+  tests/verify-headless.sh
   tests/verify-kernel-signature.sh
   tests/vm/boot-smoke.sh
   tests/vm/make-disk.sh
+  modules/desktop/usr/libexec/dux-atomic/build.d/50-desktop.sh
 )
 posix_scripts=(
-  overlay/usr/libexec/dux-atomic/needs-setup.sh
+  modules/desktop/usr/libexec/dux-atomic/needs-setup.sh
 )
 
 cd "$repo_root"
