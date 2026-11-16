@@ -56,6 +56,6 @@ The image ships no interactive user. A real install creates the operator account
 - [CI and publishing](docs/ci.md)
 - [Known gaps before promotion](docs/known-gaps.md)
 - [Roadmap](docs/superpowers/plans/2026-11-14-tooling-and-platform-roadmap.md)
-- [Approved design](docs/superpowers/specs/2026-11-09-ultus-atomic-design.md)
+- [Approved design](docs/superpowers/specs/2026-11-09-dux-atomic-design.md)
 - [Agent container profile](docs/agent-container.md)
 - [Microsoft Agent Framework study plan](docs/learning/2026-11-14-microsoft-agent-framework-12-stage-plan.md)

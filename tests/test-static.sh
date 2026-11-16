@@ -440,16 +440,24 @@ else
 fi
 
 # Bindings travel with the module and name an absolute unit path, so a swap
-# cannot leave a link pointing at a name only the old desktop shipped. The
-# image test proves each target resolves after installation.
+# cannot leave a link pointing at a name only the old desktop shipped. A target
+# that still names the old identity is the failure a rename leaves behind, and
+# git grep does not read a symlink's target, so check it here. The image test
+# proves each target resolves after installation, including package-owned units
+# the module does not ship.
 binding_failures=0
 while IFS= read -r link; do
   target=$(readlink "$link")
   case $target in
     /usr/lib/systemd/*) ;;
     *) echo "FAIL ${link#"$repo_root"/} points at '${target}', not an absolute unit path" >&2
-       binding_failures=1 ;;
+       binding_failures=1
+       continue ;;
   esac
+  if [[ $target == *dux-atomic* ]]; then
+    echo "FAIL ${link#"$repo_root"/} still points at '${target}', which names the old identity" >&2
+    binding_failures=1
+  fi
 done < <(find "$desktop_overlay" -type l)
 if ((binding_failures == 0)); then
   echo "ok   every desktop binding names an absolute unit path inside the module's overlay"
@@ -1257,21 +1265,21 @@ else
   fi
 fi
 
-# Ensure the old repository/image token `dux-atomic` does not appear in live
-# files. Allow it only in historic records (docs/research/, docs/agents/,
-# docs/superpowers/) and CHANGELOG.md, and allow the one tmpfiles rule that
-# targets the legacy on-disk motd file used for upgrade cleanup.
-bad=$(git grep -Il "dux-atomic" || true)
+# The old repository/image token belongs to the historical record now. A live
+# file may still name a historical path, and the upgrade rule must name the /etc
+# file it removes, but nothing else may carry the token. git grep reads tracked
+# file content only; the binding check above covers symlink targets.
+allowed_paths='^(docs/research/|docs/agents/|docs/superpowers/|CHANGELOG\.md:|overlay/usr/lib/tmpfiles\.d/ultus-atomic-upgrade\.conf:|tests/test-static\.sh:)'
+# A live doc cites the approved spec or plan by the filename it was recorded
+# under, so that one citation stays.
+allowed_citation='docs/superpowers/(specs|plans)/2026-11-09-dux-atomic'
+bad=$(git grep -In "dux-atomic" | grep -Ev "$allowed_paths" | grep -Ev "$allowed_citation" || true)
 if [[ -n $bad ]]; then
-  # Filter allowed historical locations and the deliberate tmpfiles cleanup rule
-  filtered=$(printf "%s\n" "$bad" | grep -Ev '^docs/research/|^docs/agents/|^docs/superpowers/|^CHANGELOG.md$|^modules/desktop/usr/lib/tmpfiles.d/ultus-atomic-upgrade.conf$|^tests/test-static.sh$' || true)
-  if [[ -n $filtered ]]; then
-    echo "FAIL legacy token 'dux-atomic' found in live files outside allowlist:" >&2
-    printf "%s\n" "$filtered" >&2
-    failures=$((failures + 1))
-  else
-    echo "ok   no stray 'dux-atomic' outside allowed historical records and the tmpfiles cleanup rule"
-  fi
+  echo "FAIL legacy token 'dux-atomic' found outside the historical record:" >&2
+  printf "%s\n" "$bad" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the old token appears only in the historical record and the upgrade rule"
 fi
 
 if ((failures > 0)); then

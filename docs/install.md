@@ -83,7 +83,7 @@ No target is installed with an encrypted root. That is the recorded policy, not 
 
 Secure Boot needs no per-machine enrollment on this image. The chain is Fedora's end to end: `shim-x64` and `grub2-efi-x64` are Fedora-signed, and the pinned base keeps Fedora's kernel, whose signature is issued by `CN=fedoraca, OU=Fedora Secure Boot CA 20200709` with subject `CN=kernel-signer`. In-tree modules are signed by `Fedora kernel signing key`, so they load from the kernel's builtin keyring. Verified on the built image on 2026-11-12: the kernel's PE certificate table holds that PKCS#7 signature, and `modinfo -F signer` reports the Fedora key for `nf_tables.ko.xz` and `nouveau.ko.xz`.
 
-No boot with Secure Boot enabled has been recorded on either target. Record `mokutil --sb-state` per machine before the install, then record the boot result after it. The desktop has Secure Boot disabled today (`docs/superpowers/specs/2026-11-09-ultus-atomic-design.md:73`); enabling it should need no enrollment step, but that is unproven until one boot is recorded.
+No boot with Secure Boot enabled has been recorded on either target. Record `mokutil --sb-state` per machine before the install, then record the boot result after it. The desktop has Secure Boot disabled today (`docs/superpowers/specs/2026-11-09-dux-atomic-design.md:73`); enabling it should need no enrollment step, but that is unproven until one boot is recorded.
 
 Fedora's shim is signed through Microsoft's third-party UEFI CA, so the firmware must trust that CA. Most machines ship with it enabled. Some Lenovo ThinkPad models ship with it off, and there the firmware setting has to be turned on once; that is a trust setting in firmware, not a key enrolled in the MOK list, and it survives upgrades without repeating. A Secure Boot violation at first boot on those machines points at this setting before anything else.
 
@@ -102,7 +102,7 @@ The desktop's NVIDIA modules are unsigned, so that machine needs Secure Boot off
 
 ## The desktop
 
-The generic image does not drive the desktop's monitors. Both active displays are on the RTX 3070 (`docs/superpowers/specs/2026-11-09-ultus-atomic-design.md:73`), and the image has no NVIDIA kernel driver. Arch cannot switch to bootc in place (`docs/superpowers/specs/2026-11-09-ultus-atomic-design.md:81`), so the desktop needs a fresh atomic install of an NVIDIA variant that does not exist yet. Do not install the generic image on the desktop. [#94](https://github.com/ultus-net/ultus-atomic/issues/94) builds and publishes the variant.
+The generic image does not drive the desktop's monitors. Both active displays are on the RTX 3070 (`docs/superpowers/specs/2026-11-09-dux-atomic-design.md:73`), and the image has no NVIDIA kernel driver. Arch cannot switch to bootc in place (`docs/superpowers/specs/2026-11-09-dux-atomic-design.md:81`), so the desktop needs a fresh atomic install of an NVIDIA variant that does not exist yet. Do not install the generic image on the desktop. [#94](https://github.com/ultus-net/ultus-atomic/issues/94) builds and publishes the variant.
 
 ## After first boot
 
@@ -121,13 +121,15 @@ sudo bootc rollback --apply
 
 ## Upgrading an existing machine to the new image identity
 
-If you already run the old image and want to switch to the renamed published image identity, run (one-time):
+If you already run the image under its previous name, switch once to the renamed reference:
 
 ```bash
-sudo bootc switch ghcr.io/ultus-net/ultus-atomic:latest --target-imgref ghcr.io/ultus-net/ultus-atomic:latest
+sudo bootc switch --apply ghcr.io/ultus-net/ultus-atomic:latest
 ```
 
-This updates the boot selection to the new image reference; it does not change files under /etc left by the previous image. See the upgrade-cleanup tmpfiles rule described in the module for the one-time removal of historical legacy files (for example, a legacy /etc/motd.d entry written by an earlier image).
+A switch changes the booted image, not the files under `/etc`, because an upgrade preserves that tree. The shared overlay ships `/usr/lib/tmpfiles.d/ultus-atomic-upgrade.conf`, which removes the three entries the earlier image identity wrote there: its message-of-the-day file, and the two user-unit links its preset made in `graphical-session-pre.target.wants/`, which would dangle once the units are renamed. `systemd-tmpfiles` applies the rule at boot, so the stale entries survive only until the first boot of this image. The image's own preset owns the current user units.
+
+The first-login completion marker moves to the new identity's directory under `~/.local/state/`. An existing account has no marker at the new path, so the setup runs once more; `dms setup --skip-existing` leaves an existing config alone.
 
 ## Sources
 

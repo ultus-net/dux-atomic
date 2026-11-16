@@ -70,14 +70,6 @@ test -f /usr/share/ultus-atomic/dms/session.json || {
 
 # The greeter picks session index 0 when it has no memory, and the desktop-file
 # order is asynchronous. Seed the compositor's session as the first login.
-# Ensure the greetd wants directory has the greeter defaults symlink so the
-# check below does not fail in build contexts that omitted it. Create it from
-# the installed unit if necessary.
-if [ ! -e /usr/lib/systemd/system/greetd.service.wants/ultus-atomic-greeter-defaults.service ]; then
-  mkdir -p /usr/lib/systemd/system/greetd.service.wants || true
-  ln -sfn /usr/lib/systemd/system/ultus-atomic-greeter-defaults.service /usr/lib/systemd/system/greetd.service.wants/ultus-atomic-greeter-defaults.service || true
-fi
-
 for path in \
   /usr/lib/systemd/system/ultus-atomic-greeter-defaults.service \
   /usr/lib/systemd/system/greetd.service.wants/ultus-atomic-greeter-defaults.service \

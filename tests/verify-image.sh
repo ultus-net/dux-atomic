@@ -127,6 +127,50 @@ if ((!headless)) && [[ -d $module_overlay ]]; then
   fi
   echo "ok   every path in modules/desktop/ is present in the image (${#module_paths[@]} paths)"
 fi
+# An upgrade preserves /etc, so the rule that removes the previous identity's
+# motd file and its stale user-unit links has to travel in the image itself. The
+# shared overlay ships it to both variants. Compare the image copy to the tracked
+# rule so a build that drops or rewrites it reds here.
+upgrade_rule=/usr/lib/tmpfiles.d/ultus-atomic-upgrade.conf
+upgrade_want=$(grep -v '^#' "$repo_root/overlay$upgrade_rule")
+upgrade_got=$("$runtime" run --rm "$image" grep -v '^#' "$upgrade_rule" 2>/dev/null)
+if [[ -z $upgrade_got || $upgrade_got != "$upgrade_want" ]]; then
+  echo "FAIL the image does not carry the tracked ${upgrade_rule} rule" >&2
+  exit 1
+fi
+echo "ok   the image carries the overlay rule that cleans the previous identity's /etc entries"
+# Prove what the rule does on a throwaway root: every path it names must go and
+# the current motd must survive. The probe reads the removals from the rule
+# itself, so it cannot drift from it. A real in-place upgrade needs a VM, so this
+# pins the rule's behaviour in every image build instead.
+upgrade_probe=$("$runtime" run --rm "$image" bash -c '
+  set -eu
+  root=/tmp/tmpfiles-probe
+  rule=/usr/lib/tmpfiles.d/ultus-atomic-upgrade.conf
+  mapfile -t legacy < <(sed -n "s/^r \\([^ ]*\\) .*/\\1/p" "$rule")
+  # The previous identity wrote exactly three entries under /etc: its motd file
+  # and the two user-unit links its preset made.
+  if (( ${#legacy[@]} != 3 )); then echo "expected-3-removals-found-${#legacy[@]}"; exit 0; fi
+  mkdir -p "$root/usr/lib/tmpfiles.d" "$root/etc/motd.d"
+  cp "$rule" "$root$rule"
+  for path in "${legacy[@]}"; do
+    mkdir -p "$root$(dirname "$path")"
+    : > "$root$path"
+  done
+  : > "$root/etc/motd.d/ultus-atomic"
+  systemd-tmpfiles --remove --root="$root" >/dev/null
+  status=ok
+  for path in "${legacy[@]}"; do
+    if [[ -e $root$path ]]; then status="kept-$path"; fi
+  done
+  if [[ ! -e $root/etc/motd.d/ultus-atomic ]]; then status=current-motd-removed; fi
+  echo "$status"
+') || { echo "FAIL the upgrade rule probe did not run in the image" >&2; exit 1; }
+if [[ $upgrade_probe != ok ]]; then
+  echo "FAIL the upgrade rule left the wrong state: ${upgrade_probe}" >&2
+  exit 1
+fi
+echo "ok   the upgrade rule removes the previous identity's /etc entries and keeps the current motd"
 # The pinned base's /etc/dnf/dnf.conf carries only a comment and [main], and the
 # overlay replaces it with the linutil Configure DNF defaults (#111). Ask dnf5
 # for the values it resolves, so a file that parses but is not read still reds.
