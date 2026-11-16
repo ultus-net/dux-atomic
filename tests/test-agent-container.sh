@@ -12,7 +12,7 @@ printf 'hello\n' > "$tmp_proj/file.txt"
 export AGENT_CONTAINER_DRY_RUN=1
 
 # Clean dry run should succeed
-if ! output=$("$script" localhost/dux-atomic:dev "$tmp_proj" -- /bin/true 2>&1); then
+if ! output=$("$script" localhost/ultus-atomic:dev "$tmp_proj" -- /bin/true 2>&1); then
   echo "FAIL: clean dry run failed" >&2
   echo "$output" >&2
   exit 1
@@ -54,7 +54,7 @@ for rcases in "${red_cases[@]}"; do
   export AGENT_CONTAINER_EXTRA="$rcases"
   rc=0
   set +e
-  out=$("$script" localhost/dux-atomic:dev "$tmp_proj" -- /bin/true 2>&1) || rc=$?
+  out=$("$script" localhost/ultus-atomic:dev "$tmp_proj" -- /bin/true 2>&1) || rc=$?
   set -e
   if [[ $rc -eq 0 ]]; then
     echo "FAIL: script allowed disallowed extra: $rcases" >&2
@@ -77,7 +77,7 @@ for g in "${green_cases[@]}"; do
   export AGENT_CONTAINER_EXTRA="$g"
   rc=0
   set +e
-  out=$("$script" localhost/dux-atomic:dev "$tmp_proj" -- /bin/true 2>&1) || rc=$?
+  out=$("$script" localhost/ultus-atomic:dev "$tmp_proj" -- /bin/true 2>&1) || rc=$?
   set -e
   if [[ ${rc:-0} -ne 0 ]]; then
     echo "FAIL: allowlist token rejected: $g" >&2
@@ -93,9 +93,9 @@ done
 export AGENT_CONTAINER_EXTRA=
 tmp_parent=$tmp_proj/tmpdir
 mkdir -p "$tmp_parent"
-out=$(TMPDIR=$tmp_parent "$script" localhost/dux-atomic:dev "$tmp_proj" -- /bin/true 2>&1) \
+out=$(TMPDIR=$tmp_parent "$script" localhost/ultus-atomic:dev "$tmp_proj" -- /bin/true 2>&1) \
   || (echo "FAIL: dry run under a custom TMPDIR failed: $out" >&2; exit 1)
-echo "$out" | grep -qF "$tmp_parent/dux-atomic-agent." \
+echo "$out" | grep -qF "$tmp_parent/ultus-atomic-agent." \
   || (echo "FAIL: the temporary home ignores TMPDIR: $out" >&2; exit 1)
 echo "OK: the temporary home follows TMPDIR" >&2
 

@@ -12,7 +12,7 @@ Type=oneshot
 # The package tmpfiles rule owns /var/cache/dms-greeter with mode 0750. Create
 # the state directory if absent, without widening an existing tree.
 ExecStartPre=/usr/bin/install -d -m 0750 -o greeter -g greeter /var/cache/dms-greeter/.local/state
-ExecStart=/usr/bin/install -m 0644 -o greeter -g greeter /usr/share/dux-atomic/greeter/memory.json /var/cache/dms-greeter/.local/state/memory.json
+ExecStart=/usr/bin/install -m 0644 -o greeter -g greeter /usr/share/ultus-atomic/greeter/memory.json /var/cache/dms-greeter/.local/state/memory.json
 
 [Install]
 WantedBy=greetd.service

@@ -1,4 +1,4 @@
-# dux-atomic image definition.
+# ultus-atomic image definition.
 #
 # Layout follows the Universal Blue image-template
 # (https://github.com/ublue-os/image-template): a ctx stage exposes the build

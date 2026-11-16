@@ -4,7 +4,7 @@
 
 ```bash
 sudo pacman -S --needed qemu-full edk2-ovmf
-podman save localhost/dux-atomic:dev | sudo podman load
+podman save localhost/ultus-atomic:dev | sudo podman load
 sudo tests/vm/make-disk.sh
 tests/vm/boot-smoke.sh
 ```
@@ -16,10 +16,10 @@ tests/vm/boot-smoke.sh
 Test the digest the registry promoted, not the tag, because the tag can move between the pull and the boot:
 
 ```bash
-digest=$(skopeo inspect docker://ghcr.io/ultus-net/dux-atomic:latest --format '{{.Digest}}')
-sudo podman pull ghcr.io/ultus-net/dux-atomic@"$digest"
+digest=$(skopeo inspect docker://ghcr.io/ultus-net/ultus-atomic:latest --format '{{.Digest}}')
+sudo podman pull ghcr.io/ultus-net/ultus-atomic@"$digest"
 rm -rf output
-sudo tests/vm/make-disk.sh ghcr.io/ultus-net/dux-atomic@"$digest" output
+sudo tests/vm/make-disk.sh ghcr.io/ultus-net/ultus-atomic@"$digest" output
 ```
 
 `make-disk.sh` refuses an image that is not in rootful podman storage, hence the explicit pull. The `skopeo inspect` call is the same one the promotion record uses, so this digest matches the recorded one. `output/` holds only bootc-image-builder output and is gitignored, and `make-disk.sh` does not clear it, so `rm -rf output` drops an earlier candidate's disk that later commands on this page would otherwise boot.

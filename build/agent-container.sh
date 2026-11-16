@@ -15,7 +15,7 @@ set -euo pipefail
 usage(){
   cat <<EOF
 Usage: $0 [IMAGE] PROJECT_PATH -- [COMMAND...]
-Defaults: IMAGE=localhost/dux-atomic:dev
+Defaults: IMAGE=localhost/ultus-atomic:dev
 The project is mounted writable at /work and the command starts there.
 Environment:
   AGENT_CONTAINER_DRY_RUN=1  Print the podman command without running it
@@ -26,7 +26,7 @@ EOF
   exit 2
 }
 
-IMAGE=${1:-localhost/dux-atomic:dev}
+IMAGE=${1:-localhost/ultus-atomic:dev}
 PROJECT=${2:-}
 
 if [[ "$PROJECT" == "" ]]; then
@@ -303,7 +303,7 @@ fi
 extra_fields_to_append=("${allowed_extra_tokens[@]:-}")
 
 # Build podman run args
-TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/dux-atomic-agent.XXXXXX")
+TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/ultus-atomic-agent.XXXXXX")
 HOME_IN_CONTAINER=/home/agent
 XDG_CACHE=/tmp/agent-cache
 PROJECT_IN_CONTAINER=/work

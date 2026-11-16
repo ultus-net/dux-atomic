@@ -29,7 +29,7 @@ Anything else (for example -v, --volume, --mount, --privileged, --pid, --ipc, --
 
 Usage example (dry run):
 
-AGENT_CONTAINER_DRY_RUN=1 build/agent-container.sh localhost/dux-atomic:dev /path/to/project -- --name test-agent --network=none
+AGENT_CONTAINER_DRY_RUN=1 build/agent-container.sh localhost/ultus-atomic:dev /path/to/project -- --name test-agent --network=none
 
 See also
 - `docs/research/2026-11-14-agent-container.md` — the recorded run and its output

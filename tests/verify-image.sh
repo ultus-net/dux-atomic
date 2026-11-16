@@ -17,7 +17,7 @@ while [[ ${1:-} == --* ]]; do
   esac
 done
 
-image=${1:-localhost/dux-atomic:dev}
+image=${1:-localhost/ultus-atomic:dev}
 runtime=${CONTAINER_RUNTIME:-podman}
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 
@@ -127,6 +127,76 @@ if ((!headless)) && [[ -d $module_overlay ]]; then
   fi
   echo "ok   every path in modules/desktop/ is present in the image (${#module_paths[@]} paths)"
 fi
+# An upgrade preserves /etc, so the rule that removes the previous identity's
+# motd file and its stale user-unit links has to travel in the image itself. The
+# shared overlay ships it to both variants. Compare the image copy to the tracked
+# rule so a build that drops or rewrites it reds here.
+upgrade_rule=/usr/lib/tmpfiles.d/ultus-atomic-upgrade.conf
+upgrade_want=$(grep -v '^#' "$repo_root/overlay$upgrade_rule")
+upgrade_got=$("$runtime" run --rm "$image" grep -v '^#' "$upgrade_rule" 2>/dev/null)
+if [[ -z $upgrade_got || $upgrade_got != "$upgrade_want" ]]; then
+  echo "FAIL the image does not carry the tracked ${upgrade_rule} rule" >&2
+  exit 1
+fi
+echo "ok   the image carries the overlay rule that cleans the previous identity's /etc entries"
+# Prove what the rule does on a throwaway root, for both kinds of entry the
+# previous identity left behind: a regular file and a symlink. The probe reads
+# the removals from the rule itself, so it cannot drift from it. A real in-place
+# upgrade needs a VM, so this pins the rule's effect in every image build.
+upgrade_probe=$("$runtime" run --rm "$image" bash -c '
+  set -eu
+  rule=/usr/lib/tmpfiles.d/ultus-atomic-upgrade.conf
+  mapfile -t legacy < <(sed -n "s/^r \\([^ ]*\\) .*/\\1/p" "$rule")
+  # The previous identity wrote exactly three entries under /etc: its motd file
+  # and the two user-unit links its preset made.
+  if (( ${#legacy[@]} != 3 )); then echo "expected-3-removals-found-${#legacy[@]}"; exit 0; fi
+  status=ok
+  for kind in file link; do
+    root=/tmp/tmpfiles-probe-$kind
+    mkdir -p "$root/usr/lib/tmpfiles.d"
+    cp "$rule" "$root$rule"
+    for path in "${legacy[@]}"; do
+      mkdir -p "$root$(dirname "$path")"
+      if [[ $kind == file ]]; then
+        : > "$root$path"
+      else
+        ln -s /usr/lib/systemd/user/gone.service "$root$path"
+      fi
+    done
+    : > "$root/etc/motd.d/ultus-atomic"
+    systemd-tmpfiles --remove --root="$root" >/dev/null
+    for path in "${legacy[@]}"; do
+      if [[ -e $root$path || -L $root$path ]]; then status="kept-$kind-$path"; fi
+    done
+    if [[ ! -e $root/etc/motd.d/ultus-atomic ]]; then status=current-motd-removed; fi
+  done
+  echo "$status"
+') || { echo "FAIL the upgrade rule probe did not run in the image" >&2; exit 1; }
+if [[ $upgrade_probe != ok ]]; then
+  echo "FAIL the upgrade rule left the wrong state: ${upgrade_probe}" >&2
+  exit 1
+fi
+echo "ok   the upgrade rule removes the previous identity's /etc entries, file and symlink, and keeps the current motd"
+# The probe proves the rule's effect on a root. This proves the boot path that
+# applies it: the unit must be wanted by sysinit.target, ordered before it, and
+# invoke systemd-tmpfiles with --remove, which is what reaches a preserved /etc.
+upgrade_boot=$("$runtime" run --rm "$image" bash -c '
+  set -eu
+  unit=/usr/lib/systemd/system/systemd-tmpfiles-setup.service
+  want=/usr/lib/systemd/system/sysinit.target.wants/systemd-tmpfiles-setup.service
+  if [[ ! -e $want ]]; then echo not-wanted-by-sysinit; exit 0; fi
+  if ! grep -qxF "ExecStart=systemd-tmpfiles --create --remove --boot --exclude-prefix=/dev" "$unit"; then
+    echo no-remove-boot-run
+    exit 0
+  fi
+  if ! grep -qxF "Before=sysinit.target" "$unit"; then echo no-sysinit-ordering; exit 0; fi
+  echo ok
+') || { echo "FAIL the upgrade rule's boot path did not run in the image" >&2; exit 1; }
+if [[ $upgrade_boot != ok ]]; then
+  echo "FAIL the upgrade rule's boot path is not wired: ${upgrade_boot}" >&2
+  exit 1
+fi
+echo "ok   systemd-tmpfiles-setup.service is wanted by sysinit.target and runs systemd-tmpfiles --remove --boot"
 # The pinned base's /etc/dnf/dnf.conf carries only a comment and [main], and the
 # overlay replaces it with the linutil Configure DNF defaults (#111). Ask dnf5
 # for the values it resolves, so a file that parses but is not read still reds.

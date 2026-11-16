@@ -1,13 +1,13 @@
-# dux-atomic
+# ultus-atomic
 
-[![ci](https://github.com/ultus-net/dux-atomic/actions/workflows/ci.yml/badge.svg)](https://github.com/ultus-net/dux-atomic/actions/workflows/ci.yml)
+[![ci](https://github.com/ultus-net/ultus-atomic/actions/workflows/ci.yml/badge.svg)](https://github.com/ultus-net/ultus-atomic/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A planned Fedora bootc developer and gaming workstation for two machines, built on Fedora's own bootc image so Secure Boot needs no per-machine enrollment.
 
 ![The Dux desktop at first login: the DMS bar and Welcome dialog on a niri session](docs/assets/dux-desktop.png)
 
-The build definition follows the Universal Blue image-template. Every green push to `main` publishes `ghcr.io/ultus-net/dux-atomic:sha-<commit>`.
+The build definition follows the Universal Blue image-template. Every green push to `main` publishes `ghcr.io/ultus-net/ultus-atomic:sha-<commit>`.
 
 ## Status
 

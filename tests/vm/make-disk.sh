@@ -6,7 +6,7 @@
 #
 # The image must be in rootful podman storage. Either build it with sudo
 # podman, or copy it across:
-#   podman save localhost/dux-atomic:dev | sudo podman load
+#   podman save localhost/ultus-atomic:dev | sudo podman load
 #
 # The base image ships no interactive user, so the disk is built with one test
 # account for the login stage. Override it with TEST_USER and TEST_PASSWORD, or
@@ -16,7 +16,7 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-image=${1:-localhost/dux-atomic:dev}
+image=${1:-localhost/ultus-atomic:dev}
 out=${2:-$repo_root/output}
 test_user=${TEST_USER:-dux}
 test_password=${TEST_PASSWORD:-dux-test}
