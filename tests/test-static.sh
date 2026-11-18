@@ -639,6 +639,20 @@ elif ! grep -qF "skopeo inspect --raw" "$repin_workflow" || ! grep -qF "skopeo i
 elif ! grep -qF "github.event_name == 'schedule'" "$repin_workflow" || ! grep -qF "github.event.inputs.apply" "$repin_workflow"; then
   echo "FAIL repin-base workflow does not gate rewrites on schedule or inputs.apply == 'true'" >&2
   failures=$((failures + 1))
+elif ! awk '
+      # A commit needs an author and a committer. The step env sets only the
+      # author unless both GIT_COMMITTER_* names are there too, and without
+      # them the job dies with "empty ident name" before the pin PR opens
+      # (run 43809847458).
+      /GIT_COMMITTER_NAME:/ { name = 1 }
+      /GIT_COMMITTER_EMAIL:/ { email = 1 }
+      END { exit !(name && email) }
+    ' "$repin_workflow"; then
+  echo "FAIL repin-base workflow sets no committer identity, so the repin PR never opens" >&2
+  failures=$((failures + 1))
+elif ! grep -qF "fetch-depth: 0" "$repin_workflow"; then
+  echo "FAIL repin-base workflow checks out shallow, so its new-branch push is rejected" >&2
+  failures=$((failures + 1))
 elif grep -qE 'refs/heads/main' "$repin_workflow" || grep -qF "--force" "$repin_workflow"; then
   echo "FAIL repin-base workflow pushes to main or force-pushes" >&2
   failures=$((failures + 1))
