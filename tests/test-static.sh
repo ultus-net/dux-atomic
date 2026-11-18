@@ -837,8 +837,9 @@ else
   echo "ok   the runner package installs retry a transient apt failure"
 fi
 
-# The hostname was what broke twice, so the code is checked and not only the
-# comment above it.
+# The hostname was what broke twice, so the helper's active lines are checked
+# for one: any `*.archive.ubuntu.com` there means the selection went back to a
+# hostname instead of the list's first entry.
 if [[ ! -f $mirror_helper ]] ||
   grep -vE '^[[:space:]]*#' "$mirror_helper" | grep -qE '[a-z0-9-]+\.archive\.ubuntu\.com'; then
   echo "FAIL the apt mirror failover selects a hostname instead of the list's first entry" >&2

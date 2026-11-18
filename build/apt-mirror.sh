@@ -10,7 +10,8 @@
 #
 # Prints the commented entry and returns 0 when it changed the file. Returns 1
 # and changes nothing when the file is missing, has fewer than two active
-# entries, or has no active entry, so a short list is never emptied.
+# entries, has no active entry, or the write itself fails, so a short list is
+# never emptied and a failed write is never reported as a change.
 
 deprioritise_primary_mirror() {
   local file=${1:-}
@@ -23,7 +24,7 @@ deprioritise_primary_mirror() {
   local target line entry
   target=$(grep -nE -m1 '^[[:space:]]*https?://[^[:space:]]+' "$file") || return 1
   line=${target%%:*}
-  sudo sed -i -E "${line}s|^([[:space:]]*)(https?://)|\1# \2|" "$file"
+  sudo sed -i -E "${line}s|^([[:space:]]*)(https?://)|\1# \2|" "$file" || return 1
   entry=${target#*:}
   printf '%s\n' "${entry#"${entry%%[![:space:]]*}"}"
 }
