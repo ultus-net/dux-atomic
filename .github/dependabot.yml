@@ -8,11 +8,7 @@ updates:
       prefix: chore
     labels:
       - dependencies
-  - package-ecosystem: docker
-    directory: /
-    schedule:
-      interval: weekly
-    commit-message:
-      prefix: chore
-    labels:
-      - dependencies
+  # No docker ecosystem. Dependabot cannot read registry.fedoraproject.org and
+  # fails every run with private_source_authentication_failure (run
+  # 44125441096), so the base pin has one refresh path: repin-base.yml, which
+  # probes the digest on a schedule and opens a reviewed PR (#102).
