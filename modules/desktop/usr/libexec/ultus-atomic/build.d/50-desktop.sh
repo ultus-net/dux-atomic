@@ -151,7 +151,6 @@ test "$(stat -c %U:%G "$check_root/var/lib/greeter")" = "greeter:greeter" || {
 rm -rf "$check_root"
 check_root=
 
-# Enable the greeter. The package ships /etc/greetd/config.toml already
-# pointing at the greeter with the compositor; the enable helper needs a live
-# user. The exit trap then disables the COPRs.
+# Enable the greeter. The module ships /etc/greetd/config.toml, so the
+# compositor comes from this repository. The exit trap then disables the COPRs.
 systemctl enable greetd

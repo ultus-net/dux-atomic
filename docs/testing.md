@@ -106,9 +106,9 @@ Each row earns its place because the VM cannot reach it. A pass means the eviden
 | --- | --- | --- |
 | Secure Boot boot | Boot with firmware Secure Boot on | `bootctl status` showing `SecureBoot: enabled`, and the boot completing to the greeter |
 | Greeter | Pick the account in the user picker and log in | Screenshot of the picker and of the session after login |
-| First login provisioning | `systemctl --user status ultus-atomic-desktop.service` | Unit `active`, completion marker present, `~/.config/niri/config.kdl` written, `dms.service` `active` |
+| First login provisioning | `systemctl --user status ultus-atomic-desktop.service` | Unit `active`, completion marker present, `~/.config/hypr/hyprland.lua` written, `dms.service` `active` |
 | Desktop | Bar, launcher, Ghostty, a screenshot | Screenshot, and `systemctl --user is-active dms.service` |
-| Xfce fallback | Log out, choose the Xfce X11 session | Session runs, and `niri.service` and `dms.service` are absent from it |
+| Xfce fallback | Log out, choose the Xfce X11 session | Session runs, and `hyprland-session.target` and `dms.service` are absent from it |
 | Second session | Start a second session while one runs | Both sessions listed by `loginctl list-sessions`, no crash |
 | Screen sharing | Share a screen from a browser | A live share, plus `systemctl --user status xdg-desktop-portal` |
 | Applications | Flathub set present, Steam launches one game | Screenshot of the game, and `lsmod | grep ntsync` |

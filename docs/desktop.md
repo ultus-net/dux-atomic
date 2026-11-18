@@ -40,9 +40,11 @@ A swap replaces four paths:
    presets, assert its wiring, then enable its greeter, with an exit trap that
    disables the repositories on every path, so a failed build cannot commit a
    layer with third-party repositories enabled.
-4. `tests/test-static.sh` and `docs/first-login.md`: the module's fixtures (the
-   product-name list the leak check uses and the first-login cases) and the
-   description of what a first login does.
+4. The tests and docs that name the product: `tests/test-static.sh` (the
+   product-name list the leak check uses and the first-login cases),
+   `tests/verify-image.sh` (the portal override it reads), `tests/vm/boot-smoke.sh`
+   (the config path and DMS binding it probes), `docs/first-login.md`, and the
+   desktop rows in `docs/testing.md`.
 
 Nothing outside those paths changes. `/etc/dnf/dnf.conf`, the firewalld zone,
 the plymouth kargs, `/etc/motd.d`, the os-release identity, the RPM Fusion
