@@ -9,12 +9,17 @@
 # azure.archive.ubuntu.com without ever reaching the next mirror.
 #
 # The runner image points every suite at mirror+file:/etc/apt/apt-mirrors.txt,
-# where azure.archive.ubuntu.com is priority 1 and archive.ubuntu.com is
-# priority 2. apt spends every Acquire::Retries attempt on the same URI before
-# it re-ranks the list, so a higher count delays the failover instead of adding
-# resilience. Keep one attempt, drop the delay (apt 2.8 hangs on a dead first
-# mirror without it), and comment the Azure entry out between attempts so the
-# next one goes straight to the rest of the list.
+# and its first entry is the mirror apt tries first. apt spends every
+# Acquire::Retries attempt on the same URI before it re-ranks the list, so a
+# higher count delays the failover instead of adding resilience. Keep one
+# attempt, drop the delay (apt 2.8 hangs on a dead first mirror without it), and
+# comment that first entry out between attempts so the next one goes straight to
+# the rest of the list.
+#
+# The entry is chosen by position, not by hostname. Run 44300517908 lost two
+# image jobs because the list named us-east-2.ec2.archive.ubuntu.com while this
+# script matched only azure.archive.ubuntu.com, so nothing was ever commented
+# out and every attempt retried the same slow mirror (#143).
 #
 # https://github.com/actions/runner-images/issues/14823
 #
@@ -31,19 +36,9 @@ mirrors=${APT_MIRRORS_FILE:-/etc/apt/apt-mirrors.txt}
 budget=300
 deadline=$((SECONDS + budget))
 
-# Comment out the Azure entry only. The call is idempotent, the rest of the
-# list stays usable, and a list without that entry is left alone. Never remove
-# another entry: `install` failures also rotate, and dropping
-# archive.ubuntu.com as well would leave the security mirror alone.
-deprioritise_azure_mirror() {
-  local file=$1
-  [[ -f $file ]] || return 0
-  grep -qE '^[[:space:]]*http://azure\.archive\.ubuntu\.com/ubuntu/' "$file" || return 0
-  sudo sed -i -E \
-    's|^([[:space:]]*)http://azure\.archive\.ubuntu\.com/ubuntu/|\1# http://azure.archive.ubuntu.com/ubuntu/|' \
-    "$file"
-  echo "commented out the Azure mirror in $file; the next attempt uses the rest" >&2
-}
+helper_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=apt-mirror.sh
+. "$helper_dir/apt-mirror.sh"
 
 apt_retry() {
   local attempt cap
@@ -61,7 +56,9 @@ apt_retry() {
     fi
     echo "apt-get $* failed on attempt ${attempt} of 3" >&2
     ((attempt < 3)) || return 1
-    deprioritise_azure_mirror "$mirrors"
+    if dropped=$(deprioritise_primary_mirror "$mirrors"); then
+      echo "commented out the primary mirror ($dropped); the next attempt uses the rest" >&2
+    fi
     sleep 15
   done
   return 1
