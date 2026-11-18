@@ -95,7 +95,7 @@ sudo podman run --rm --privileged --pid=host --ipc=host \
   /dev/nvme0n1
 ```
 
-The image ships no account and locks root, so the install ends with no login at all. Create the first account before the first graphical login, then reboot into the greeter.
+The image ships no account and locks root, so the install ends with no login at all. Create the first account before the first graphical login: the debug-shell route in [Install](install.md#the-first-account), or an `anaconda-iso` build, which creates it during the install and is the route Universal Blue takes ([Install](install.md#alternative-an-installer-iso)). Then reboot into the greeter.
 
 ### The checks
 
