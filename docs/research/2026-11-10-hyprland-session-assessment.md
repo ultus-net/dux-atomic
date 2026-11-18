@@ -1,8 +1,8 @@
 # Hyprland session assessment
 
 Date: 2026-11-10.
-Status: decided. Work deferred. Superseded 2026-11-18 by the niri-to-Hyprland
-replacement (#138).
+Status: superseded 2026-11-18 by the niri-to-Hyprland replacement (#138). The
+assessment below records the earlier decision and the deferral it recommended.
 
 Related: `docs/superpowers/specs/2026-11-09-dux-atomic-design.md`,
 `docs/superpowers/plans/2026-11-09-dux-atomic-candidate-images.md`.
