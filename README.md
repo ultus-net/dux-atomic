@@ -5,7 +5,7 @@
 
 A planned Fedora bootc developer and gaming workstation for two machines, built on Fedora's own bootc image so Secure Boot needs no per-machine enrollment.
 
-![The Dux desktop at first login: the DMS bar and Welcome dialog on a niri session](docs/assets/dux-desktop.png)
+![The Dux desktop at first login: the DMS bar and Welcome dialog on a Hyprland session](docs/assets/dux-desktop.png)
 
 The build definition follows the Universal Blue image-template. Every green push to `main` publishes `ghcr.io/ultus-net/ultus-atomic:sha-<commit>`.
 
@@ -15,7 +15,7 @@ The build definition follows the Universal Blue image-template. Every green push
 | --- | --- |
 | Base image | Fedora `fedora-bootc:45`, pinned by digest, with Dependabot watching for a bump. Fedora signs the kernel, so Secure Boot needs no enrollment |
 | Generic x86_64 image | Builds, boots to the greeter in a VM, and provisions the desktop on first login |
-| Desktop | niri, Dux Modular Shell, Dux Greeter, Ghostty, and an Xfce X11 fallback |
+| Desktop | Hyprland, Dux Modular Shell, Dux Greeter, Ghostty, and an Xfce X11 fallback |
 | Applications | Steam ships in the image. Lutris follows after the gaming dogfood. Zed, Bitwarden, Obsidian, Zen Browser, Discord, and Spotify arrive from Flathub at first login; OpenCode stays a dotfiles-owned CLI |
 | Developer and sysadmin tooling | The image ships a C toolchain, Node with npm, btop, and a diagnostics set. Homebrew owns the shell niceties, and a pinned container owns the cloud CLIs ([detail](docs/developer-tooling.md)) |
 | NVIDIA variant | Planned, not built |
@@ -35,9 +35,9 @@ just ci-local
 
 | Component | What it is |
 | --- | --- |
-| niri | Scrollable-tiling Wayland compositor |
+| Hyprland | Dynamic tiling Wayland compositor, configured in Lua |
 | Dux Modular Shell | Desktop shell with launcher, status bar, and lock screen |
-| Dux Greeter | Login greeter, with the niri session preselected |
+| Dux Greeter | Login greeter, with the Hyprland session preselected |
 | Ghostty | Terminal |
 | Xfce | X11 fallback session |
 | Steam | Gaming client, with gamescope and MangoHud |

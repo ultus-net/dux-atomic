@@ -259,7 +259,7 @@ fi
 if ((!headless)); then
   "$runtime" run --rm "$image" grep -qx \
     'org.freedesktop.impl.portal.FileChooser=gtk;' \
-    /etc/xdg-desktop-portal/niri-portals.conf \
+    /etc/xdg-desktop-portal/hyprland-portals.conf \
     || { echo "FAIL the file-chooser portal override is missing or wrong" >&2; exit 1; }
 fi
 # Steam pulls the 32-bit graphics stack through its own dependencies, so this

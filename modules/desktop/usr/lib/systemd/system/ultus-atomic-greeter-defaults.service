@@ -1,8 +1,8 @@
 [Unit]
-Description=Default the Dux greeter to the Niri session
+Description=Default the Dux greeter to the Hyprland session
 Documentation=https://github.com/duxlabs-dev/dux-greeter
 # The greeter picks index 0 when it has no remembered session, and the
-# desktop-file load order is asynchronous. Seed Niri so the first login is
+# desktop-file load order is asynchronous. Seed Hyprland so the first login is
 # deterministic. A remembered choice on a later boot wins.
 ConditionPathExists=!/var/cache/dms-greeter/.local/state/memory.json
 Before=greetd.service

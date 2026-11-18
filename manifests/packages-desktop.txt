@@ -2,7 +2,8 @@
 # variant or when the desktop overlay subtree is present.
 
 # Compositor, shell, greeter and terminal
-niri
+hyprland
+xdg-desktop-portal-hyprland
 dms
 dms-greeter
 quickshell

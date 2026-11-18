@@ -345,7 +345,7 @@ fi
 # a swap.
 desktop_manifest=$repo_root/manifests/packages-desktop.txt
 desktop_overlay=$repo_root/modules/desktop
-desktop_names='dms|dms-greeter|niri|ghostty|quickshell|matugen|dux-search|dux-calendar|dux-files'
+desktop_names='dms|dms-greeter|hyprland|ghostty|quickshell|matugen|dux-search|dux-calendar|dux-files'
 leaks=
 if [[ ! -f $desktop_manifest ]] || [[ ! -d $desktop_overlay ]]; then
   echo "FAIL the desktop module needs both manifests/packages-desktop.txt and modules/desktop/" >&2
@@ -491,17 +491,17 @@ fi
 cond_root=$(mktemp -d)
 trap 'rm -rf "$cond_root"' EXIT
 mkdir -p "$cond_root/fresh" \
-  "$cond_root/partial/.config/niri" \
-  "$cond_root/user/.config/niri" \
-  "$cond_root/done/.config/niri" "$cond_root/done/.local/state/ultus-atomic" \
+  "$cond_root/partial/.config/hypr" \
+  "$cond_root/user/.config/hypr" \
+  "$cond_root/done/.config/hypr" "$cond_root/done/.local/state/ultus-atomic" \
   "$cond_root/reset/.local/state/ultus-atomic" \
-  "$cond_root/xdgstate/.config/niri" "$cond_root/xdgstate-state/ultus-atomic"
-# Copied from ~/.config/niri/config.kdl after `dms setup headless` in image
-# 3e886bc33a30; see docs/research/2026-11-10-dms-first-login.md.
-printf 'include optional=true "dms/colors.kdl"\n' >"$cond_root/partial/.config/niri/config.kdl"
-printf '// user config\n' >"$cond_root/user/.config/niri/config.kdl"
-printf 'include optional=true "dms/colors.kdl"\n' >"$cond_root/done/.config/niri/config.kdl"
-printf 'include optional=true "dms/colors.kdl"\n' >"$cond_root/xdgstate/.config/niri/config.kdl"
+  "$cond_root/xdgstate/.config/hypr" "$cond_root/xdgstate-state/ultus-atomic"
+# The include line `dms setup` appends for Hyprland; see
+# https://duxlabs.dev/docs/dms/compositors.
+printf 'require("dms.colors")\n' >"$cond_root/partial/.config/hypr/hyprland.lua"
+printf '%s\n' '-- user config' >"$cond_root/user/.config/hypr/hyprland.lua"
+printf 'require("dms.colors")\n' >"$cond_root/done/.config/hypr/hyprland.lua"
+printf 'require("dms.colors")\n' >"$cond_root/xdgstate/.config/hypr/hyprland.lua"
 : >"$cond_root/done/.local/state/ultus-atomic/desktop-setup.done"
 : >"$cond_root/reset/.local/state/ultus-atomic/desktop-setup.done"
 : >"$cond_root/xdgstate-state/ultus-atomic/desktop-setup.done"

@@ -1,7 +1,8 @@
 # Hyprland session assessment
 
 Date: 2026-11-10.
-Status: decided. Work deferred.
+Status: decided. Work deferred. Superseded 2026-11-18 by the niri-to-Hyprland
+replacement (#138).
 
 Related: `docs/superpowers/specs/2026-11-09-dux-atomic-design.md`,
 `docs/superpowers/plans/2026-11-09-dux-atomic-candidate-images.md`.
@@ -11,7 +12,10 @@ Related: `docs/superpowers/specs/2026-11-09-dux-atomic-design.md`,
 Should dux-atomic ship Hyprland as a third desktop session alongside niri and
 the Xfce X11 fallback, and should the running Omarchy installation be its base?
 
-## Decision
+## Decision (superseded 2026-11-18)
+
+The operator replaced niri with Hyprland as the single Wayland session (#138).
+The text below records the earlier decision.
 
 - Defer the Hyprland session until each variant has its own hardware acceptance
   record. The NVIDIA variant waits on NVIDIA UAT. The candidate images add no

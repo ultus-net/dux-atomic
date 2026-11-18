@@ -7,23 +7,33 @@
 set -ouex pipefail
 
 # The desktop packages come from the Dux COPRs. duxlabs/dms pulls
-# duxlabs/dux-repo, which also carries the terminal and the shell. They are
-# third-party, so they stay enabled only while this step needs them: the trap
-# below disables them on every exit, including a failed check, so no layer
-# commits with them enabled.
+# duxlabs/dux-repo, which also carries the terminal and the shell.
+# sdegler/hyprland carries Hyprland and its portal, because Fedora retired the
+# compositor (no fc45 build). All three are third-party, so they stay enabled
+# only while this step needs them: the trap below disables them on every exit,
+# including a failed check, so no layer commits with them enabled.
 dnf5 -y copr enable duxlabs/dms
 dnf5 -y copr enable duxlabs/dux-repo
+dnf5 -y copr enable sdegler/hyprland
 
 check_root=
 desktop_cleanup() {
   [[ -z ${check_root:-} ]] || rm -rf "$check_root"
   dnf5 -y copr disable duxlabs/dms >/dev/null || true
   dnf5 -y copr disable duxlabs/dux-repo >/dev/null || true
+  dnf5 -y copr disable sdegler/hyprland >/dev/null || true
 }
 trap desktop_cleanup EXIT
 
 source /ctx/build/manifest.sh
 install_manifest /ctx/manifests/packages-desktop.txt
+
+# The COPR installs hyprland-session.target under /usr/lib64/systemd/user, and
+# `systemd-analyze --user unit-paths` does not list that directory, so systemd
+# never finds the unit there. Copy it to the path systemd reads, so the
+# compositor's own session target resolves and dms can bind to it (#138).
+install -Dm0644 /usr/lib64/systemd/user/hyprland-session.target \
+  /usr/lib/systemd/user/hyprland-session.target
 
 # A new account gets the desktop on its first graphical login. A user preset
 # enables both units, and the image-level compositor binding keeps the shell
@@ -36,14 +46,30 @@ for unit in ultus-atomic-desktop ultus-atomic-dms-defaults; do
     exit 1
   }
 done
-for unit in /usr/lib/systemd/user/dms.service /usr/lib/systemd/user/niri.service; do
+for unit in /usr/lib/systemd/user/dms.service /usr/lib/systemd/user/hyprland-session.target; do
   test -f "$unit" || {
     echo "missing ${unit}; the first-login binding would dangle" >&2
     exit 1
   }
 done
-test -L /usr/lib/systemd/user/niri.service.wants/dms.service || {
+test -L /usr/lib/systemd/user/hyprland-session.target.wants/dms.service || {
   echo "the shell is not bound to the compositor for new accounts" >&2
+  exit 1
+}
+test -x /usr/bin/Hyprland || {
+  echo "the compositor is missing; the session entry would not start" >&2
+  exit 1
+}
+test -x /usr/bin/start-hyprland || {
+  echo "the session launcher is missing; the session entry would not start" >&2
+  exit 1
+}
+test -f /usr/share/wayland-sessions/hyprland.desktop || {
+  echo "the compositor ships no session entry" >&2
+  exit 1
+}
+test -f /etc/xdg-desktop-portal/hyprland-portals.conf || {
+  echo "the portal override is missing; screen sharing would fall back" >&2
   exit 1
 }
 test -f /usr/bin/dms || {

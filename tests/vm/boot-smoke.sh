@@ -180,7 +180,7 @@ serial_login() {
 dump_greeter_diagnostics() {
   echo "collecting greeter diagnostics on the serial console" >&2
   serial_write 'echo DUX_DIAG_BEGIN'
-  serial_write "ps -eo user,pid,stat,wchan:20,comm | grep -E 'greetd|dms-greeter|niri' | head -20"
+  serial_write "ps -eo user,pid,stat,wchan:20,comm | grep -E 'greetd|dms-greeter|hyprland' | head -20"
   serial_write 'systemctl --no-pager status greetd | head -15'
   serial_write 'loginctl list-sessions --no-legend'
   serial_write 'ls -l /dev/dri'
@@ -252,13 +252,13 @@ if [[ $login == 1 ]]; then
   # Run the first-login units the way graphical-session-pre.target would, then
   # check the provisioned files. The unit conditions skip a provisioned home.
   serial_write 'systemctl --user start ultus-atomic-desktop.service ultus-atomic-dms-defaults.service; printf "DUX_UNITS:%s\n" "$?"'
-  serial_write 'printf "DUX_NIRI_CONFIG:%s\n" "$(test -f "$HOME/.config/niri/config.kdl" && echo ok || echo missing)"'
-  serial_write 'printf "DUX_DMS_BINDS:%s\n" "$(test -f "$HOME/.config/niri/dms/binds.kdl" && echo ok || echo missing)"'
+  serial_write 'printf "DUX_HYPR_CONFIG:%s\n" "$(test -f "$HOME/.config/hypr/hyprland.lua" && echo ok || echo missing)"'
+  serial_write 'printf "DUX_DMS_BINDS:%s\n" "$(test -f "$HOME/.config/hypr/dms/binds.lua" && echo ok || echo missing)"'
   serial_write 'printf "DUX_SESSION_SEED:%s\n" "$(grep -q 101418 "$HOME/.local/state/dms/session.json" 2>/dev/null && echo ok || echo missing)"'
   serial_write 'printf "DUX_SETUP_MARKER:%s\n" "$(test -f "${XDG_STATE_HOME:-$HOME/.local/state}/ultus-atomic/desktop-setup.done" && echo ok || echo missing)"'
-  serial_write 'printf "DUX_USER_DMS_LINK:%s\n" "$(test -L "$HOME/.config/systemd/user/niri.service.wants/dms.service" && echo ok || echo missing)"'
-  serial_write 'printf "DUX_DMS_WANTED:%s\n" "$(systemctl --user show -p Wants niri.service | grep -q dms.service && echo ok || echo missing)"'
-  serial_write 'printf "DUX_PRE_WANTED:%s\n" "$(systemctl --user show -p Wants niri.service | grep -q graphical-session-pre.target && echo ok || echo missing)"'
+  serial_write 'printf "DUX_USER_DMS_LINK:%s\n" "$(test -L "$HOME/.config/systemd/user/hyprland-session.target.wants/dms.service" && echo ok || echo missing)"'
+  serial_write 'printf "DUX_DMS_WANTED:%s\n" "$(systemctl --user show -p Wants hyprland-session.target | grep -q dms.service && echo ok || echo missing)"'
+  serial_write 'printf "DUX_PRE_WANTED:%s\n" "$(systemctl --user show -p Wants hyprland-session.target | grep -q graphical-session-pre.target && echo ok || echo missing)"'
   serial_write 'printf "DUX_DESKTOP_ENABLED:%s\n" "$(systemctl --user is-enabled ultus-atomic-desktop.service 2>/dev/null | grep -qx enabled && echo ok || echo missing)"'
   # The greeter cache is 0750 greeter:greeter, so the test user cannot read
   # memory.json. Assert the seed unit's state over the system bus instead.
@@ -309,7 +309,7 @@ if [[ $login == 1 ]]; then
     grep -a 'DUX_UNITS:' "$log" >&2 || true
     exit 1
   fi
-  for marker in DUX_NIRI_CONFIG DUX_DMS_BINDS DUX_SESSION_SEED DUX_SETUP_MARKER DUX_USER_DMS_LINK DUX_DMS_WANTED DUX_PRE_WANTED DUX_DESKTOP_ENABLED DUX_GREETER_SEED; do
+  for marker in DUX_HYPR_CONFIG DUX_DMS_BINDS DUX_SESSION_SEED DUX_SETUP_MARKER DUX_USER_DMS_LINK DUX_DMS_WANTED DUX_PRE_WANTED DUX_DESKTOP_ENABLED DUX_GREETER_SEED; do
     if ! grep -q "${marker}:ok" "$log"; then
       echo "first login failed: ${marker} is not ok" >&2
       grep -a "${marker}:" "$log" >&2 || true
