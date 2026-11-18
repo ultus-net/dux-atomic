@@ -837,15 +837,17 @@ else
   echo "ok   the runner package installs retry a transient apt failure"
 fi
 
-# The hostname was what broke twice, so the helper's active lines are checked
-# for one: any `*.archive.ubuntu.com` there means the selection went back to a
-# hostname instead of the list's first entry.
+# The hostname was what broke twice, so the helper must keep both halves of the
+# positional selection: the pattern that finds the first active URL, and no
+# `*.archive.ubuntu.com` in any line that is not a comment. Either one alone
+# would let a hostname back in.
 if [[ ! -f $mirror_helper ]] ||
+  ! grep -qF "grep -nE -m1 '^[[:space:]]*https?://[^[:space:]]+'" "$mirror_helper" ||
   grep -vE '^[[:space:]]*#' "$mirror_helper" | grep -qE '[a-z0-9-]+\.archive\.ubuntu\.com'; then
-  echo "FAIL the apt mirror failover selects a hostname instead of the list's first entry" >&2
+  echo "FAIL the apt mirror failover does not select the list's first active entry" >&2
   failures=$((failures + 1))
 else
-  echo "ok   the apt mirror failover selects the list's first entry, not a hostname"
+  echo "ok   the apt mirror failover selects the list's first active entry, not a hostname"
 fi
 
 # A job that runs the helper needs the repository in its workspace. Run
