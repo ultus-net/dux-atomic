@@ -823,10 +823,14 @@ fi
 # 43033654470 spent 67 minutes in the package install before apt reported
 # "Temporary failure resolving", and publish, verify and promote never ran.
 # Every job installs through the bounded helper, and no bare apt-get remains.
-# apt must also fail over off the Azure mirror: run 43052107613 spent the whole
-# budget on Ign: lines for azure.archive.ubuntu.com and never reached
-# archive.ubuntu.com, the second entry in the runner's mirror list.
+# apt must also fail over off the mirror that is failing: run 43052107613 spent
+# the whole budget on Ign: lines for azure.archive.ubuntu.com and never reached
+# archive.ubuntu.com, the second entry in the runner's mirror list. Run
+# 44300517908 then failed twice because the list named
+# us-east-2.ec2.archive.ubuntu.com while the helper matched only the Azure
+# hostname, so the entry is selected by position now (#143).
 installer=$repo_root/build/install-packages.sh
+mirror_helper=$repo_root/build/apt-mirror.sh
 if [[ ! -x $installer ]] ||
    ! grep -qF 'budget=300' "$installer" ||
    ! grep -qF 'deadline=$((SECONDS + budget))' "$installer" ||
@@ -834,7 +838,8 @@ if [[ ! -x $installer ]] ||
    ! grep -qF 'timeout "$cap" sudo env DEBIAN_FRONTEND=noninteractive' "$installer" ||
    ! grep -qF 'apt-get -o Acquire::Retries=1 -o Acquire::Retries::Delay=false' "$installer" ||
    ! grep -qF 'for attempt in 1 2 3; do' "$installer" ||
-   ! grep -qF 'deprioritise_azure_mirror "$mirrors"' "$installer" ||
+   ! grep -qF 'deprioritise_primary_mirror "$mirrors"' "$installer" ||
+   ! grep -qF 'apt-mirror.sh' "$installer" ||
    ! grep -qF 'apt_retry install -y "$@"' "$installer" ||
    ! grep -qF 'build/install-packages.sh podman qemu-system-x86 qemu-utils ovmf' "$workflow" ||
    ! grep -qF 'build/install-packages.sh podman skopeo' "$workflow" ||
@@ -844,6 +849,19 @@ if [[ ! -x $installer ]] ||
   failures=$((failures + 1))
 else
   echo "ok   the runner package installs retry a transient apt failure"
+fi
+
+# The hostname was what broke twice, so the helper must keep both halves of the
+# positional selection: the pattern that finds the first active URL, and no
+# `*.archive.ubuntu.com` in any line that is not a comment. Either one alone
+# would let a hostname back in.
+if [[ ! -f $mirror_helper ]] ||
+  ! grep -qF "grep -nE -m1 '^[[:space:]]*https?://[^[:space:]]+'" "$mirror_helper" ||
+  grep -vE '^[[:space:]]*#' "$mirror_helper" | grep -qE '[a-z0-9-]+\.archive\.ubuntu\.com'; then
+  echo "FAIL the apt mirror failover does not select the list's first active entry" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the apt mirror failover selects the list's first active entry, not a hostname"
 fi
 
 # A job that runs the helper needs the repository in its workspace. Run
