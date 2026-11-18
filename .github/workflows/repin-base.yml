@@ -23,6 +23,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          # A shallow clone cannot push a new branch: the server rejects the
+          # missing parents with "shallow update not allowed".
+          fetch-depth: 0
 
       - name: Install skopeo
         run: sudo apt-get update && sudo apt-get install -y skopeo
@@ -77,8 +80,13 @@ jobs:
       - name: Rewrite Containerfiles and open a PR
         if: ${{ steps.inspect.outcome != 'success' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.apply == 'true')) }}
         env:
+          # A git commit needs a committer as well as an author. Author alone
+          # left the committer empty and the job died before opening the PR
+          # (run 43809847458).
           GIT_AUTHOR_NAME: "github-actions[bot]"
           GIT_AUTHOR_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
+          GIT_COMMITTER_NAME: "github-actions[bot]"
+          GIT_COMMITTER_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
@@ -107,7 +115,7 @@ jobs:
           sed -E "s|^FROM registry\.fedoraproject\.org/fedora-bootc:${tag}@sha256:[0-9a-f]{64}$|FROM registry.fedoraproject.org/fedora-bootc:${tag}@${new_full}|" -i "$repo_root/Containerfile"
           sed -E "s|^FROM registry\.fedoraproject\.org/fedora-bootc:${tag}@sha256:[0-9a-f]{64}$|FROM registry.fedoraproject.org/fedora-bootc:${tag}@${new_full}|" -i "$repo_root/Containerfile.nvidia"
 
-          git -C "$repo_root" -c user.name="$GIT_AUTHOR_NAME" -c user.email="$GIT_AUTHOR_EMAIL" checkout -b "$branch"
+          git -C "$repo_root" checkout -b "$branch"
           git -C "$repo_root" add Containerfile Containerfile.nvidia
           git -C "$repo_root" commit -F "$body_file"
 

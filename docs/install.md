@@ -43,7 +43,11 @@ The install writes no account. Do not reboot into the greeter yet; create the fi
 
 ### Alternative: an installer ISO
 
-`bootc-image-builder` still accepts `--type iso`, and the pinned builder in `tests/vm/make-disk.sh:66` lists `iso` and `anaconda-iso` in `build --help`. Both types are legacy: the unified `image-builder` CLI documents `generic-iso` for new work, and upstream plans to remove the Anaconda ISO type. No ISO has been built or booted from this image, and the image ships neither `anaconda` nor `dracut-live`, so treat this path as unconfirmed.
+`bootc-image-builder` accepts `--type anaconda-iso`, which runs the Anaconda installer and can create the first account during the install. The other legacy type, `iso`, writes no account. Both are on their way out: upstream plans to remove the Anaconda ISO in favour of `bootc-installer`, which the pinned builder already lists, and the standalone `bootc-image-builder` is being folded into the unified `image-builder` CLI.
+
+Universal Blue builds this artefact for its own images, so its [`disk_config/iso-gnome.toml`](https://github.com/ublue-os/image-template/blob/main/disk_config/iso-gnome.toml) is the worked example. It enables Anaconda's Storage and Runtime modules, disables the rest, and runs a kickstart `%post` that switches the installed system to the registry reference, so day-2 updates follow the tag instead of the ISO's embedded copy. Two details differ here. Their kickstart passes `bootc switch --mutate-in-place`, which this image's bootc 1.17.1 does not accept; the equivalent is `bootc switch --transport registry <ref>`. Their GNOME module list disables `Users`, which suits an image that already ships an account but not this one; keep `Users` enabled.
+
+No ISO has been built or booted from this image, and the image ships neither `anaconda` nor `dracut-live`, so treat this path as unconfirmed.
 
 ```bash
 mkdir -p output
@@ -53,10 +57,10 @@ sudo podman run --rm --privileged \
   -v /var/lib/containers/storage:/var/lib/containers/storage \
   quay.io/centos-bootc/bootc-image-builder@sha256:a0ee98db5bfb8337e45efb92f0c5d1a19179c85ce80a3360abc628fd1a17cc5c \
   build ghcr.io/ultus-net/ultus-atomic:latest \
-  --type iso --rootfs btrfs --output /output
+  --type anaconda-iso --rootfs btrfs --output /output
 ```
 
-The build writes an installer ISO under `output`. Anaconda supports creating the first account and setting up LUKS during the install, but neither has been exercised on this image.
+The build writes an installer ISO under `output`, and Anaconda can create the first account and set up LUKS during the install. Without a kickstart `%post`, the installed system keeps the ISO's embedded reference rather than the registry tag, so day-2 updates need that switch line.
 
 ## The first account
 
