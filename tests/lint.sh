@@ -29,6 +29,7 @@ fi
 bash_scripts=(
   build/common.sh
   build/manifest.sh
+  build/apt-mirror.sh
   build/install-packages.sh
   build/package-lock.sh
   build/compare-lock.sh
@@ -41,6 +42,7 @@ bash_scripts=(
   tests/test-static.sh
   tests/test-agent-container.sh
   tests/test-lock-drift.sh
+  tests/test-apt-mirror.sh
   tests/verify-image.sh
   tests/verify-headless.sh
   tests/verify-kernel-signature.sh
@@ -69,4 +71,4 @@ done
 "$runtime" run --rm -v "$repo_root:/mnt:ro" -w /mnt "$actionlint_image" \
   .github/workflows/ci.yml
 
-bash tests/test-static.sh && bash tests/test-agent-container.sh && bash tests/test-lock-drift.sh
+bash tests/test-static.sh && bash tests/test-agent-container.sh && bash tests/test-lock-drift.sh && bash tests/test-apt-mirror.sh
