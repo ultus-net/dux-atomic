@@ -81,17 +81,18 @@ The install leaves no encrypted root on either machine, by policy (#54). The dis
 
 ### Install
 
-The image must exist under the reference the install records. `:latest` moves only on a manual promotion (`docs/ci.md`), so install the promoted tag or, before the first promotion, the `sha-<commit>` tag, and pass that same reference as `--target-imgref` so day-2 updates follow it.
+The image must exist under the reference the install records. `:latest` moves only on a manual promotion (`docs/ci.md`), so set `ref` to the promoted tag, or to the `sha-<commit>` tag before the first promotion, and pass that same reference as `--target-imgref` so day-2 updates follow it.
 
 ```bash
+ref=ghcr.io/ultus-net/ultus-atomic:latest
 lsblk
 sudo podman run --rm --privileged --pid=host --ipc=host \
   -v /var/lib/containers:/var/lib/containers \
   -v /dev:/dev \
   --security-opt label=type:unconfined_t \
-  ghcr.io/ultus-net/ultus-atomic:latest \
+  "$ref" \
   bootc install to-disk --wipe --filesystem btrfs \
-  --target-imgref ghcr.io/ultus-net/ultus-atomic:latest \
+  --target-imgref "$ref" \
   /dev/nvme0n1
 ```
 
