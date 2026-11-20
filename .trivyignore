@@ -51,3 +51,10 @@ CVE-2026-56865 exp:2027-02-11
 CVE-2026-57231 exp:2027-02-11
 CVE-2026-84304 exp:2027-02-11
 CVE-2026-84445 exp:2027-02-11
+
+# usr/bin/dms, usr/bin/dfiles, usr/bin/dsearch and the ostree objects that
+# carry them, duxlabs COPR Go builds (Go stdlib 1.27.1, 1.27rc2 and 1.27.3,
+# fixed 1.27.4). The advisory needs an HTTP/1 server, and these binaries are
+# not network servers on this image, but the gate is severity-based. Only the
+# upstream rebuild clears it. Reported in run 44668700473.
+CVE-2026-97054 exp:2027-02-11

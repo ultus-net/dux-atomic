@@ -11,7 +11,7 @@ dms-0:2.1.2-1.fc45.x86_64	copr:copr.fedorainfracloud.org:duxlabs:dms
 dms-cli-0:2.1.2-1.fc45.x86_64	copr:copr.fedorainfracloud.org:duxlabs:dms
 dux-calendar-0:2.1.2-1.fc45.x86_64	copr:copr.fedorainfracloud.org:duxlabs:dux-repo
 dux-files-0:2.1.2-1.fc45.x86_64	copr:copr.fedorainfracloud.org:duxlabs:dux-repo
-dux-qt-base-git-0:0.4.8^955.gitf7e8816-1.fc45.x86_64	copr:copr.fedorainfracloud.org:duxlabs:dux-repo
+dux-qt-base-git-0:0.4.73^962.git75d4524-1.fc45.x86_64	copr:copr.fedorainfracloud.org:duxlabs:dux-repo
 dux-search-0:2.1.1-1.fc45.x86_64	copr:copr.fedorainfracloud.org:duxlabs:dux-repo
 fdk-aac-0:3.0.0-1.fc45.i686	rpmfusion-nonfree
 fdk-aac-0:3.0.0-1.fc45.x86_64	rpmfusion-nonfree
