@@ -15,10 +15,10 @@ dux-qt-base-git-0:0.4.8^955.gitf7e8816-1.fc45.x86_64	copr:copr.fedorainfracloud.
 dux-search-0:2.1.1-1.fc45.x86_64	copr:copr.fedorainfracloud.org:duxlabs:dux-repo
 fdk-aac-0:3.0.0-1.fc45.i686	rpmfusion-nonfree
 fdk-aac-0:3.0.0-1.fc45.x86_64	rpmfusion-nonfree
-ffmpeg-0:9.0.2-3.fc45.x86_64	rpmfusion-free
-ffmpeg-libs-0:9.0.2-3.fc45.x86_64	rpmfusion-free
+ffmpeg-0:9.0.2-4.fc45.x86_64	rpmfusion-free-updates
+ffmpeg-libs-0:9.0.2-4.fc45.x86_64	rpmfusion-free-updates
 ghostty-0:1.4.0-3.fc45.x86_64	copr:copr.fedorainfracloud.org:duxlabs:dux-repo
-libavdevice-0:9.0.2-3.fc45.x86_64	rpmfusion-free
+libavdevice-0:9.0.2-4.fc45.x86_64	rpmfusion-free-updates
 libde265-0:1.1.3-1.fc45.x86_64	rpmfusion-free-updates
 libheif-freeworld-0:1.23.7-1.fc45.x86_64	rpmfusion-free-updates
 matugen-0:4.2.0-1.fc45.x86_64	copr:copr.fedorainfracloud.org:duxlabs:dux-repo
