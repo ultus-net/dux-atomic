@@ -77,6 +77,8 @@ Four answers decide how the rest of the run goes, and they belong in the UAT rec
 | Target disk | `lsblk -o NAME,SIZE,MODEL,TRAN` | `bootc install to-disk --wipe` erases the whole device, including the data partition on the same drive; the data comes back from restic |
 | Network at install | `curl -sI https://ghcr.io/v2/` | The installer pulls the image; anonymous GHCR access is enough |
 
+The laptop's model, device IDs, version floor, and boot-path facts are recorded in [Laptop hardware: Dell Pro 14 PC14250](hardware/dell-pro-14-pc14250.md).
+
 The install leaves no encrypted root on either machine, by policy (#54). The disk is wiped and the data on it is unprotected at rest, which is accepted rather than overlooked.
 
 ### Install

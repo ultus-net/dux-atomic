@@ -53,6 +53,7 @@ The image ships no interactive user. A real install creates the operator account
 - [Applications](docs/applications.md)
 - [Developer and sysadmin tooling](docs/developer-tooling.md)
 - [Testing](docs/testing.md)
+- [Laptop hardware: Dell Pro 14 PC14250](docs/hardware/dell-pro-14-pc14250.md)
 - [CI and publishing](docs/ci.md)
 - [Known gaps before promotion](docs/known-gaps.md)
 - [Roadmap](docs/superpowers/plans/2026-11-14-tooling-and-platform-roadmap.md)
