@@ -4,7 +4,7 @@ Reference record for the laptop that takes the generic image. The operator
 supplied this brief on 2026-11-20, when the machine ran Bluefin 44
 `bluefin-dx`. No build of this repo has been installed on it. The approved
 design asks for the model and Secure Boot state before deployment
-([design](../superpowers/specs/2026-11-09-dux-atomic-design.md)), and this page
+(`docs/superpowers/specs/2026-11-09-dux-atomic-design.md`), and this page
 carries the model, the device IDs, and the boot-path facts.
 
 NixOS and any dual-boot layout are another agent's task. This page covers the
@@ -104,14 +104,17 @@ installed image's versions, not Bluefin's.
 
   ```
   ostree=/ostree/boot.0/default/<hash>/0 rhgb quiet
-  root=UUID=ac3f23e8-5d4a-4219-bc43-cd0fe5b9c331 vconsole.keymap=us
+  root=UUID=<host-root-uuid> vconsole.keymap=us
   rootflags=subvol=root rw
   ```
 
   The deployment root is btrfs `subvol=/root` (subvolid 256), with `home` 257
   and `var` 258. `/` itself is composefs over the deployment and is read-only.
-- Secure Boot is disabled. Nothing needs signing for this work. If that
-  changes, the image needs UKI signing and a shim path.
+  The root filesystem UUID is recorded on the host, not in this page.
+- Secure Boot is disabled. That is the recorded state on 2026-11-20, and no
+  signature is needed while it holds. The design also treats an employer
+  requirement as a deployment gate, so recheck the state before install. If it
+  is enabled, the image needs UKI signing and a shim path.
 - `/boot` is ext4 on p2, 2.0G total with 1.6G free. It must hold two
   deployments, the current one and the rollback. At 250M each this fits, but
   do not ship a much larger initramfs without rechecking the free space.
