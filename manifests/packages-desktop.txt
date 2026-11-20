@@ -1,7 +1,7 @@
 # packages-desktop.txt — desktop-only packages. Installed only by the desktop
 # variant or when the desktop overlay subtree is present.
 
-# Compositor, shell, greeter and terminal
+# Session services, compositor, shell, greeter and terminal
 niri
 dms
 dms-greeter
@@ -13,3 +13,78 @@ dux-search
 dux-calendar
 dux-files
 matugen
+
+# Wayland portals, keyring, policy agent and session services
+xdg-desktop-portal
+xdg-desktop-portal-gtk
+xdg-desktop-portal-gnome
+gnome-keyring
+xfce-polkit
+accountsservice
+upower
+rtkit
+playerctl
+xdg-user-dirs
+xdg-utils
+dconf
+adwaita-icon-theme
+adwaita-cursor-theme
+
+# Audio: PipeWire and the ALSA/CONFIGFS firmware the laptop's codec needs
+pipewire
+pipewire-alsa
+pipewire-pulseaudio
+pipewire-utils
+wireplumber
+alsa-utils
+alsa-ucm
+alsa-sof-firmware
+
+# Hardware, power and the day-2 update timer the base presets
+bluez
+power-profiles-daemon
+brightnessctl
+
+# Graphics stack and media codecs for the session
+mesa-dri-drivers
+mesa-vulkan-drivers
+vulkan-loader
+xwayland-satellite
+xorg-x11-server-Xwayland
+libva-intel-media-driver
+gstreamer1-plugins-good
+gstreamer1-plugin-libav
+ffmpeg
+google-noto-color-emoji-fonts
+
+# Terminal tools, containers and Flatpak
+distrobox
+wl-clipboard
+flatpak
+
+# Build toolchain Homebrew bootstraps against, plus Node for the dotfiles npm
+# globals. Fedora splits npm out of nodejs, and nodejs is 22.23.1.
+gcc
+gcc-c++
+make
+patch
+zlib-ng-compat-devel
+bzip2-devel
+nodejs
+nodejs-npm
+
+# Xfce X11 fallback
+xfce4-session
+xfwm4
+xfce4-panel
+xfce4-screensaver
+xfce4-power-manager
+xfce4-notifyd
+xorg-x11-server-Xorg
+xinit
+
+# Gaming
+steam
+gamescope
+mangohud
+steam-devices

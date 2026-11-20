@@ -1,0 +1,4 @@
+# packages-server.txt — host tools the server needs and no other role does.
+# Installed only by Containerfile.server through PACKAGE_MANIFEST_EXTRA.
+
+restic

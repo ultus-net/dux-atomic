@@ -58,5 +58,7 @@ The image ships no interactive user. A real install creates the operator account
 - [Known gaps before promotion](docs/known-gaps.md)
 - [Roadmap](docs/superpowers/plans/2026-11-14-tooling-and-platform-roadmap.md)
 - [Approved design](docs/superpowers/specs/2026-11-09-dux-atomic-design.md)
+- [Headless server design](docs/superpowers/specs/2026-11-20-headless-server-image-design.md)
+- [Headless server plan, part 1](docs/superpowers/plans/2026-11-20-headless-server-part-1-base-and-image.md)
 - [Agent container profile](docs/agent-container.md)
 - [Microsoft Agent Framework study plan](docs/learning/2026-11-14-microsoft-agent-framework-12-stage-plan.md)

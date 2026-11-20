@@ -50,6 +50,17 @@ else
   failures=$((failures + 1))
 fi
 
+# The repin workflow rewrites Containerfile and Containerfile.nvidia. A third
+# Containerfile left behind silently keeps an old base, which is the drift the
+# single-base rule exists to prevent.
+mapfile -t base_digests < <(grep -hoE '^FROM registry\.fedoraproject\.org/fedora-bootc:45@sha256:[0-9a-f]{64}$' "$repo_root"/Containerfile* | sort -u)
+if ((${#base_digests[@]} != 1)); then
+  echo "FAIL the Containerfiles do not share one base pin" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   every Containerfile carries the same base pin"
+fi
+
 manifest=$repo_root/manifests/packages-common.txt
 if [[ ! -f $manifest ]]; then
   echo "FAIL manifests/packages-common.txt is missing" >&2
@@ -62,6 +73,29 @@ else
   else
     echo "ok   packages-common.txt is one package per line"
   fi
+fi
+
+# The server image installs packages-common.txt plus packages-server.txt. A
+# desktop package left in the base ships Steam and an X server to a headless
+# box, so name the failure here rather than in an image build.
+server_manifest=$repo_root/manifests/packages-server.txt
+desktop_manifest_early=$repo_root/manifests/packages-desktop.txt
+overlap=$(grep -Ev '^[[:space:]]*(#.*)?$' "$desktop_manifest_early" |
+  while read -r name; do grep -qx "$name" "$repo_root/manifests/packages-common.txt" && echo "$name"; done) || true
+if [[ ! -f $server_manifest ]]; then
+  echo "FAIL manifests/packages-server.txt is missing" >&2
+  failures=$((failures + 1))
+elif [[ -n $overlap ]]; then
+  echo "FAIL packages-common.txt still names desktop packages:"$'\n'"$overlap" >&2
+  failures=$((failures + 1))
+elif ! grep -qx 'tailscale' "$repo_root/manifests/packages-common.txt"; then
+  echo "FAIL packages-common.txt does not name tailscale, so the server ships no tailnet" >&2
+  failures=$((failures + 1))
+elif ! grep -qx 'restic' "$server_manifest"; then
+  echo "FAIL packages-server.txt does not name restic" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the base names tailscale and no desktop package, and the server names restic"
 fi
 
 # The NVIDIA variant installs a second manifest (#72). The shared image reads
@@ -108,18 +142,29 @@ else
   echo "ok   the NVIDIA variant names its own manifest and the shared image does not"
 fi
 
-# build/common.sh reads the shared overlay and every modules/*/ tree, and skips
-# a tree the build context lacks. A variant that omits one COPY therefore builds
-# without it and still exits 0, so compare the ctx stages rather than trust the
-# two files to stay in step.
-ctx_trees=$(grep -oE '^COPY (build|manifests|overlay|modules) ' "$repo_root/Containerfile")
-variant_ctx_trees=$(grep -oE '^COPY (build|manifests|overlay|modules) ' "$variant_containerfile")
-if [[ $ctx_trees != "$variant_ctx_trees" ]]; then
-  echo "FAIL Containerfile.nvidia exposes different build-context trees than Containerfile, so a variant can build without a tree the shared build reads" >&2
-  failures=$((failures + 1))
-else
-  echo "ok   every Containerfile exposes the same build-context trees"
-fi
+# Each host copies one module tree by name, so a host cannot inherit another
+# host's module. build/common.sh copies whatever /ctx/modules/* it finds, so a
+# COPY that drifts silently ships the wrong role.
+ctx_trees=$(grep -oE '^COPY (build|manifests|overlay) ' "$repo_root/Containerfile")
+for cf in "$repo_root"/Containerfile*; do
+  [[ -f $cf ]] || continue
+  name=${cf##*/}
+  trees=$(grep -oE '^COPY (build|manifests|overlay) ' "$cf")
+  mapfile -t module_copies < <(grep -E '^COPY modules([ /]|$)' "$cf" || true)
+  case $name in
+    Containerfile|Containerfile.nvidia) expected='COPY modules/desktop /modules/desktop' ;;
+    Containerfile.server) expected='COPY modules/server /modules/server' ;;
+    *) expected= ;;
+  esac
+  if [[ $trees != "$ctx_trees" ]]; then
+    echo "FAIL ${name} exposes different build-context trees than Containerfile" >&2
+    failures=$((failures + 1))
+  elif ((${#module_copies[@]} != 1)) || [[ ${module_copies[0]:-} != "$expected" ]]; then
+    echo "FAIL ${name} must contain exactly one module copy: ${expected}" >&2
+    failures=$((failures + 1))
+  fi
+done
+echo "ok   every Containerfile copies one module tree by name"
 
 # The two helpers the variant path adds are decision functions, so exercise
 # them here: a matching devel must pass, a mismatched or absent one must fail
@@ -266,8 +311,8 @@ if ! grep -qF 'node --version' "$repo_root/tests/verify-image.sh" ||
    ! grep -qF 'npm --version' "$repo_root/tests/verify-image.sh" ||
    ! grep -qF 'node_minor < 18' "$repo_root/tests/verify-image.sh" ||
    ! grep -qF 'node_major < 22' "$repo_root/tests/verify-image.sh" ||
-   ! grep -qx 'nodejs' "$manifest" ||
-   ! grep -qx 'nodejs-npm' "$manifest"; then
+   ! grep -qx 'nodejs' "$repo_root/manifests/packages-desktop.txt" ||
+   ! grep -qx 'nodejs-npm' "$repo_root/manifests/packages-desktop.txt"; then
   echo "FAIL the image does not prove Node 22.18 and npm run, so the dotfiles npm globals could be skipped at first login" >&2
   failures=$((failures + 1))
 else
@@ -772,6 +817,9 @@ elif ! grep -qF 'steps.desktop.outputs.desktop' "$workflow"; then
   failures=$((failures + 1))
 elif ! grep -qF 'rm -rf modules/desktop manifests/packages-desktop.txt' <<<"$headless_block"; then
   echo "FAIL the headless job does not delete both module paths before its build" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'mkdir modules/desktop' <<<"$headless_block"; then
+  echo "FAIL the headless job removes modules/desktop without recreating its empty build-context directory" >&2
   failures=$((failures + 1))
 elif ! grep -qF 'git ls-tree -r --name-only HEAD modules/desktop' <<<"$headless_block"; then
   echo "FAIL the headless job saves no list of the files the module ships" >&2

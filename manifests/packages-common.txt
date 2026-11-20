@@ -5,78 +5,27 @@
 
 # (Desktop packages moved to manifests/packages-desktop.txt)
 
-# Wayland portals, keyring, policy agent and session services
-xdg-desktop-portal
-xdg-desktop-portal-gtk
-xdg-desktop-portal-gnome
-gnome-keyring
-xfce-polkit
-accountsservice
-upower
-rtkit
-playerctl
-xdg-user-dirs
-xdg-utils
-dconf
-hicolor-icon-theme
-adwaita-icon-theme
-adwaita-cursor-theme
-
-# Audio: PipeWire and the ALSA/CONFIGFS firmware the laptop's codec needs
-pipewire
-pipewire-alsa
-pipewire-pulseaudio
-pipewire-utils
-wireplumber
-alsa-utils
-alsa-ucm
-alsa-sof-firmware
+# Tailnet: every host joins, the server is reachable only through it
+tailscale
 
 # Hardware, power and the day-2 update timer the base presets
-bluez
 NetworkManager-wifi
 wpa_supplicant
 iwlwifi-mvm-firmware
 firewalld
-power-profiles-daemon
 zram-generator-defaults
-brightnessctl
 
-# Graphics stack and media codecs for the session
-mesa-dri-drivers
-mesa-vulkan-drivers
-vulkan-loader
-xwayland-satellite
-xorg-x11-server-Xwayland
-libva-intel-media-driver
-gstreamer1-plugins-good
-gstreamer1-plugin-libav
-ffmpeg
-google-noto-color-emoji-fonts
-
-# Terminal tools, containers and Flatpak
+# Terminal tools
 tmux
 htop
 btop
+# btop depends on this theme even in a headless image
+hicolor-icon-theme
 git
 just
 fzf
-distrobox
-wl-clipboard
-flatpak
 rsync
 zip
-
-# Build toolchain Homebrew bootstraps against, plus Node for the dotfiles npm
-# globals. Fedora splits npm out of nodejs, and nodejs is 22.23.1.
-gcc
-gcc-c++
-make
-patch
-zlib-ng-compat-devel
-bzip2-devel
-nodejs
-nodejs-npm
 
 # Sysadmin diagnostics: the tools a broken machine still needs, before any
 # user-space package manager exists.
@@ -96,19 +45,3 @@ usbutils
 dmidecode
 sysstat
 7zip
-
-# Xfce X11 fallback
-xfce4-session
-xfwm4
-xfce4-panel
-xfce4-screensaver
-xfce4-power-manager
-xfce4-notifyd
-xorg-x11-server-Xorg
-xinit
-
-# Gaming
-steam
-gamescope
-mangohud
-steam-devices
