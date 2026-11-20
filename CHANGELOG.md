@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Ignore the Go stdlib advisory that reddened the image scan once the lock drift cleared (#3). Run 44668700473 failed `Vulnerability scan` on CVE-2026-97054, an HTTP/1 `MaxBytesReader` issue fixed in Go 1.27.4, reported at HIGH in `dms`, `dfiles`, `dsearch` (stdlib 1.27.1 and 1.27.3) and in the ostree objects that carry them (1.27rc2). The duxlabs COPR builds those binaries, and the fixed toolchain is the upstream rebuild this file already waits on, so the entry joins that group and expires 2027-02-11. The binaries are not network servers on this image, but the gate is severity-based. `docs/known-gaps.md` moves the count to 38 CVEs and one GHSA. No image content changes.
+
+- Refresh the third-party package lock after the duxlabs COPR rebuilt `dux-qt-base-git` from `0.4.8^955.gitf7e8816` to `0.4.73^962.git75d4524` (#149). The push of the #147 lock refresh (run 44662539952) failed `image` on that drift, and PR #150 runs 44662877215, 44664778795 and 44666160624 failed or flipped on it, so branch protection blocked every pull request. `manifests/packages-common.lock` is regenerated with `build/package-lock.sh` from `localhost/ultus-atomic:lock` (`e4c2604fe9a8`), a local build of main `a883d44`, and `build/compare-lock.sh` names that one NEVRA line as the entire difference. No manifest, build step, or image behaviour changes.
+
 - Preserve a valid empty desktop build context in the headless CI job, trigger server CI for its lock, enforce one named module copy per host, and verify the server mount unit without claiming a runtime mount.
 
 - Verify the server image in CI with its own lock and path filter.
