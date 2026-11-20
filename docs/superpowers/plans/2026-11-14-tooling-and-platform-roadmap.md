@@ -36,6 +36,7 @@ Status: active. Supersedes the unstarted tasks in `2026-11-09-dux-atomic-candida
 | Agent isolation | Built: `build/agent-container.sh` runs an agent rootless with only the project mounted, and `tests/test-agent-container.sh` reds on a forbidden mount | #71, `docs/research/2026-11-14-agent-container.md` |
 | Home snapshots | Not built | #68 |
 | Publication | Signed digest, SBOM and provenance attested, `:latest` moves on manual promotion | #63, `docs/ci.md` |
+| Headless server image | Part 1 merged: server-safe base split, `Containerfile.server`, `modules/server`, and the `image-server` job; no image has booted a server role yet | #149, #150 |
 | Secure Boot | Policy decided, no boot with it enabled recorded | `docs/known-gaps.md` |
 
 ## Order of work
@@ -53,6 +54,7 @@ The sequence is dependency order, not priority. Tasks 1 to 3 unblock an honest p
 | 7 | #71 Project-scoped agent container | 2 | A scripted rootless profile with only the project mounted, and a test that reds on a forbidden mount |
 | 8 | #68 Local home snapshots | a btrfs install | A btrbk config, an enabled timer, and a restore drill |
 | 9 | Promotion gate | 3, 4, 5 | Secure Boot boot recorded on hardware, graphical dogfood recorded, `:latest` promoted |
+| 10 | #149 Headless server image and `devbox-oc` retirement | 6, 4 | The spec's vertical slice passes on a booted EliteDesk, and `devbox-oc` is archived after a verified restic restore and a recorded rollback |
 
 ## Task 1: land the developer tooling layer (#67)
 
@@ -163,6 +165,21 @@ Status: blocked on hardware evidence: the gaming host is EFI with a TPM and Secu
 - [ ] Promote `:latest` and record the registry digests.
 
 Acceptance: `docs/install.md` and `docs/known-gaps.md` state what the promoted digest was proven to do, and nothing more.
+
+## Task 10: headless server image (#149)
+
+Status: part 1 merged; the rest of the parts are unstarted. The design is revision 3 in `docs/superpowers/specs/2026-11-20-headless-server-image-design.md`, and #149 carries the parts table and the tracking rule.
+
+| Part | Work item | State |
+| --- | --- | --- |
+| 1. Base split and image definition | #150 | Merged |
+| 2. Server module: rootless agents, tailnet, secrets, backup, update window | #152 | Next |
+| 3. Publish one package per host and promote | #153 | Not started |
+| 4. VM boot, vertical slice, install on the EliteDesk | #154 | Not started |
+
+Files: `Containerfile.server`, `modules/server/`, `manifests/packages-server.txt`, `tests/verify-image.sh`, `docs/testing.md`.
+
+Acceptance: the vertical slice in the spec passes on a booted server before anything is published: install, tailnet reachability, a write through the mapped volume, a quiesced restore, an in-window update, a missing-partition failure, and a rollback. Retiring `devbox-oc` additionally needs a verified restic restore of the existing `data`-labelled filesystem and one deliberate rollback in the UAT table.
 
 ## Review focus
 
