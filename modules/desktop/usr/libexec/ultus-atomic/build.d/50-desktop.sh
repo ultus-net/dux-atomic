@@ -6,6 +6,11 @@
 # modules/desktop/.
 set -ouex pipefail
 
+# The desktop installs user applications from Flathub; the server has no Flatpak
+install -d /etc/flatpak/remotes.d
+curl --retry 3 -fsSLo /etc/flatpak/remotes.d/flathub.flatpakrepo \
+  https://dl.flathub.org/repo/flathub.flatpakrepo
+
 # The desktop packages come from the Dux COPRs. duxlabs/dms pulls
 # duxlabs/dux-repo, which also carries the terminal and the shell. They are
 # third-party, so they stay enabled only while this step needs them: the trap

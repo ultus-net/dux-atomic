@@ -64,6 +64,29 @@ else
   fi
 fi
 
+# The server image installs packages-common.txt plus packages-server.txt. A
+# desktop package left in the base ships Steam and an X server to a headless
+# box, so name the failure here rather than in an image build.
+server_manifest=$repo_root/manifests/packages-server.txt
+desktop_manifest_early=$repo_root/manifests/packages-desktop.txt
+overlap=$(grep -Ev '^[[:space:]]*(#.*)?$' "$desktop_manifest_early" |
+  while read -r name; do grep -qx "$name" "$repo_root/manifests/packages-common.txt" && echo "$name"; done) || true
+if [[ ! -f $server_manifest ]]; then
+  echo "FAIL manifests/packages-server.txt is missing" >&2
+  failures=$((failures + 1))
+elif [[ -n $overlap ]]; then
+  echo "FAIL packages-common.txt still names desktop packages:"$'\n'"$overlap" >&2
+  failures=$((failures + 1))
+elif ! grep -qx 'tailscale' "$repo_root/manifests/packages-common.txt"; then
+  echo "FAIL packages-common.txt does not name tailscale, so the server ships no tailnet" >&2
+  failures=$((failures + 1))
+elif ! grep -qx 'restic' "$server_manifest"; then
+  echo "FAIL packages-server.txt does not name restic" >&2
+  failures=$((failures + 1))
+else
+  echo "ok   the base names tailscale and no desktop package, and the server names restic"
+fi
+
 # The NVIDIA variant installs a second manifest (#72). The shared image reads
 # only packages-common.txt, so the variant names its own file through
 # PACKAGE_MANIFEST_EXTRA. Losing either half of that wiring still builds an
@@ -266,8 +289,8 @@ if ! grep -qF 'node --version' "$repo_root/tests/verify-image.sh" ||
    ! grep -qF 'npm --version' "$repo_root/tests/verify-image.sh" ||
    ! grep -qF 'node_minor < 18' "$repo_root/tests/verify-image.sh" ||
    ! grep -qF 'node_major < 22' "$repo_root/tests/verify-image.sh" ||
-   ! grep -qx 'nodejs' "$manifest" ||
-   ! grep -qx 'nodejs-npm' "$manifest"; then
+   ! grep -qx 'nodejs' "$repo_root/manifests/packages-desktop.txt" ||
+   ! grep -qx 'nodejs-npm' "$repo_root/manifests/packages-desktop.txt"; then
   echo "FAIL the image does not prove Node 22.18 and npm run, so the dotfiles npm globals could be skipped at first login" >&2
   failures=$((failures + 1))
 else
