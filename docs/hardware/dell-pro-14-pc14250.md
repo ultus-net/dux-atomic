@@ -158,6 +158,10 @@ installed image's versions, not Bluefin's.
 
 ## Repo state checked on 2026-11-20
 
+Everything in this section measures local build output. None of it is install
+proof: no build of this repo has run on the laptop, and the install-time
+acceptance items above stay open.
+
 Checked against `localhost/ultus-atomic-server:dev` (`3279dd47e7ab`, built from
 the headless-server branch) and `localhost/ultus-atomic:split`. Both are Fedora
 45 builds with kernel `7.3.3-300.fc45.x86_64`.
