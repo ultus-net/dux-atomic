@@ -28,6 +28,11 @@ desktop_cleanup() {
 trap desktop_cleanup EXIT
 
 source /ctx/build/manifest.sh
+
+# RPM Fusion's ffmpeg-libs replaces Fedora's free codec libraries, and dnf5
+# erases the free set only when the transaction allows it. The NVIDIA variant
+# installs the free set first, so install ffmpeg here in its own transaction.
+dnf5 install -y --allowerasing ffmpeg
 install_manifest /ctx/manifests/packages-desktop.txt
 
 # A new account gets the desktop on its first graphical login. A user preset
