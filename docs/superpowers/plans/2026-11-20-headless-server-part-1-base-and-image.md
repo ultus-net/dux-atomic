@@ -8,7 +8,7 @@
 
 **Tech Stack:** Fedora 45 `fedora-bootc` base pinned by tag and digest, `dnf5`, systemd units, bash gates in `tests/`, GitHub Actions.
 
-**Spec:** `docs/superpowers/specs/2026-11-20-headless-server-image-design.md` (revision 2, approved 2026-11-20)
+**Spec:** `docs/superpowers/specs/2026-11-20-headless-server-image-design.md` (revision 3: revision 2 as approved, plus two operator decisions on test hardware and disk layout)
 
 ## Global Constraints
 
@@ -412,6 +412,8 @@ This plan is part 1 of the spec. The remaining parts, each its own plan from the
 | 2. Server behaviour | Server module, Rootless agents, Data disk, Secrets, Updates, First boot and recovery | A booted server running both workloads as `agents`, with secrets, backup, health, and the window |
 | 3. Publishing and promotion | Publishing, Container images | Three published packages, one promotion per host, and a digest delivery path |
 | 4. Hardware | Tests (VM rows), Migration preconditions, Rollout | The vertical slice on a booted server, the EliteDesk installed, `devbox-oc` archived |
+
+Part 4 runs both physical roles on the one HP EliteDesk 800 G4 Mini: the generic desktop image, then the server image. The `nvidia` image still needs the RTX 3070 host, because the mini has no NVIDIA hardware.
 
 Do not start part 2 until the server image builds and verifies in CI, because every later task assumes that gate.
 

@@ -1,17 +1,23 @@
 # Headless server image in ultus-atomic
 
-Status: draft, awaiting operator approval
+Status: approved 2026-11-20 (revision 2); revision 3 appends two operator decisions
 Date: 2026-11-20
 Supersedes: the OS layer of the `devbox-oc` repository, once the server host is installed
 
 Revision 2 incorporates an adversarial review that rejected revision 1. The
 material changes are these. The stock updater's `--apply` is replaced with
-`--download-only`, because it reboots outside any window. The data-disk mount
-targets `/var/srv`, because `/srv` is a symlink. Backups stop the workloads
-before restic runs. Secrets move to the data disk, so a rollback cannot drop
+`--download-only`, because it reboots outside any window. The data-partition
+mount targets `/var/srv`, because `/srv` is a symlink. Backups stop the workloads
+before restic runs. Secrets move to the data partition, so a rollback cannot drop
 them. The package split updates three gates that assume the current manifest.
 Tailscale needs `serve` or nothing is reachable. A booted vertical slice gates
 publication.
+
+Revision 3 records two operator decisions made after approval. Physical testing
+runs on an HP EliteDesk 800 G4 Mini, which serves the GUI run and the headless
+run one image at a time. Each host uses one drive holding the OS partitions and
+one data partition, because hosts are disposable and rebuilt from backup rather
+than repaired in place.
 
 ## Intent
 
@@ -52,8 +58,8 @@ server works, and this design does not claim otherwise.
 1. Publish three images: `ultus-atomic` (desktop, name unchanged), `ultus-atomic-server`, and `ultus-atomic-nvidia`.
 2. Build the server from a server-safe base plus one module, with no desktop, greeter, Steam, Xfce, Flathub remote, or developer toolchain.
 3. Bake Tailscale into every image and enable `tailscaled`.
-4. Run OpenCode and Hermes as rootless containers, each mounted on one data-disk subtree.
-5. Mount the data disk by filesystem label at `/var/srv`, reach it as `/srv` through the base image's symlink, back it up quiesced with restic, and apply OS updates only inside a maintenance window.
+4. Run OpenCode and Hermes as rootless containers, each mounted on one data-partition subtree.
+5. Mount the data partition by filesystem label at `/var/srv`, reach it as `/srv` through the base image's symlink, back it up quiesced with restic, and apply OS updates only inside a maintenance window. A host is disposable: a rebuild restores the data from backup.
 6. Enforce all of the above in tests, not prose.
 7. Leave the desktop image's installed package set unchanged apart from deliberately adding Tailscale.
 
@@ -89,6 +95,20 @@ server works, and this design does not claim otherwise.
   mount on a symlinked path. The mount unit targets `/var/srv`.
 - The static gate stays the cheapest gate, and it runs before any image builds.
 
+### Test hardware
+
+Physical testing runs on an HP EliteDesk 800 G4 Mini:
+
+- Intel Core i5-8500T, six cores, 35 W T-series, Intel UHD Graphics 630, TPM 2.0, one Intel I219-LM gigabit NIC.
+- Two SO-DIMM slots, 32 GB maximum.
+- Two M.2 2280 storage slots, one M.2 2230 WLAN slot, and one 2.5 inch SATA bay.
+- Two DisplayPort 1.2 outputs as standard.
+
+Two consequences bind the design:
+
+1. The mini is both the GUI test target and the headless test target, one image at a time. The UHD 630 is enough for the generic desktop image, so the greeter, the session, and the first-login units get hardware coverage without the NVIDIA stack. The `nvidia` image still needs the RTX 3070 host, because the mini has no NVIDIA hardware.
+2. One drive carries both the OS and the data. `bootc install to-disk --wipe --root-size <size>` writes the OS partitions and leaves the remainder of the drive unallocated, then the operator creates one data partition, makes ext4 on it, and labels it `ultus-data`. The pinned base lists `--root-size` in `bootc install to-disk --help`, so this needs no extra tooling. A host is disposable: a rebuild wipes the drive, so recovery is reinstall plus a restic restore, never a disk migration.
+
 ## Decisions the operator made
 
 | Decision | Choice |
@@ -96,10 +116,11 @@ server works, and this design does not claim otherwise.
 | Repository split | Two repos: `ultus-atomic` for bootc, `nixos-base` for NixOS. `devbox-oc` retires |
 | Agent isolation | Rootless containers, no host home, SSH, socket, or devices, one `/var/srv` subtree per workload |
 | Package layout | Split `packages-common.txt` into a server-safe base and a desktop set |
-| Data disk | Mount the data disk by `LABEL=ultus-data` at `/var/srv`; the operator creates the filesystem once and no unit does. The existing disk is labelled `data` |
+| Data disk | One drive, an OS partition set and one data partition. Mount the data partition by `LABEL=ultus-data` at `/var/srv`; the operator creates it once and no unit does. A host is disposable: recovery is reinstall plus a restic restore |
 | Image packaging | One GHCR package per host, each with its own sha tag and promotion |
 | Updates | Download automatically, apply and reboot only inside a scheduled maintenance window |
 | Tailscale | Baked into every image, `tailscaled` enabled, reachable surfaces published with `tailscale serve` |
+| Test hardware | HP EliteDesk 800 G4 Mini, used for both the GUI and the headless run |
 
 ## Approaches considered
 
@@ -133,9 +154,9 @@ server works, and this design does not claim otherwise.
 
 | Image | Containerfile | Modules copied | Extra manifest | Purpose |
 | --- | --- | --- | --- | --- |
-| `ultus-atomic` | `Containerfile` | `modules/desktop/` | none | Laptop, generic x86_64 |
-| `ultus-atomic-nvidia` | `Containerfile.nvidia` | `modules/desktop/` | `packages-nvidia.txt` | Desktop on the RTX 3070 |
-| `ultus-atomic-server` | `Containerfile.server` | `modules/server/` | `packages-server.txt` | EliteDesk dev server |
+| `ultus-atomic` | `Containerfile` | `modules/desktop/` | none | Laptop; also the GUI test target on the EliteDesk 800 G4 Mini |
+| `ultus-atomic-nvidia` | `Containerfile.nvidia` | `modules/desktop/` | `packages-nvidia.txt` | Desktop on the RTX 3070 host; the mini cannot test it |
+| `ultus-atomic-server` | `Containerfile.server` | `modules/server/` | `packages-server.txt` | EliteDesk 800 G4 Mini, headless |
 
 Each Containerfile pins the same base by tag and digest and copies the same
 `build`, `manifests`, and `overlay` trees. The static gate gains an assertion
@@ -277,11 +298,14 @@ through the base image's symlink. The mount unit cannot use `/srv`, because
 systemd refuses to mount on a path that contains a symlink
 (`devbox-oc/os/butane/ucore.bu:157`).
 
-The install page tells the operator to create the filesystem and set the label
-once, before first boot of the installed system. No unit creates, relabels, or
-guesses a device. A second qcow2 labelled `ultus-data` in the VM test exercises
-the mount path in CI, and an unlabelled second disk proves the agents stay
-stopped instead of writing to the OS disk.
+The install page tells the operator to size the root partition and create the
+data partition once. `bootc install to-disk --wipe --root-size <size> <device>`
+writes the OS partitions and leaves the rest of the drive unallocated; the
+operator then adds one partition, makes ext4 on it, and labels it `ultus-data`.
+No unit creates a partition, formats, relabels, or guesses a device. The VM test
+attaches a second qcow2 labelled `ultus-data` as a convenience, which exercises
+the same labelled mount, and an unlabelled disk proves the agents stay stopped
+instead of writing to the OS disk.
 
 ### Secrets
 
@@ -443,13 +467,15 @@ node, npm, and 32-bit mesa checks, which move behind the desktop role.
 
 ### Migration preconditions
 
-The existing disk is labelled `data` (`devbox-oc/os/butane/ucore.bu:169`), and
-the new mount expects `ultus-data`. Before the rebuild:
+The existing `devbox-oc` disk is labelled `data`, and the new mount expects
+`ultus-data`. The rebuild wipes the drive, so the data partition is created
+again and filled from the backup, never relabelled in place. Before the rebuild:
 
 1. Take a restic backup on the running `devbox-oc` and verify it by restoring to a scratch path.
 2. Confirm the restore contains the OpenCode and Hermes state, not an empty tree.
-3. Relabel the existing filesystem with `e2label`, or restore into a new filesystem labelled `ultus-data`.
-4. Never run the install page's filesystem-creation step against the existing disk.
+3. Record the drive's size and the space the data needs, so `--root-size` leaves room for the data partition.
+4. Install with `bootc install to-disk --wipe --root-size <size>`, create the data partition in the remaining space, make ext4 on it, label it `ultus-data`, and restore the backup into it.
+5. Never point the install at the existing data partition expecting it to survive: `--wipe` erases the whole device.
 
 Archiving `devbox-oc` needs more than one UAT row. It needs a verified restore
 of that disk and a server that has survived one update window.

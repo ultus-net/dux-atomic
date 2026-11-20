@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Record the physical test target and the disk layout for the server work: an HP EliteDesk 800 G4 Mini (i5-8500T, UHD 630, one I219-LM NIC) runs both the GUI checks on the generic image and the headless checks on the server image, one image at a time. The `nvidia` image keeps the RTX 3070 host, because the mini has no NVIDIA hardware. Each host uses one drive with the OS partitions and one data partition, because hosts are disposable and recovered by reinstall plus a restic restore. `bootc install to-disk --help` in the pinned base lists `--root-size`, so the install can leave the rest of the drive for the data partition, which the operator creates, formats ext4, and labels `ultus-data`; no unit partitions, formats, or relabels. The migration preconditions therefore drop the in-place `e2label` step: the rebuild wipes the drive, recreates the partition, and restores the backup into it. `docs/superpowers/specs/2026-11-20-headless-server-image-design.md` carries the hardware section, the decision rows, and the revised data-partition and migration text; the part 1 plan says part 4 owns both physical runs; `docs/testing.md` names the machine and says the wipe takes the data partition with it. No image, manifest, test, or workflow changes.
+
 - Add `Containerfile.server` and `modules/server`, and copy one module tree per Containerfile.
 
 - Split the package manifests into a server-safe base, a desktop set, and a server set; Tailscale is now in every image.
