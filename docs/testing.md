@@ -64,7 +64,7 @@ The image disables Plymouth (`plymouth.enable=0`), so both the VM and real hardw
 
 ## Hardware install and UAT
 
-No build of this image has run on physical hardware. The VM covers the greeter session and the first-login units and nothing else: it never logs in through the greeter's picker, never starts the Xfce fallback or a second session, and never renders the desktop ([Known gaps](known-gaps.md)). This section is the order that closes those gaps, and the evidence to keep for each check.
+No build of this image has run on physical hardware. Physical runs use the HP EliteDesk 800 G4 Mini for both roles: the generic image for the GUI checks below, then the server image for the headless set. The `nvidia` image needs the RTX 3070 host, because the mini has no NVIDIA hardware. The VM covers the greeter session and the first-login units and nothing else: it never logs in through the greeter's picker, never starts the Xfce fallback or a second session, and never renders the desktop ([Known gaps](known-gaps.md)). This section is the order that closes those gaps, and the evidence to keep for each check.
 
 ### Record the machine first
 
@@ -73,8 +73,8 @@ Four answers decide how the rest of the run goes, and they belong in the UAT rec
 | Fact | Command | Why it decides |
 | --- | --- | --- |
 | Machine and firmware | `dmidecode -s system-product-name`, `bootctl status` | Secure Boot state has never been recorded on either target (#54) |
-| GPU | `lspci -nn \| grep -Ei 'vga\|3d'` | The desktop needs the NVIDIA variant (#94) and a MOK enrollment (#95); the laptop takes the generic image |
-| Target disk | `lsblk -o NAME,SIZE,MODEL,TRAN` | `bootc install to-disk --wipe` erases the whole device |
+| GPU | `lspci -nn \| grep -Ei 'vga\|3d'` | The desktop on the RTX 3070 host needs the NVIDIA variant (#94) and a MOK enrollment (#95); the mini's UHD 630 takes the generic image |
+| Target disk | `lsblk -o NAME,SIZE,MODEL,TRAN` | `bootc install to-disk --wipe` erases the whole device, including the data partition on the same drive; the data comes back from restic |
 | Network at install | `curl -sI https://ghcr.io/v2/` | The installer pulls the image; anonymous GHCR access is enough |
 
 The laptop's model, device IDs, version floor, and boot-path facts are recorded in [Laptop hardware: Dell Pro 14 PC14250](hardware/dell-pro-14-pc14250.md).
@@ -133,6 +133,14 @@ One row per run, filled from the checks above. Keep the digest, because a rebuil
 ```bash
 tests/test-signing.sh
 ```
+
+## Image gates
+
+| Gate | What it asserts |
+| --- | --- |
+| `tests/verify-image.sh --server` | No desktop package is installed; `var-srv.mount` is present and enabled; `tailscale` and `restic` are installed; no Flathub remote is seeded; and the third-party set matches `manifests/packages-server.lock`. |
+
+The server VM slice is a later part.
 
 ## CI boot test
 

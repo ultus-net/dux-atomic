@@ -70,12 +70,6 @@ fi
 # has no console or SSH login, so keep the unit disabled.
 systemctl disable sshd.service
 
-# The Universal Blue base shipped the Flathub remote, and the Dux documentation
-# installs user applications from it. Seed the same remote here.
-install -d /etc/flatpak/remotes.d
-curl --retry 3 -fsSLo /etc/flatpak/remotes.d/flathub.flatpakrepo \
-  https://dl.flathub.org/repo/flathub.flatpakrepo
-
 # A module may ship build-time steps under /usr/libexec/ultus-atomic/build.d/.
 # They run in name order after the shared install, so a module owns its
 # repositories, its packages, its presets and its checks, and this build names
