@@ -316,6 +316,9 @@ if ((server)); then
   fi
   "$runtime" run --rm "$image" test -f /usr/lib/systemd/system/var-srv.mount \
     || { echo "FAIL var-srv.mount is missing" >&2; exit 1; }
+  "$runtime" run --rm "$image" systemd-analyze verify /usr/lib/systemd/system/var-srv.mount \
+    || { echo "FAIL var-srv.mount does not verify" >&2; exit 1; }
+  echo "ok   var-srv.mount passes systemd-analyze verify"
   "$runtime" run --rm "$image" systemctl is-enabled var-srv.mount | grep -qx enabled \
     || { echo "FAIL var-srv.mount is not enabled" >&2; exit 1; }
   "$runtime" run --rm "$image" rpm -q tailscale restic >/dev/null \
@@ -324,7 +327,7 @@ if ((server)); then
     echo "FAIL the server image seeds the Flathub remote" >&2
     exit 1
   fi
-  echo "ok   the server image carries no desktop package and mounts its data disk"
+  echo "ok   the server image carries no desktop package and has an enabled data-disk mount unit"
 fi
 # The lock records every package whose origin repository is not a Fedora
 # repository. The comparison is a post-build drift gate: the build installs

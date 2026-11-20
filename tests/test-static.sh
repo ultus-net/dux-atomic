@@ -150,23 +150,20 @@ for cf in "$repo_root"/Containerfile*; do
   [[ -f $cf ]] || continue
   name=${cf##*/}
   trees=$(grep -oE '^COPY (build|manifests|overlay) ' "$cf")
-  module_lines=$(grep -cE '^COPY modules/[a-z]+ /modules/[a-z]+$' "$cf" || true)
+  mapfile -t module_copies < <(grep -E '^COPY modules([ /]|$)' "$cf" || true)
+  case $name in
+    Containerfile|Containerfile.nvidia) expected='COPY modules/desktop /modules/desktop' ;;
+    Containerfile.server) expected='COPY modules/server /modules/server' ;;
+    *) expected= ;;
+  esac
   if [[ $trees != "$ctx_trees" ]]; then
     echo "FAIL ${name} exposes different build-context trees than Containerfile" >&2
     failures=$((failures + 1))
-  elif ((module_lines != 1)); then
-    echo "FAIL ${name} does not copy exactly one module tree by name" >&2
+  elif ((${#module_copies[@]} != 1)) || [[ ${module_copies[0]:-} != "$expected" ]]; then
+    echo "FAIL ${name} must contain exactly one module copy: ${expected}" >&2
     failures=$((failures + 1))
   fi
 done
-case "$(grep -oE '^COPY modules/[a-z]+ /modules/[a-z]+$' "$repo_root/Containerfile")" in
-  'COPY modules/desktop /modules/desktop') ;;
-  *) echo "FAIL Containerfile does not copy modules/desktop" >&2; failures=$((failures + 1)) ;;
-esac
-case "$(grep -oE '^COPY modules/[a-z]+ /modules/[a-z]+$' "$repo_root/Containerfile.server")" in
-  'COPY modules/server /modules/server') ;;
-  *) echo "FAIL Containerfile.server does not copy modules/server" >&2; failures=$((failures + 1)) ;;
-esac
 echo "ok   every Containerfile copies one module tree by name"
 
 # The two helpers the variant path adds are decision functions, so exercise
@@ -820,6 +817,9 @@ elif ! grep -qF 'steps.desktop.outputs.desktop' "$workflow"; then
   failures=$((failures + 1))
 elif ! grep -qF 'rm -rf modules/desktop manifests/packages-desktop.txt' <<<"$headless_block"; then
   echo "FAIL the headless job does not delete both module paths before its build" >&2
+  failures=$((failures + 1))
+elif ! grep -qF 'mkdir modules/desktop' <<<"$headless_block"; then
+  echo "FAIL the headless job removes modules/desktop without recreating its empty build-context directory" >&2
   failures=$((failures + 1))
 elif ! grep -qF 'git ls-tree -r --name-only HEAD modules/desktop' <<<"$headless_block"; then
   echo "FAIL the headless job saves no list of the files the module ships" >&2

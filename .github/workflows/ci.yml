@@ -120,7 +120,7 @@ jobs:
           event="${{ github.event_name }}"
           # Every path the server build reads: its Containerfile, both role
           # manifests, the shared build trees and the role-aware verifier.
-          regex='^(Containerfile$|Containerfile\.server$|build/|overlay/|modules/|manifests/packages-(common|desktop|server)[.]txt$|tests/verify-image[.]sh$)'
+          regex='^(Containerfile$|Containerfile\.server$|build/|overlay/|modules/|manifests/packages-(common|desktop|server)[.]txt$|manifests/packages-server[.]lock$|tests/verify-image[.]sh$)'
           matched=false
           if [[ "$event" == 'pull_request' ]]; then
             if git diff --name-only "${{ github.event.pull_request.base.sha }}...HEAD" | grep -Eq "$regex"; then
@@ -394,6 +394,8 @@ jobs:
           rm -rf modules/desktop manifests/packages-desktop.txt
           test ! -e modules/desktop
           test ! -e manifests/packages-desktop.txt
+          # Containerfile still names this source; an empty tree keeps it valid.
+          mkdir modules/desktop
 
       - name: Build headless
         run: podman build --layers -t localhost/ultus-atomic:headless .
