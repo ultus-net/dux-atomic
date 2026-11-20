@@ -1,7 +1,9 @@
 # Hyprland session assessment
 
 Date: 2026-11-10.
-Status: decided. Work deferred.
+Status: parked 2026-11-18 after the `sdegler/hyprland` build. niri stays the
+Wayland session and no compositor comes from a third-party COPR (#138). The
+decision below is the earlier deferral this parking replaces.
 
 Related: `docs/superpowers/specs/2026-11-09-dux-atomic-design.md`,
 `docs/superpowers/plans/2026-11-09-dux-atomic-candidate-images.md`.
