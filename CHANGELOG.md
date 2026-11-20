@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Record the headless server track in the roadmap (#149). The plan at `docs/superpowers/plans/2026-11-14-tooling-and-platform-roadmap.md` predated the server work, so it listed no server row, no part, and no acceptance. It now carries the merged part 1, the three open parts with their work items, and the spec's vertical slice as the gate before anything is published. No image, manifest, test, or workflow changes.
+
 - Rebuild the NVIDIA variant when the desktop set changes (#158). The variant copies `modules/desktop` and installs `manifests/packages-desktop.txt`, but neither path was in the `image-nvidia` filter, so the job skipped exactly the changes that can break it. This fix would not have run that job otherwise.
 
 - Install `ffmpeg` from RPM Fusion with `--allowerasing` in the desktop build step, so the NVIDIA variant builds again (#158). Run 44680721441 failed job 136103372936 while installing `manifests/packages-desktop.txt`: the NVIDIA set had already pulled Fedora's `libavcodec-free` and `libswresample-free` 9.0.2-4, and RPM Fusion's `ffmpeg-libs` conflicts with them by design, so dnf5 refused the transaction. Reproduced from the pinned base image with no repository content, where the same conflict appears and `--allowerasing` erases exactly those two packages in favour of `ffmpeg` and `ffmpeg-libs`. The 2026-11-18 NVIDIA build passed because the NVIDIA set installed no free codec library then, so neither manifest is at fault and no package version is pinned. `docs/build.md` records the step. No image content change on the desktop host, where the free set is never installed.
