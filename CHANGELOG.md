@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `Containerfile.server` and `modules/server`, and copy one module tree per Containerfile.
+
 - Split the package manifests into a server-safe base, a desktop set, and a server set; Tailscale is now in every image.
 
 - Fail over to the next apt mirror by position, because the runner renamed the host it serves packages from (#143). `build/install-packages.sh` matched `azure.archive.ubuntu.com` and nothing else, and the runner's mirror list now names `us-east-2.ec2.archive.ubuntu.com`, so the match returned early, nothing was commented out, and attempts 2 and 3 retried the same slow mirror. Run 44300517908 lost two `image` jobs to it: `Ign:33 http://us-east-2.ec2.archive.ubuntu.com/ubuntu noble-updates/main amd64 libspeex1`, then `install budget of 300s is spent` with attempt 3 never reached. The failover moves into `build/apt-mirror.sh`, which comments the highest-priority active entry whatever host it names and refuses when fewer than two entries would remain, so a short list is never emptied. `tests/test-apt-mirror.sh` runs the real function against both host forms plus single-entry, fully-commented and missing lists; the previous helper leaves the regional entry untouched (`.vm/probe-apt-mirror-old.sh`), and `tests/test-static.sh` reds when an active line in the helper names a mirror host again. The 300s budget and 180s per-attempt cap are unchanged, so `promote`'s ten-minute bound still holds (#46).

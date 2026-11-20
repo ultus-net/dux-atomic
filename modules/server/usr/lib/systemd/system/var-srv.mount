@@ -1,0 +1,16 @@
+# /var/srv, not /srv: /srv is a symlink in the base image and systemd refuses
+# to mount on a symlinked path.
+[Unit]
+Description=Ultus data disk
+After=local-fs-pre.target
+Before=local-fs.target
+
+[Mount]
+What=/dev/disk/by-label/ultus-data
+Where=/var/srv
+Type=ext4
+Options=defaults,noatime,nofail
+TimeoutSec=30
+
+[Install]
+WantedBy=local-fs.target

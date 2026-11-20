@@ -49,6 +49,7 @@ bash_scripts=(
   tests/vm/boot-smoke.sh
   tests/vm/make-disk.sh
   modules/desktop/usr/libexec/ultus-atomic/build.d/50-desktop.sh
+  modules/server/usr/libexec/ultus-atomic/build.d/50-server.sh
 )
 posix_scripts=(
   modules/desktop/usr/libexec/ultus-atomic/needs-setup.sh
