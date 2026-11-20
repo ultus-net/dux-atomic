@@ -1,19 +1,29 @@
 #!/usr/bin/env bash
 # Run the built image's own lint and unit verification, then compare the
-# installed third-party packages against manifests/packages-common.lock.
+# installed third-party packages against the lock for its role.
 #
-#   tests/verify-image.sh [--no-package-lock] [--headless] [image]
+#   tests/verify-image.sh [--no-package-lock] [--headless] [--server] [--package-lock <lock>] [image]
 
 set -euo pipefail
+
+usage="Usage: ${BASH_SOURCE[0]} [--no-package-lock] [--headless] [--server] [--package-lock <lock>] [image]"
 
 # Parse optional leading flags
 no_lock=0
 headless=0
+server=0
+lock_path=
 while [[ ${1:-} == --* ]]; do
   case "$1" in
     --no-package-lock) no_lock=1; shift ;;
     --headless) headless=1; shift ;;
-    --*) echo "Usage: ${BASH_SOURCE[0]} [--no-package-lock] [--headless] [image]" >&2; exit 2 ;;
+    --server) server=1; shift ;;
+    # An explicit lock path wins over both role defaults, so a role can be
+    # verified against a lock outside manifests/ without editing the script.
+    --package-lock)
+      [[ -n ${2:-} ]] || { echo "$usage" >&2; exit 2; }
+      lock_path=$2; shift 2 ;;
+    --*) echo "$usage" >&2; exit 2 ;;
   esac
 done
 
@@ -27,8 +37,9 @@ repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 # every binding resolves; the greeter command and a session entry name
 # executables; and first-login setup is gated, ordered, bounded and marks
 # completion. Nothing below names the shipped desktop, so these assertions
-# survive a swap. A headless image has none of it, so --headless skips the block.
-if ((!headless)); then
+# survive a swap. A headless image has none of it, so --headless skips the block,
+# and so does --server: the server image ships no desktop at all.
+if ((!headless && !server)); then
 "$runtime" run --rm -i "$image" bash -s <<'IN_IMAGE'
 set -euo pipefail
 fail() { echo "$*" >&2; exit 1; }
@@ -116,7 +127,7 @@ fi
 # from the tree, not from a list of product names, so a swapped desktop is
 # covered by the same assertion.
 module_overlay=$repo_root/modules/desktop
-if ((!headless)) && [[ -d $module_overlay ]]; then
+if ((!headless && !server)) && [[ -d $module_overlay ]]; then
   mapfile -t module_paths < <(cd "$module_overlay" && find . \( -type f -o -type l \) -printf '/%P\n' | sort)
   ((${#module_paths[@]} > 0)) || { echo "FAIL modules/desktop/ is empty" >&2; exit 1; }
   missing=$(printf '%s\n' "${module_paths[@]}" |
@@ -229,9 +240,9 @@ echo "ok   the public zone allows exactly dhcpv6-client and ssh (#116)"
 # whatprovides.
 manifests=("$repo_root/manifests/packages-common.txt")
 desktop_manifest=$repo_root/manifests/packages-desktop.txt
-# A headless build installs the shared set only, so the module's manifest is not
-# part of what has to resolve.
-[[ -f $desktop_manifest && $headless -eq 0 ]] && manifests+=("$desktop_manifest")
+# A headless build installs the shared set only, and the server image asserts
+# the desktop set is absent, so neither reads the module's manifest here.
+[[ -f $desktop_manifest && $headless -eq 0 && $server -eq 0 ]] && manifests+=("$desktop_manifest")
 packages=$(grep -hEv '^[[:space:]]*(#.*)?$' "${manifests[@]}")
 # shellcheck disable=SC2086 # Word splitting is intended: the manifest is one name per line.
 if ! "$runtime" run --rm "$image" rpm -q --whatprovides $packages >/dev/null; then
@@ -255,32 +266,66 @@ fi
   bash /opt/tests/verify-kernel-signature.sh
 # xdg-desktop-portal reads /etc before /usr/share, so the override is what
 # routes FileChooser to gtk instead of nautilus, which this image does not ship.
-# The override is a module file, so a headless image has none.
-if ((!headless)); then
+# The override is a module file, so a headless image has none and the server
+# image ships no file that could carry it.
+if ((!headless && !server)); then
   "$runtime" run --rm "$image" grep -qx \
     'org.freedesktop.impl.portal.FileChooser=gtk;' \
     /etc/xdg-desktop-portal/niri-portals.conf \
     || { echo "FAIL the file-chooser portal override is missing or wrong" >&2; exit 1; }
 fi
 # Steam pulls the 32-bit graphics stack through its own dependencies, so this
-# driver is not a manifest name and needs its own assertion.
-"$runtime" run --rm "$image" rpm -q mesa-vulkan-drivers.i686 \
-  || { echo "FAIL the 32-bit mesa Vulkan driver is not installed" >&2; exit 1; }
-# The dotfiles bootstrap installs its npm globals only when npm exists, and it
-# needs Node's TypeScript type stripping, on by default from 22.18. Fedora
-# splits npm into its own package, so both the runtime and npm are checked (#67).
-node_version=$("$runtime" run --rm "$image" node --version) \
-  || { echo "FAIL node is not runnable in the image" >&2; exit 1; }
-node_semver=${node_version#v}
-node_major=${node_semver%%.*}
-node_minor=${node_semver#*.}
-node_minor=${node_minor%%.*}
-if (( node_major < 22 || (node_major == 22 && node_minor < 18) )); then
-  echo "FAIL node ${node_version} predates the 22.18 the dotfiles require" >&2
-  exit 1
+# driver is not a manifest name and needs its own assertion. The dotfiles
+# bootstrap installs its npm globals only when npm exists, and it needs Node's
+# TypeScript type stripping, on by default from 22.18. Fedora splits npm into
+# its own package, so both the runtime and npm are checked (#67).
+if ((!headless && !server)); then
+  "$runtime" run --rm "$image" rpm -q mesa-vulkan-drivers.i686 \
+    || { echo "FAIL the 32-bit mesa Vulkan driver is not installed" >&2; exit 1; }
+  node_version=$("$runtime" run --rm "$image" node --version) \
+    || { echo "FAIL node is not runnable in the image" >&2; exit 1; }
+  node_semver=${node_version#v}
+  node_major=${node_semver%%.*}
+  node_minor=${node_semver#*.}
+  node_minor=${node_minor%%.*}
+  if (( node_major < 22 || (node_major == 22 && node_minor < 18) )); then
+    echo "FAIL node ${node_version} predates the 22.18 the dotfiles require" >&2
+    exit 1
+  fi
+  "$runtime" run --rm "$image" npm --version >/dev/null \
+    || { echo "FAIL npm is not runnable in the image" >&2; exit 1; }
 fi
-"$runtime" run --rm "$image" npm --version >/dev/null \
-  || { echo "FAIL npm is not runnable in the image" >&2; exit 1; }
+# The server image carries the base plus packages-server.txt and one module.
+# Anything from the desktop manifest in it means the split failed, not that the
+# verifier is strict.
+if ((server)); then
+  desktop_list=$(grep -Ev '^[[:space:]]*(#.*)?$' "$repo_root/manifests/packages-desktop.txt")
+  # Query each name separately and use its status, so rpm's missing-provider
+  # diagnostics cannot look like installed packages. --whatprovides covers
+  # virtual names such as xinit.
+  present=$("$runtime" run --rm -i "$image" bash -c '
+    while IFS= read -r name; do
+      if rpm -q --whatprovides "$name" >/dev/null 2>&1; then
+        printf "%s\n" "$name"
+      fi
+    done
+  ' <<<"$desktop_list")
+  if [[ -n $present ]]; then
+    echo "FAIL the server image installs desktop packages:"$'\n'"$present" >&2
+    exit 1
+  fi
+  "$runtime" run --rm "$image" test -f /usr/lib/systemd/system/var-srv.mount \
+    || { echo "FAIL var-srv.mount is missing" >&2; exit 1; }
+  "$runtime" run --rm "$image" systemctl is-enabled var-srv.mount | grep -qx enabled \
+    || { echo "FAIL var-srv.mount is not enabled" >&2; exit 1; }
+  "$runtime" run --rm "$image" rpm -q tailscale restic >/dev/null \
+    || { echo "FAIL the server image lacks tailscale or restic" >&2; exit 1; }
+  if "$runtime" run --rm "$image" test -e /etc/flatpak/remotes.d/flathub.flatpakrepo; then
+    echo "FAIL the server image seeds the Flathub remote" >&2
+    exit 1
+  fi
+  echo "ok   the server image carries no desktop package and mounts its data disk"
+fi
 # The lock records every package whose origin repository is not a Fedora
 # repository. The comparison is a post-build drift gate: the build installs
 # from live repositories and the lock records what landed in the image, so a
@@ -290,7 +335,12 @@ fi
 if (( no_lock == 1 )); then
   echo "ok   package lock comparison skipped (--no-package-lock)"
 else
+  # The lock is role-dependent: the shared image records the desktop's
+  # third-party set and the server image the server's. An explicit
+  # --package-lock path wins over both defaults.
   lock=$repo_root/manifests/packages-common.lock
+  ((server)) && lock=$repo_root/manifests/packages-server.lock
+  [[ -n $lock_path ]] && lock=$lock_path
   expected=$(grep -vE '^(#|$)' "$lock" || true)
   if [[ -z $expected ]]; then
     echo "FAIL the package lock has no third-party lines to compare" >&2

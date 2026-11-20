@@ -27,7 +27,6 @@ playerctl
 xdg-user-dirs
 xdg-utils
 dconf
-hicolor-icon-theme
 adwaita-icon-theme
 adwaita-cursor-theme
 

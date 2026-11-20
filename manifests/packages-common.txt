@@ -19,6 +19,8 @@ zram-generator-defaults
 tmux
 htop
 btop
+# btop depends on this theme even in a headless image
+hicolor-icon-theme
 git
 just
 fzf

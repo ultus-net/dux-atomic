@@ -1,0 +1,10 @@
+# manifests/packages-server.lock - regenerate with build/package-lock.sh <image>
+# One line per resolved NEVRA: <nevra> TAB <from_repo>.
+# Records every package whose origin repository is not a Fedora repository.
+# COPR publishes a main repository and a dependency repository; which one
+# served a package can vary at build time, so the generator normalizes the
+# dependency-repo prefix to the main project prefix before recording. The
+# NEVRA still pins what landed, and a package moving between those two
+# repositories of the same COPR is therefore not drift.
+rpmfusion-free-release-0:45-2.noarch	@commandline
+rpmfusion-nonfree-release-0:45-2.noarch	@commandline
